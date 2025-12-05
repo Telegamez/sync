@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 0/22 | 0% |
-| Phase 3: Multi-Peer Audio | Pending | 0/7 | 0% |
-| Phase 4: Shared AI Session | Pending | 0/7 | 0% |
+| Phase 2: Room Infrastructure | In Progress | 3/23 | 13% |
+| Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
+| Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-100` - Define Room and Peer TypeScript types
+**Next Feature:** `FEAT-102` - Room CRUD API - List Rooms endpoint
 
 ---
 
@@ -59,7 +59,73 @@ Rebranded to "AI Collaboration Engine" with synchronized intelligence messaging:
 
 ## Phase 2: Room Infrastructure (In Progress)
 
-*No features completed yet.*
+### FEAT-100: Define Room and Peer TypeScript types
+**Date:** 2024-12-05
+**Test:** `tests/unit/types/room.test.ts`
+
+Created comprehensive TypeScript type definitions for multi-peer room functionality:
+
+**Files Created:**
+- `src/types/room.ts` - Room, RoomSummary, CreateRoomRequest, JoinRoomResponse, etc.
+- `src/types/peer.ts` - Peer, PeerSummary, PeerRole, PeerConnectionState, etc.
+- `src/types/signaling.ts` - All signaling event types and payloads
+- `src/types/index.ts` - Central type exports
+
+**Test Results:**
+✅ 14 tests passing
+
+---
+
+### FEAT-150: Voice mode and turn management types
+**Date:** 2024-12-05
+**Test:** `tests/unit/types/voice-mode.test.ts`
+
+Created types for PTT and turn management to prevent AI interruption chaos:
+
+**Files Created:**
+- `src/types/voice-mode.ts` - VoiceMode, AIResponseState, TurnRequest, RoomVoiceSettings, etc.
+
+**Key Types:**
+- `VoiceMode`: 'open' | 'pushToTalk' | 'wakeWord' | 'designatedSpeaker'
+- `AIResponseState`: 'idle' | 'listening' | 'processing' | 'speaking' | 'locked'
+- `TurnRequest`: Queue management for AI requests
+- `DEFAULT_VOICE_SETTINGS`: Sensible defaults (PTT mode, locking enabled)
+
+**Test Results:**
+✅ Covered by room.test.ts (types imported and validated)
+
+---
+
+### FEAT-101: Room CRUD API - Create Room endpoint
+**Date:** 2024-12-05
+**Test:** `tests/unit/api/rooms/create.test.ts`
+
+Implemented room creation API with in-memory storage:
+
+**Files Created:**
+- `src/server/store/rooms.ts` - In-memory room store with CRUD operations
+- `src/app/api/rooms/route.ts` - POST endpoint for room creation
+
+**Key Features:**
+- `createRoom()` - Creates room with unique nanoid, defaults for voice settings
+- `getRoom()` - Retrieves room by ID
+- `generateRoomId()` - Generates unique 10-character room IDs
+- Request validation for name, maxParticipants, aiPersonality
+- Voice settings merged with DEFAULT_VOICE_SETTINGS
+
+**Test Results:**
+✅ 19 tests passing
+
+---
+
+### Infrastructure Setup
+**Date:** 2024-12-05
+
+Set up testing infrastructure:
+- Installed Vitest + happy-dom + @testing-library
+- Created `vitest.config.ts`
+- Added test scripts to package.json
+- Created `.claude/settings.json` for permissions
 
 ### Upcoming Features:
 1. `FEAT-100` - TypeScript types for Room and Peer

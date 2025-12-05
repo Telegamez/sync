@@ -49,7 +49,7 @@
       ],
       "testFile": "tests/unit/types/room.test.ts",
       "dependencies": [],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-101",
@@ -66,7 +66,7 @@
       ],
       "testFile": "tests/unit/api/rooms/create.test.ts",
       "dependencies": ["FEAT-100"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-102",
@@ -846,7 +846,7 @@
       ],
       "testFile": "tests/unit/types/voice-mode.test.ts",
       "dependencies": ["FEAT-100"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-151",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 0,
-    "pending": 51
+    "passed": 3,
+    "pending": 48
   }
 }
