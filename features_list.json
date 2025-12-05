@@ -1,0 +1,1016 @@
+{
+  "$schema": "./features_list.schema.json",
+  "metadata": {
+    "project": "swensync",
+    "version": "0.2.0",
+    "lastUpdated": "2024-12-05T00:00:00.000Z",
+    "protocol": "Long-Horizon Engineering Protocol v1.0",
+    "currentPhase": "Phase 2: Room Infrastructure"
+  },
+  "phases": {
+    "phase1": {
+      "name": "Foundation",
+      "status": "complete",
+      "description": "Single-peer WebRTC voice AI interface"
+    },
+    "phase2": {
+      "name": "Room Infrastructure",
+      "status": "in_progress",
+      "description": "Room creation, signaling, and multi-peer WebRTC"
+    },
+    "phase3": {
+      "name": "Multi-Peer Audio",
+      "status": "pending",
+      "description": "Audio mixing, per-peer analysis, synchronization"
+    },
+    "phase4": {
+      "name": "Shared AI Session",
+      "status": "pending",
+      "description": "Single AI per room with synchronized broadcast"
+    },
+    "phase5": {
+      "name": "Production Polish",
+      "status": "pending",
+      "description": "Auth, persistence, permissions, optimization"
+    }
+  },
+  "features": [
+    {
+      "id": "FEAT-100",
+      "phase": 2,
+      "category": "types",
+      "description": "Define Room and Peer TypeScript types",
+      "priority": "critical",
+      "steps": [
+        "Create src/types/room.ts with Room interface (id, name, maxParticipants, createdAt, etc.)",
+        "Create src/types/peer.ts with Peer interface (id, name, isMuted, isSpeaking, etc.)",
+        "Create src/types/signaling.ts with all signaling event types",
+        "Export types from central index"
+      ],
+      "testFile": "tests/unit/types/room.test.ts",
+      "dependencies": [],
+      "passes": false
+    },
+    {
+      "id": "FEAT-101",
+      "phase": 2,
+      "category": "api",
+      "description": "Room CRUD API - Create Room endpoint",
+      "priority": "critical",
+      "steps": [
+        "Create src/app/api/rooms/route.ts",
+        "Implement POST handler for room creation",
+        "Generate unique room ID (nanoid)",
+        "Validate request body (name, maxParticipants)",
+        "Return created room object"
+      ],
+      "testFile": "tests/unit/api/rooms/create.test.ts",
+      "dependencies": ["FEAT-100"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-102",
+      "phase": 2,
+      "category": "api",
+      "description": "Room CRUD API - List Rooms endpoint",
+      "priority": "high",
+      "steps": [
+        "Implement GET handler in src/app/api/rooms/route.ts",
+        "Return list of active rooms with participant counts",
+        "Support pagination parameters",
+        "Filter by room status (active/full)"
+      ],
+      "testFile": "tests/unit/api/rooms/list.test.ts",
+      "dependencies": ["FEAT-101"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-103",
+      "phase": 2,
+      "category": "api",
+      "description": "Room CRUD API - Get Room by ID endpoint",
+      "priority": "high",
+      "steps": [
+        "Create src/app/api/rooms/[roomId]/route.ts",
+        "Implement GET handler for single room",
+        "Return room details with current participants",
+        "Handle 404 for non-existent rooms"
+      ],
+      "testFile": "tests/unit/api/rooms/get.test.ts",
+      "dependencies": ["FEAT-101"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-104",
+      "phase": 2,
+      "category": "signaling",
+      "description": "Signaling server - Socket.io integration",
+      "priority": "critical",
+      "steps": [
+        "Install socket.io and socket.io-client",
+        "Create src/server/signaling/index.ts with Socket.io server",
+        "Create src/lib/signaling/client.ts for client connection",
+        "Implement connection/disconnection handlers",
+        "Add CORS configuration for development"
+      ],
+      "testFile": "tests/unit/signaling/server.test.ts",
+      "dependencies": ["FEAT-100"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-105",
+      "phase": 2,
+      "category": "signaling",
+      "description": "Signaling server - Room join/leave events",
+      "priority": "critical",
+      "steps": [
+        "Implement room:join event handler",
+        "Implement room:leave event handler",
+        "Track participants per room in memory",
+        "Broadcast peer:joined and peer:left to room members",
+        "Handle max participants limit"
+      ],
+      "testFile": "tests/unit/signaling/room-events.test.ts",
+      "dependencies": ["FEAT-104"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-106",
+      "phase": 2,
+      "category": "signaling",
+      "description": "Signaling server - WebRTC signaling relay",
+      "priority": "critical",
+      "steps": [
+        "Implement signal:offer event relay",
+        "Implement signal:answer event relay",
+        "Implement signal:ice candidate relay",
+        "Route signals to specific peers within room",
+        "Handle signaling errors gracefully"
+      ],
+      "testFile": "tests/unit/signaling/webrtc-relay.test.ts",
+      "dependencies": ["FEAT-105"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-107",
+      "phase": 2,
+      "category": "signaling",
+      "description": "Signaling server - Presence and state sync",
+      "priority": "high",
+      "steps": [
+        "Track peer presence state (connected, muted, speaking)",
+        "Implement presence:update broadcasts",
+        "Send full room state on join",
+        "Handle disconnection cleanup",
+        "Implement heartbeat for stale connection detection"
+      ],
+      "testFile": "tests/unit/signaling/presence.test.ts",
+      "dependencies": ["FEAT-105"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-108",
+      "phase": 2,
+      "category": "hooks",
+      "description": "useRoomConnection hook - Socket.io connection management",
+      "priority": "critical",
+      "steps": [
+        "Create src/hooks/useRoomConnection.ts",
+        "Manage Socket.io connection lifecycle",
+        "Handle reconnection with exponential backoff",
+        "Expose connection state (connecting, connected, error)",
+        "Provide joinRoom and leaveRoom methods"
+      ],
+      "testFile": "tests/unit/hooks/useRoomConnection.test.ts",
+      "dependencies": ["FEAT-104"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-109",
+      "phase": 2,
+      "category": "hooks",
+      "description": "useRoomPeers hook - Peer state management",
+      "priority": "critical",
+      "steps": [
+        "Create src/hooks/useRoomPeers.ts",
+        "Track all peers in current room",
+        "Handle peer:joined and peer:left events",
+        "Manage WebRTC peer connections (mesh topology)",
+        "Expose peers array with connection status"
+      ],
+      "testFile": "tests/unit/hooks/useRoomPeers.test.ts",
+      "dependencies": ["FEAT-108"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-110",
+      "phase": 2,
+      "category": "hooks",
+      "description": "usePresence hook - Real-time presence state",
+      "priority": "high",
+      "steps": [
+        "Create src/hooks/usePresence.ts",
+        "Subscribe to presence:update events",
+        "Track speaking/muted state per peer",
+        "Provide updatePresence method",
+        "Handle local presence state changes"
+      ],
+      "testFile": "tests/unit/hooks/usePresence.test.ts",
+      "dependencies": ["FEAT-109"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-111",
+      "phase": 2,
+      "category": "components",
+      "description": "RoomLobby component - Room list and join interface",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/RoomLobby.tsx",
+        "Display list of available rooms",
+        "Show participant count and room status",
+        "Implement room search/filter",
+        "Add create room button"
+      ],
+      "testFile": "tests/unit/components/RoomLobby.test.tsx",
+      "dependencies": ["FEAT-102"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-112",
+      "phase": 2,
+      "category": "components",
+      "description": "RoomCard component - Room preview card",
+      "priority": "medium",
+      "steps": [
+        "Create src/components/room/RoomCard.tsx",
+        "Display room name and description",
+        "Show participant avatars (up to 4)",
+        "Display participant count (X/max)",
+        "Add join button with loading state"
+      ],
+      "testFile": "tests/unit/components/RoomCard.test.tsx",
+      "dependencies": ["FEAT-100"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-113",
+      "phase": 2,
+      "category": "components",
+      "description": "CreateRoomForm component - Room creation UI",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/CreateRoomForm.tsx",
+        "Room name input with validation",
+        "Max participants selector (2-10)",
+        "AI personality selection (optional)",
+        "Submit handler with loading state"
+      ],
+      "testFile": "tests/unit/components/CreateRoomForm.test.tsx",
+      "dependencies": ["FEAT-101"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-114",
+      "phase": 2,
+      "category": "components",
+      "description": "ParticipantList component - Active participants display",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/ParticipantList.tsx",
+        "Display all room participants",
+        "Show speaking/muted indicators",
+        "Highlight current speaker",
+        "Responsive layout (horizontal on mobile)"
+      ],
+      "testFile": "tests/unit/components/ParticipantList.test.tsx",
+      "dependencies": ["FEAT-110"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-115",
+      "phase": 2,
+      "category": "components",
+      "description": "ParticipantAvatar component - Peer avatar with status",
+      "priority": "medium",
+      "steps": [
+        "Create src/components/room/ParticipantAvatar.tsx",
+        "Generate avatar from name initials or image",
+        "Show speaking ring animation",
+        "Show muted indicator icon",
+        "Show connection status indicator"
+      ],
+      "testFile": "tests/unit/components/ParticipantAvatar.test.tsx",
+      "dependencies": ["FEAT-100"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-116",
+      "phase": 2,
+      "category": "components",
+      "description": "RoomControls component - Mute/Leave controls",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/RoomControls.tsx",
+        "Mute/unmute microphone toggle",
+        "Leave room button",
+        "Settings button (future expansion)",
+        "Accessible with keyboard navigation"
+      ],
+      "testFile": "tests/unit/components/RoomControls.test.tsx",
+      "dependencies": ["FEAT-108"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-117",
+      "phase": 2,
+      "category": "pages",
+      "description": "Room lobby page - /rooms",
+      "priority": "high",
+      "steps": [
+        "Create src/app/rooms/page.tsx",
+        "Fetch and display room list",
+        "Handle loading and error states",
+        "Add create room modal/page link",
+        "Implement room joining navigation"
+      ],
+      "testFile": "tests/e2e/rooms/lobby.spec.ts",
+      "dependencies": ["FEAT-111", "FEAT-112"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-118",
+      "phase": 2,
+      "category": "pages",
+      "description": "Create room page - /rooms/create",
+      "priority": "high",
+      "steps": [
+        "Create src/app/rooms/create/page.tsx",
+        "Integrate CreateRoomForm component",
+        "Handle successful creation redirect",
+        "Show validation errors",
+        "Add back/cancel navigation"
+      ],
+      "testFile": "tests/e2e/rooms/create.spec.ts",
+      "dependencies": ["FEAT-113"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-119",
+      "phase": 2,
+      "category": "pages",
+      "description": "Room experience page - /rooms/[roomId]",
+      "priority": "critical",
+      "steps": [
+        "Create src/app/rooms/[roomId]/page.tsx",
+        "Initialize room connection on mount",
+        "Display participants and voice interface",
+        "Handle room not found (404)",
+        "Handle room full error"
+      ],
+      "testFile": "tests/e2e/rooms/room-experience.spec.ts",
+      "dependencies": ["FEAT-108", "FEAT-114", "FEAT-116"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-120",
+      "phase": 2,
+      "category": "webrtc",
+      "description": "Multi-peer WebRTC mesh - Peer connection management",
+      "priority": "critical",
+      "steps": [
+        "Extend useRoomPeers for full mesh topology",
+        "Create RTCPeerConnection for each peer",
+        "Handle offer/answer exchange via signaling",
+        "Handle ICE candidate exchange",
+        "Track connection state per peer"
+      ],
+      "testFile": "tests/unit/webrtc/mesh.test.ts",
+      "dependencies": ["FEAT-106", "FEAT-109"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-121",
+      "phase": 2,
+      "category": "webrtc",
+      "description": "Multi-peer WebRTC mesh - Audio track management",
+      "priority": "critical",
+      "steps": [
+        "Add local audio track to each peer connection",
+        "Receive and manage remote audio tracks",
+        "Create audio elements for each peer's audio",
+        "Handle track muting/unmuting",
+        "Clean up tracks on peer disconnect"
+      ],
+      "testFile": "tests/unit/webrtc/audio-tracks.test.ts",
+      "dependencies": ["FEAT-120"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-200",
+      "phase": 3,
+      "category": "audio",
+      "description": "Audio mixer - Multi-stream mixing foundation",
+      "priority": "critical",
+      "steps": [
+        "Create src/lib/audio/mixer.ts",
+        "Initialize AudioContext for mixing",
+        "Create GainNode per audio source",
+        "Create MediaStreamDestination for mixed output",
+        "Provide addStream/removeStream methods"
+      ],
+      "testFile": "tests/unit/audio/mixer.test.ts",
+      "dependencies": ["FEAT-121"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-201",
+      "phase": 3,
+      "category": "audio",
+      "description": "Audio mixer - Per-peer volume control",
+      "priority": "high",
+      "steps": [
+        "Add per-source GainNode control",
+        "Implement setVolume(peerId, level) method",
+        "Implement mute/unmute per peer",
+        "Handle volume normalization for many peers",
+        "Expose volume levels for UI"
+      ],
+      "testFile": "tests/unit/audio/mixer-volume.test.ts",
+      "dependencies": ["FEAT-200"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-202",
+      "phase": 3,
+      "category": "hooks",
+      "description": "useAudioMixer hook - React integration",
+      "priority": "critical",
+      "steps": [
+        "Create src/hooks/useAudioMixer.ts",
+        "Initialize mixer on mount",
+        "Auto-add peer audio streams",
+        "Auto-remove on peer disconnect",
+        "Expose mixed output stream"
+      ],
+      "testFile": "tests/unit/hooks/useAudioMixer.test.ts",
+      "dependencies": ["FEAT-200", "FEAT-121"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-203",
+      "phase": 3,
+      "category": "audio",
+      "description": "Per-peer audio analysis - Speaking detection",
+      "priority": "high",
+      "steps": [
+        "Create AnalyserNode per peer audio stream",
+        "Implement volume level detection",
+        "Set speaking threshold with hysteresis",
+        "Emit speaking state changes",
+        "Debounce rapid state changes"
+      ],
+      "testFile": "tests/unit/audio/speaking-detection.test.ts",
+      "dependencies": ["FEAT-202"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-204",
+      "phase": 3,
+      "category": "audio",
+      "description": "Per-peer audio visualization",
+      "priority": "medium",
+      "steps": [
+        "Extend AudioWaveVisualizer for multiple sources",
+        "Create per-peer AnalyserNode",
+        "Display visualization per participant avatar",
+        "Distinguish local vs remote audio",
+        "Handle visualization cleanup"
+      ],
+      "testFile": "tests/unit/audio/peer-visualization.test.ts",
+      "dependencies": ["FEAT-203"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-205",
+      "phase": 3,
+      "category": "components",
+      "description": "SpeakingIndicator component - Active speaker display",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/SpeakingIndicator.tsx",
+        "Display current active speaker(s)",
+        "Animate speaker transitions",
+        "Show multi-speaker state",
+        "Integrate with ParticipantList"
+      ],
+      "testFile": "tests/unit/components/SpeakingIndicator.test.tsx",
+      "dependencies": ["FEAT-203"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-206",
+      "phase": 3,
+      "category": "audio",
+      "description": "Audio synchronization - Playback timing",
+      "priority": "high",
+      "steps": [
+        "Implement jitter buffer for remote audio",
+        "Synchronize playback start across peers",
+        "Handle network latency variance",
+        "Measure and report sync accuracy",
+        "Provide resync mechanism"
+      ],
+      "testFile": "tests/unit/audio/sync.test.ts",
+      "dependencies": ["FEAT-202"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-300",
+      "phase": 4,
+      "category": "ai",
+      "description": "Shared AI session - Single OpenAI connection per room",
+      "priority": "critical",
+      "steps": [
+        "Create src/server/signaling/ai-orchestrator.ts",
+        "Create single RTCPeerConnection to OpenAI per room",
+        "Manage AI session lifecycle",
+        "Handle token refresh for long sessions",
+        "Implement session recovery on disconnect"
+      ],
+      "testFile": "tests/unit/ai/orchestrator.test.ts",
+      "dependencies": ["FEAT-107", "FEAT-202"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-301",
+      "phase": 4,
+      "category": "ai",
+      "description": "Shared AI session - Mixed audio input",
+      "priority": "critical",
+      "steps": [
+        "Route mixed audio to OpenAI connection",
+        "Use server-side mixing output stream",
+        "Handle VAD for mixed input",
+        "Optimize audio quality for AI input",
+        "Handle empty room state"
+      ],
+      "testFile": "tests/unit/ai/mixed-input.test.ts",
+      "dependencies": ["FEAT-300", "FEAT-202"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-302",
+      "phase": 4,
+      "category": "ai",
+      "description": "Shared AI session - Response broadcasting",
+      "priority": "critical",
+      "steps": [
+        "Receive AI audio response stream",
+        "Broadcast to all room participants",
+        "Ensure synchronized playback start",
+        "Handle late-joining peers",
+        "Provide response state events"
+      ],
+      "testFile": "tests/unit/ai/broadcast.test.ts",
+      "dependencies": ["FEAT-300"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-303",
+      "phase": 4,
+      "category": "hooks",
+      "description": "useSharedAI hook - Client-side AI integration",
+      "priority": "critical",
+      "steps": [
+        "Create src/hooks/useSharedAI.ts",
+        "Subscribe to AI state events from signaling",
+        "Expose aiState (idle, listening, speaking)",
+        "Receive broadcasted AI audio stream",
+        "Handle AI session reconnection"
+      ],
+      "testFile": "tests/unit/hooks/useSharedAI.test.ts",
+      "dependencies": ["FEAT-302"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-304",
+      "phase": 4,
+      "category": "ai",
+      "description": "Shared context management - Conversation history",
+      "priority": "high",
+      "steps": [
+        "Track conversation context in AI orchestrator",
+        "Attribute speaker identity in context",
+        "Maintain context across session reconnects",
+        "Implement context summarization for long sessions",
+        "Expose context state to clients"
+      ],
+      "testFile": "tests/unit/ai/context.test.ts",
+      "dependencies": ["FEAT-301"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-305",
+      "phase": 4,
+      "category": "ai",
+      "description": "AI personality configuration - Per-room AI setup",
+      "priority": "medium",
+      "steps": [
+        "Define AI personality presets (facilitator, assistant, expert)",
+        "Store AI configuration in room data",
+        "Apply personality in OpenAI session instructions",
+        "Allow personality changes during session",
+        "Validate personality configuration"
+      ],
+      "testFile": "tests/unit/ai/personality.test.ts",
+      "dependencies": ["FEAT-300"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-306",
+      "phase": 4,
+      "category": "components",
+      "description": "Enhanced SwensyncOverlay for multi-peer rooms",
+      "priority": "high",
+      "steps": [
+        "Update SwensyncOverlay for room context",
+        "Display AI state with room awareness",
+        "Show which peers AI is responding to",
+        "Handle AI visualizer with shared state",
+        "Add room-specific controls"
+      ],
+      "testFile": "tests/unit/components/SwensyncOverlay-room.test.tsx",
+      "dependencies": ["FEAT-303", "FEAT-205"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-400",
+      "phase": 5,
+      "category": "auth",
+      "description": "User authentication - Supabase integration",
+      "priority": "high",
+      "steps": [
+        "Install @supabase/supabase-js and @supabase/auth-helpers-nextjs",
+        "Create Supabase client configuration",
+        "Implement sign-in/sign-up flows",
+        "Create auth context provider",
+        "Protect room routes with middleware"
+      ],
+      "testFile": "tests/unit/auth/supabase.test.ts",
+      "dependencies": [],
+      "passes": false
+    },
+    {
+      "id": "FEAT-401",
+      "phase": 5,
+      "category": "database",
+      "description": "Room persistence - Database schema",
+      "priority": "high",
+      "steps": [
+        "Create database schema for rooms table",
+        "Create schema for participants table",
+        "Create schema for room_history table",
+        "Implement migrations",
+        "Add database indexes for queries"
+      ],
+      "testFile": "tests/unit/db/schema.test.ts",
+      "dependencies": ["FEAT-400"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-402",
+      "phase": 5,
+      "category": "database",
+      "description": "Room persistence - CRUD operations",
+      "priority": "high",
+      "steps": [
+        "Create src/server/db/queries.ts",
+        "Implement createRoom with user ownership",
+        "Implement getRooms with filtering",
+        "Implement updateRoom for settings",
+        "Implement deleteRoom with cleanup"
+      ],
+      "testFile": "tests/unit/db/queries.test.ts",
+      "dependencies": ["FEAT-401"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-403",
+      "phase": 5,
+      "category": "permissions",
+      "description": "Room permissions - Owner and participant roles",
+      "priority": "medium",
+      "steps": [
+        "Define role types (owner, moderator, participant)",
+        "Implement permission checks in room API",
+        "Add kick/ban functionality for owners",
+        "Add moderator assignment",
+        "Validate permissions in signaling"
+      ],
+      "testFile": "tests/unit/permissions/roles.test.ts",
+      "dependencies": ["FEAT-400", "FEAT-402"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-404",
+      "phase": 5,
+      "category": "reliability",
+      "description": "Error recovery - Reconnection handling",
+      "priority": "high",
+      "steps": [
+        "Implement automatic reconnection in useRoomConnection",
+        "Preserve room state across reconnects",
+        "Re-establish WebRTC connections after reconnect",
+        "Handle AI session reconnection",
+        "Show reconnection status to users"
+      ],
+      "testFile": "tests/unit/reliability/reconnection.test.ts",
+      "dependencies": ["FEAT-108", "FEAT-303"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-405",
+      "phase": 5,
+      "category": "reliability",
+      "description": "Error recovery - Graceful degradation",
+      "priority": "medium",
+      "steps": [
+        "Handle partial peer connection failures",
+        "Fallback to audio-only on bandwidth issues",
+        "Handle AI session unavailability",
+        "Show degraded state indicators",
+        "Implement circuit breaker for failing services"
+      ],
+      "testFile": "tests/unit/reliability/degradation.test.ts",
+      "dependencies": ["FEAT-404"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-406",
+      "phase": 5,
+      "category": "performance",
+      "description": "Performance optimization - Audio pipeline",
+      "priority": "medium",
+      "steps": [
+        "Profile audio processing pipeline",
+        "Optimize mixer for low latency",
+        "Implement audio worklet for processing",
+        "Reduce memory allocations in audio path",
+        "Add performance monitoring"
+      ],
+      "testFile": "tests/unit/performance/audio.test.ts",
+      "dependencies": ["FEAT-202"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-407",
+      "phase": 5,
+      "category": "performance",
+      "description": "Performance optimization - Signaling efficiency",
+      "priority": "medium",
+      "steps": [
+        "Implement message batching for presence updates",
+        "Add compression for signaling messages",
+        "Optimize room state sync",
+        "Implement delta updates for presence",
+        "Profile and optimize server handlers"
+      ],
+      "testFile": "tests/unit/performance/signaling.test.ts",
+      "dependencies": ["FEAT-107"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-408",
+      "phase": 5,
+      "category": "ci",
+      "description": "GitHub Actions CI pipeline",
+      "priority": "high",
+      "steps": [
+        "Create .github/workflows/ci.yml",
+        "Run linting and type checking",
+        "Run unit tests with coverage",
+        "Run E2E tests in headless mode",
+        "Upload coverage reports"
+      ],
+      "testFile": ".github/workflows/ci.yml",
+      "dependencies": [],
+      "passes": false
+    },
+    {
+      "id": "FEAT-409",
+      "phase": 5,
+      "category": "quality",
+      "description": "Pre-commit hooks with Husky",
+      "priority": "medium",
+      "steps": [
+        "Install husky and lint-staged",
+        "Configure pre-commit for lint and format",
+        "Configure pre-push for tests",
+        "Add commit message linting",
+        "Document hook setup"
+      ],
+      "testFile": ".husky/pre-commit",
+      "dependencies": [],
+      "passes": false
+    },
+    {
+      "id": "FEAT-410",
+      "phase": 5,
+      "category": "e2e",
+      "description": "E2E tests - Multi-peer room flow",
+      "priority": "high",
+      "steps": [
+        "Test room creation and joining",
+        "Test multiple browser contexts as peers",
+        "Test peer audio transmission (mocked)",
+        "Test AI response broadcast (mocked)",
+        "Test room leaving and cleanup"
+      ],
+      "testFile": "tests/e2e/multi-peer.spec.ts",
+      "dependencies": ["FEAT-119", "FEAT-303"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-150",
+      "phase": 2,
+      "category": "types",
+      "description": "Voice mode and turn management types",
+      "priority": "critical",
+      "steps": [
+        "Define VoiceMode enum (open, pushToTalk, wakeWord, designatedSpeaker)",
+        "Define AIResponseState enum (idle, listening, processing, speaking, locked)",
+        "Define TurnRequest interface for queued participant requests",
+        "Define RoomVoiceSettings interface with mode and behavior options",
+        "Add voiceSettings to Room type"
+      ],
+      "testFile": "tests/unit/types/voice-mode.test.ts",
+      "dependencies": ["FEAT-100"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-151",
+      "phase": 3,
+      "category": "audio",
+      "description": "Push-to-Talk (PTT) implementation",
+      "priority": "critical",
+      "steps": [
+        "Create usePushToTalk hook with keyboard (Space) and touch support",
+        "Implement PTT button component with visual feedback",
+        "Gate audio stream to AI mixer only when PTT active",
+        "Handle PTT state in presence updates",
+        "Add PTT indicator to participant avatars"
+      ],
+      "testFile": "tests/unit/audio/push-to-talk.test.ts",
+      "dependencies": ["FEAT-150", "FEAT-202"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-152",
+      "phase": 3,
+      "category": "signaling",
+      "description": "AI response locking mechanism",
+      "priority": "critical",
+      "steps": [
+        "Track AI response state in signaling server (idle/speaking/locked)",
+        "Broadcast ai:state events to all room participants",
+        "Queue incoming turn requests while AI is speaking",
+        "Process queued requests after AI response completes",
+        "Implement lock timeout as safety mechanism"
+      ],
+      "testFile": "tests/unit/signaling/ai-locking.test.ts",
+      "dependencies": ["FEAT-107", "FEAT-150"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-153",
+      "phase": 3,
+      "category": "hooks",
+      "description": "useTurnManager hook - Turn-taking coordination",
+      "priority": "critical",
+      "steps": [
+        "Create useTurnManager hook for client-side turn state",
+        "Track canRequestTurn based on AI state and voice mode",
+        "Implement requestTurn() method respecting locks",
+        "Handle turn queue position feedback",
+        "Expose currentSpeaker and queuePosition"
+      ],
+      "testFile": "tests/unit/hooks/useTurnManager.test.ts",
+      "dependencies": ["FEAT-152", "FEAT-108"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-154",
+      "phase": 3,
+      "category": "components",
+      "description": "PTTButton component - Push-to-talk interface",
+      "priority": "high",
+      "steps": [
+        "Create PTTButton with hold-to-talk interaction",
+        "Visual states: idle, active, disabled (AI speaking)",
+        "Keyboard accessibility (Space key)",
+        "Mobile-friendly touch-and-hold",
+        "Haptic feedback on mobile devices"
+      ],
+      "testFile": "tests/unit/components/PTTButton.test.tsx",
+      "dependencies": ["FEAT-151"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-155",
+      "phase": 3,
+      "category": "components",
+      "description": "AIStateIndicator component - Response state display",
+      "priority": "high",
+      "steps": [
+        "Create AIStateIndicator showing current AI state",
+        "Display states: Listening, Thinking, Speaking, Locked",
+        "Show queue position when waiting",
+        "Animate state transitions",
+        "Integrate with room header"
+      ],
+      "testFile": "tests/unit/components/AIStateIndicator.test.tsx",
+      "dependencies": ["FEAT-152"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-156",
+      "phase": 3,
+      "category": "components",
+      "description": "VoiceModeSettings component - Room voice configuration",
+      "priority": "medium",
+      "steps": [
+        "Create settings panel for voice mode selection",
+        "Options: Open, Push-to-Talk, Designated Speaker",
+        "Toggle for AI response locking behavior",
+        "Toggle for peer-to-peer audio",
+        "Save settings to room configuration"
+      ],
+      "testFile": "tests/unit/components/VoiceModeSettings.test.tsx",
+      "dependencies": ["FEAT-150"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-157",
+      "phase": 4,
+      "category": "ai",
+      "description": "Server-side turn queue processing",
+      "priority": "critical",
+      "steps": [
+        "Implement FIFO queue for turn requests in AI orchestrator",
+        "Process next queued request after AI response.done",
+        "Handle queue timeouts and expiration",
+        "Notify clients of queue position changes",
+        "Implement priority override for room owner/moderator"
+      ],
+      "testFile": "tests/unit/ai/turn-queue.test.ts",
+      "dependencies": ["FEAT-152", "FEAT-300"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-158",
+      "phase": 4,
+      "category": "ai",
+      "description": "Interrupt handling for urgent overrides",
+      "priority": "medium",
+      "steps": [
+        "Implement optional interrupt button for room owner",
+        "Send response.cancel to OpenAI on interrupt",
+        "Clear current response and unlock",
+        "Process interrupt request immediately",
+        "Log interrupts for analytics"
+      ],
+      "testFile": "tests/unit/ai/interrupt.test.ts",
+      "dependencies": ["FEAT-157", "FEAT-302"],
+      "passes": false
+    }
+  ],
+  "categories": {
+    "types": "TypeScript type definitions",
+    "api": "REST API endpoints",
+    "signaling": "WebSocket signaling server",
+    "hooks": "React custom hooks",
+    "components": "React UI components",
+    "pages": "Next.js pages",
+    "webrtc": "WebRTC peer connections",
+    "audio": "Audio processing and mixing",
+    "ai": "Shared AI session management",
+    "auth": "Authentication and authorization",
+    "database": "Database schema and queries",
+    "permissions": "Role-based access control",
+    "reliability": "Error handling and recovery",
+    "performance": "Optimization and profiling",
+    "ci": "Continuous integration",
+    "quality": "Code quality tools",
+    "e2e": "End-to-end testing"
+  },
+  "statistics": {
+    "total": 51,
+    "phase2": 23,
+    "phase3": 13,
+    "phase4": 9,
+    "phase5": 11,
+    "passed": 0,
+    "pending": 51
+  }
+}
