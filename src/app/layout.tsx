@@ -5,8 +5,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Swensync - Fastest Conversational Voice AI',
-  description: 'The fastest Conversational Voice AI platform',
+  title: 'Swensync - The AI Collaboration Engine',
+  description: 'Synchronized intelligence for teams',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },

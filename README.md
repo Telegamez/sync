@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Swensync aims to be the fastest Conversational Voice AI platform.
+Swensync is the AI Collaboration Engine — synchronized intelligence for teams.
 
 ## Overview
 

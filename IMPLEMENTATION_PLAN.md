@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Swensync** — The fastest Conversational Voice AI platform.
+**Swensync** — The AI Collaboration Engine. Synchronized intelligence for teams.
 
 A clean, lightweight, independent implementation bootstrapped from the rc6 support agent codebase, with all legacy references renamed to "Swensync" and unnecessary features removed.
 
@@ -524,7 +524,7 @@ FROM node:20-alpine AS runner
 5. ✅ **Latency Stopwatch** - Visual turn-by-turn latency tracking
    - Live stopwatch showing time from user speech → AI audio response
    - History of last 5 turn latencies with color coding
-   - Performance visibility for "fastest Voice AI" positioning
+   - Performance visibility for synchronized intelligence platform
 
 ### Naming Convention
 | Concept | Name |
