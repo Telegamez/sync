@@ -115,7 +115,7 @@
       ],
       "testFile": "tests/unit/signaling/server.test.ts",
       "dependencies": ["FEAT-100"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-105",
@@ -130,9 +130,9 @@
         "Broadcast peer:joined and peer:left to room members",
         "Handle max participants limit"
       ],
-      "testFile": "tests/unit/signaling/room-events.test.ts",
+      "testFile": "tests/unit/signaling/server.test.ts",
       "dependencies": ["FEAT-104"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-106",
@@ -147,9 +147,9 @@
         "Route signals to specific peers within room",
         "Handle signaling errors gracefully"
       ],
-      "testFile": "tests/unit/signaling/webrtc-relay.test.ts",
+      "testFile": "tests/unit/signaling/server.test.ts",
       "dependencies": ["FEAT-105"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-107",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 5,
-    "pending": 46
+    "passed": 8,
+    "pending": 43
   }
 }

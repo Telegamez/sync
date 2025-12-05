@@ -135,15 +135,15 @@ describe('Room Store - Delete Room', () => {
       expect(closed?.status).toBe('closed');
     });
 
-    it('updates lastActivityAt timestamp', () => {
+    it('updates lastActivityAt timestamp', async () => {
       const room = createRoom({ name: 'Activity Test' }, 'owner');
       const originalTime = room.lastActivityAt.getTime();
 
-      // Small delay
-      setTimeout(() => {
-        const closed = closeRoom(room.id);
-        expect(closed?.lastActivityAt.getTime()).toBeGreaterThanOrEqual(originalTime);
-      }, 10);
+      // Small delay to ensure time difference
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const closed = closeRoom(room.id);
+      expect(closed?.lastActivityAt.getTime()).toBeGreaterThanOrEqual(originalTime);
     });
 
     it('returns undefined for non-existent room', () => {

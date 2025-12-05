@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 5/23 | 22% |
+| Phase 2: Room Infrastructure | In Progress | 8/23 | 35% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-104` - Signaling server - Socket.io integration
+**Next Feature:** `FEAT-107` - Signaling server - Presence and state sync
 
 ---
 
@@ -154,6 +154,39 @@ Implemented room retrieval and deletion endpoints:
 
 **Test Results:**
 ✅ 18 tests passing
+
+---
+
+### FEAT-104, 105, 106: Socket.io Signaling Server
+**Date:** 2024-12-05
+**Test:** `tests/unit/signaling/server.test.ts`
+
+Implemented real-time signaling server for WebRTC coordination:
+
+**Files Created:**
+- `src/server/signaling/index.ts` - Socket.io server with room management
+- `src/lib/signaling/client.ts` - Client-side signaling wrapper
+
+**FEAT-104: Socket.io Integration**
+- Socket.io server with CORS configuration
+- Connection/disconnection handlers
+- Peer ID generation on connect
+
+**FEAT-105: Room Join/Leave Events**
+- `room:join` event with validation (room exists, not full, not closed)
+- `room:leave` event with cleanup
+- `peer:joined` / `peer:left` broadcasts
+- Automatic cleanup on disconnect
+- First joiner becomes room owner
+
+**FEAT-106: WebRTC Signaling Relay**
+- `signal:offer` relay to target peer
+- `signal:answer` relay to target peer
+- `signal:ice` candidate relay
+- Presence updates (`presence:update`)
+
+**Test Results:**
+✅ 13 tests passing (connection, join, leave, presence)
 
 ---
 
