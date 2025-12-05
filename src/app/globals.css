@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* #17161e background = hsl(252, 12%, 10%) */
+    --background: 252 12% 10%;
+    /* #cccccb highlight/foreground = hsl(60, 1%, 80%) */
+    --foreground: 60 1% 80%;
+    --card: 252 12% 12%;
+    --card-foreground: 60 1% 80%;
+    --popover: 252 12% 12%;
+    --popover-foreground: 60 1% 80%;
+    /* Primary uses the highlight color */
+    --primary: 60 1% 80%;
+    --primary-foreground: 252 12% 10%;
+    --secondary: 252 12% 18%;
+    --secondary-foreground: 60 1% 80%;
+    --muted: 252 12% 18%;
+    --muted-foreground: 60 1% 55%;
+    --accent: 252 12% 18%;
+    --accent-foreground: 60 1% 80%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 60 1% 80%;
+    --border: 252 12% 20%;
+    --input: 252 12% 18%;
+    --ring: 60 1% 80%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Swensync-specific animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+/* Stopwatch running animation */
+@keyframes stopwatch-tick {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-stopwatch {
+  animation: stopwatch-tick 0.5s ease-in-out infinite;
+}

@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  swensync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: swensync
+    network_mode: host
+    environment:
+      - NODE_ENV=production
+      - PORT=24680
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:24680/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
