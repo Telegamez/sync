@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 3/23 | 13% |
+| Phase 2: Room Infrastructure | In Progress | 4/23 | 17% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-102` - Room CRUD API - List Rooms endpoint
+**Next Feature:** `FEAT-103` - Room CRUD API - Get Room by ID endpoint
 
 ---
 
@@ -112,6 +112,24 @@ Implemented room creation API with in-memory storage:
 - `generateRoomId()` - Generates unique 10-character room IDs
 - Request validation for name, maxParticipants, aiPersonality
 - Voice settings merged with DEFAULT_VOICE_SETTINGS
+
+**Test Results:**
+✅ 19 tests passing
+
+---
+
+### FEAT-102: Room CRUD API - List Rooms endpoint
+**Date:** 2024-12-05
+**Test:** `tests/unit/api/rooms/list.test.ts`
+
+Implemented room listing API with status filtering:
+
+**Key Features:**
+- `getAllRooms()` - Returns all rooms
+- `getRoomsByStatus()` - Filter by waiting/active/full/closed
+- `getRoomSummaries()` - Privacy-safe summaries for list views
+- `addParticipant()` - Automatically updates room status (waiting→active→full)
+- `updateRoomStatus()` - Manual status updates with timestamp
 
 **Test Results:**
 ✅ 19 tests passing
