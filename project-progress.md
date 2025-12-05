@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 8/23 | 35% |
+| Phase 2: Room Infrastructure | In Progress | 9/23 | 39% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-107` - Signaling server - Presence and state sync
+**Next Feature:** `FEAT-108` - useRoomConnection hook - Socket.io connection management
 
 ---
 
@@ -187,6 +187,40 @@ Implemented real-time signaling server for WebRTC coordination:
 
 **Test Results:**
 ✅ 13 tests passing (connection, join, leave, presence)
+
+---
+
+### FEAT-107: Signaling server - Presence and state sync
+**Date:** 2024-12-05
+**Test:** `tests/unit/signaling/presence.test.ts`
+
+Implemented comprehensive presence tracking and state synchronization:
+
+**Key Features:**
+- Presence state tracking (connected, muted, speaking, isAddressingAI)
+- `presence:update` event broadcasts to room members
+- Full room state on join (existing peers, AI state, room details)
+- Heartbeat for stale connection detection with `lastActiveAt` tracking
+- Disconnection cleanup with peer removal
+- `getRoomPeerSummaries()` for privacy-safe presence data
+
+**Presence Structure:**
+```typescript
+{
+  connectionState: 'connected',
+  audio: {
+    isMuted: boolean,
+    isSpeaking: boolean,
+    isAddressingAI: boolean,
+    audioLevel: number
+  },
+  lastActiveAt: Date,
+  isIdle: boolean
+}
+```
+
+**Test Results:**
+✅ 12 tests passing (presence tracking, room state, cleanup, heartbeat)
 
 ---
 

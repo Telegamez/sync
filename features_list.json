@@ -166,7 +166,7 @@
       ],
       "testFile": "tests/unit/signaling/presence.test.ts",
       "dependencies": ["FEAT-105"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-108",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 8,
-    "pending": 43
+    "passed": 9,
+    "pending": 42
   }
 }
