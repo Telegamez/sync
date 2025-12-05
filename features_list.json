@@ -183,7 +183,7 @@
       ],
       "testFile": "tests/unit/hooks/useRoomConnection.test.ts",
       "dependencies": ["FEAT-104"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-109",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 9,
-    "pending": 42
+    "passed": 10,
+    "pending": 41
   }
 }

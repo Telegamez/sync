@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 9/23 | 39% |
+| Phase 2: Room Infrastructure | In Progress | 10/23 | 43% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-108` - useRoomConnection hook - Socket.io connection management
+**Next Feature:** `FEAT-109` - useRoomPeers hook - Peer state management
 
 ---
 
@@ -221,6 +221,34 @@ Implemented comprehensive presence tracking and state synchronization:
 
 **Test Results:**
 ✅ 12 tests passing (presence tracking, room state, cleanup, heartbeat)
+
+---
+
+### FEAT-108: useRoomConnection hook
+**Date:** 2024-12-05
+**Test:** `tests/unit/hooks/useRoomConnection.test.ts`
+
+Implemented React hook for Socket.io connection lifecycle management:
+
+**Files Created:**
+- `src/hooks/useRoomConnection.ts` - Full connection management hook
+
+**Key Features:**
+- `connect()` / `disconnect()` - Connection lifecycle
+- `joinRoom()` / `leaveRoom()` - Room membership management
+- Automatic reconnection with configurable attempts/delay
+- Heartbeat sending for presence maintenance
+- Event handler registration for real-time updates
+- Error tracking with `ConnectionError` type
+- `getClient()` for direct signaling client access
+
+**State Exposed:**
+- `connectionState`: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+- `room`, `localPeer`, `peers`, `aiState`: Current room state
+- `isInRoom`, `isLoading`, `error`, `reconnectAttempts`
+
+**Test Results:**
+✅ 19 tests passing (connection, join/leave, peer events, error handling, cleanup)
 
 ---
 
