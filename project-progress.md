@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 4/23 | 17% |
+| Phase 2: Room Infrastructure | In Progress | 5/23 | 22% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-103` - Room CRUD API - Get Room by ID endpoint
+**Next Feature:** `FEAT-104` - Signaling server - Socket.io integration
 
 ---
 
@@ -133,6 +133,27 @@ Implemented room listing API with status filtering:
 
 **Test Results:**
 ✅ 19 tests passing
+
+---
+
+### FEAT-103: Room CRUD API - Get Room by ID endpoint
+**Date:** 2024-12-05
+**Test:** `tests/unit/api/rooms/get.test.ts`
+
+Implemented room retrieval and deletion endpoints:
+
+**Files Created:**
+- `src/app/api/rooms/[roomId]/route.ts` - GET and DELETE handlers
+
+**Key Features:**
+- `GET /api/rooms/[roomId]` - Returns full room details
+- `DELETE /api/rooms/[roomId]?action=close` - Soft close room
+- `DELETE /api/rooms/[roomId]?action=delete` - Hard delete room
+- `roomExists()` - Check room existence
+- `closeRoom()` - Soft close with status update
+
+**Test Results:**
+✅ 18 tests passing
 
 ---
 

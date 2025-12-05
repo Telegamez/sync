@@ -131,10 +131,15 @@ describe('Room Store - List Rooms', () => {
         role: 'participant',
         roomId: room.id,
         presence: {
-          isOnline: true,
-          isMuted: false,
-          isSpeaking: false,
-          lastSeen: new Date(),
+          connectionState: 'connected',
+          audio: {
+            isMuted: false,
+            isSpeaking: false,
+            isAddressingAI: false,
+            audioLevel: 0,
+          },
+          lastActiveAt: new Date(),
+          isIdle: false,
         },
         joinedAt: new Date(),
       };
@@ -208,10 +213,15 @@ describe('Room Store - Participant Management', () => {
     role: 'participant',
     roomId,
     presence: {
-      isOnline: true,
-      isMuted: false,
-      isSpeaking: false,
-      lastSeen: new Date(),
+      connectionState: 'connected',
+      audio: {
+        isMuted: false,
+        isSpeaking: false,
+        isAddressingAI: false,
+        audioLevel: 0,
+      },
+      lastActiveAt: new Date(),
+      isIdle: false,
     },
     joinedAt: new Date(),
   });
