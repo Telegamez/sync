@@ -657,9 +657,9 @@
         "Create auth context provider",
         "Protect room routes with middleware"
       ],
-      "testFile": "tests/unit/auth/supabase.test.ts",
+      "testFile": "tests/unit/auth/supabase.test.tsx",
       "dependencies": [],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-401",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 40,
-    "pending": 11
+    "passed": 41,
+    "pending": 10
   }
 }

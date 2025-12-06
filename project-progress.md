@@ -13,9 +13,9 @@
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
 | Phase 4: Shared AI Session | **Complete** | 9/9 | 100% |
-| Phase 5: Production Polish | Pending | 0/11 | 0% |
+| Phase 5: Production Polish | In Progress | 1/11 | 9% |
 
-**Phase 4 Complete!** Next Phase: Phase 5 - Production Polish
+**Phase 5 In Progress!** Next Feature: `FEAT-401` - Room persistence - Database schema
 
 ---
 
@@ -1731,12 +1731,10 @@ All 9 Phase 4 features have been implemented and tested:
 
 ---
 
-## Phase 5: Production Polish (Pending)
-
-*Ready to start!*
+## Phase 5: Production Polish (In Progress)
 
 ### Planned Features:
-1. `FEAT-400` - Supabase authentication
+1. `FEAT-400` - Supabase authentication ✅
 2. `FEAT-401` - Database schema
 3. `FEAT-402` - Room persistence CRUD
 4. `FEAT-403` - Room permissions
@@ -1747,6 +1745,48 @@ All 9 Phase 4 features have been implemented and tested:
 9. `FEAT-408` - GitHub Actions CI
 10. `FEAT-409` - Pre-commit hooks
 11. `FEAT-410` - Multi-peer E2E tests
+
+---
+
+### FEAT-400: User Authentication - Supabase Integration
+**Date:** 2024-12-06
+**Test:** `tests/unit/auth/supabase.test.tsx`
+
+Implemented Supabase authentication with mock mode for development/testing:
+
+**Files Created:**
+- `src/types/auth.ts` - Auth types (UserProfile, Session, AuthState, etc.)
+- `src/lib/supabase/client.ts` - SupabaseAuthClient class with mock mode
+- `src/lib/supabase/index.ts` - Supabase client exports
+- `src/contexts/AuthContext.tsx` - AuthProvider and hooks
+- `src/contexts/index.ts` - Context exports
+- `src/middleware.ts` - Route protection middleware
+
+**Key Features:**
+- SupabaseAuthClient with mock mode for development without Supabase
+- Sign up/sign in with email/password
+- OAuth support (Google, GitHub) when Supabase configured
+- Magic link support
+- Password reset and update
+- Profile update
+- Session persistence in localStorage
+- Auto session refresh before expiry
+- Route protection for /rooms, /profile, /settings
+- Auth context with hooks: useAuth, useIsAuthenticated, useUser, useAuthState
+
+**Auth Types:**
+- `UserProfile`: id, email, displayName, avatarUrl, createdAt, lastSignInAt
+- `Session`: accessToken, refreshToken, expiresAt, user
+- `AuthState`: 'loading' | 'authenticated' | 'unauthenticated' | 'error'
+- `AuthErrorCode`: Mapped Supabase errors to user-friendly messages
+
+**Route Protection:**
+- Protected routes: /rooms, /rooms/*, /profile, /settings
+- Public routes: /, /auth/*, /api/health
+- Automatic redirect to /auth/signin with returnUrl
+
+**Test Results:**
+✅ 73 tests passing (auth types, Supabase client, transformers, storage, auth context, hooks, session persistence, integration)
 
 ---
 

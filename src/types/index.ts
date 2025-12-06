@@ -18,3 +18,6 @@ export * from './voice-mode';
 
 // Signaling types (FEAT-100)
 export * from './signaling';
+
+// Auth types (FEAT-400)
+export * from './auth';
