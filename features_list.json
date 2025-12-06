@@ -693,7 +693,7 @@
       ],
       "testFile": "tests/unit/db/queries.test.ts",
       "dependencies": ["FEAT-401"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-403",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 42,
-    "pending": 9
+    "passed": 43,
+    "pending": 8
   }
 }

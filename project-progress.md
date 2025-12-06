@@ -13,9 +13,9 @@
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
 | Phase 4: Shared AI Session | **Complete** | 9/9 | 100% |
-| Phase 5: Production Polish | In Progress | 2/11 | 18% |
+| Phase 5: Production Polish | In Progress | 3/11 | 27% |
 
-**Phase 5 In Progress!** Next Feature: `FEAT-402` - Room persistence - CRUD operations
+**Phase 5 In Progress!** Next Feature: `FEAT-403` - Room permissions - Owner and participant roles
 
 ---
 
@@ -1828,6 +1828,47 @@ Implemented database schema for room persistence using Drizzle ORM-compatible pa
 
 **Test Results:**
 ✅ 82 tests passing (SQL definitions, defaults, validation functions, type guards, type interfaces)
+
+---
+
+### FEAT-402: Room Persistence - CRUD Operations
+**Date:** 2024-12-06
+**Test:** `tests/unit/db/queries.test.ts`
+
+Implemented database CRUD operations with support for both mock and database modes:
+
+**Files Created:**
+- `src/server/db/queries.ts` - Complete CRUD operations for rooms, participants, and history
+
+**Room Operations:**
+- `createRoom()` - Create room with validation and ownership
+- `getRoom()` / `getRoomWithCount()` / `getRoomWithParticipants()` - Room retrieval
+- `getRooms()` - List rooms with filtering (status, owner, search), pagination, sorting
+- `updateRoom()` / `updateRoomVoiceSettings()` / `updateRoomStatus()` - Room updates
+- `deleteRoom()` (soft) / `hardDeleteRoom()` (permanent) / `closeRoom()` - Room deletion
+- `roomExists()` / `getRoomCount()` - Room queries
+
+**Participant Operations:**
+- `addParticipant()` - Add participant with capacity checks and status updates
+- `removeParticipant()` - Remove participant with time tracking
+- `kickParticipant()` - Remove with audit event
+- `updateParticipantRole()` - Change role with audit event
+- `getParticipants()` / `getParticipantByPeerId()` / `getParticipantCount()` - Queries
+
+**History Operations:**
+- `recordRoomEvent()` - Record events (room_created, participant_joined, role_changed, etc.)
+- `getRoomHistory()` - Retrieve history with filtering and pagination
+
+**Key Features:**
+- Mock mode for development/testing without database
+- DatabaseClient interface for Drizzle/Supabase integration
+- Automatic room status updates based on participant count
+- Full event history for auditing
+- Query options: status filter, owner filter, search, pagination, sorting
+- Factory function `createRoomQueries()` for dependency injection
+
+**Test Results:**
+✅ 67 tests passing (room CRUD, participant CRUD, history, factory, integration tests)
 
 ---
 
