@@ -234,7 +234,7 @@
       ],
       "testFile": "tests/unit/components/RoomLobby.test.tsx",
       "dependencies": ["FEAT-102"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-112",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 12,
-    "pending": 39
+    "passed": 13,
+    "pending": 38
   }
 }

@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 12/23 | 52% |
+| Phase 2: Room Infrastructure | In Progress | 13/23 | 57% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-111` - RoomLobby component - Room list and join interface
+**Next Feature:** `FEAT-112` - RoomCard component - Room preview card
 
 ---
 
@@ -312,6 +312,42 @@ Implemented React hook for managing real-time presence state in a room:
 
 **Test Results:**
 ✅ 37 tests passing (initial state, local updates, peer events, derived state, helpers, callbacks, cleanup, debouncing)
+
+---
+
+### FEAT-111: RoomLobby component - Room list and join interface
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/RoomLobby.test.tsx`
+
+Implemented React component for browsing and joining available rooms:
+
+**Files Created:**
+- `src/components/room/RoomLobby.tsx` - Main lobby component
+- `src/components/room/index.ts` - Component exports
+
+**Key Features:**
+- Display list of available rooms in responsive grid
+- Room cards with name, description, participant count, status badge
+- Search by name and description (client-side filtering)
+- Status filter dropdown (All/Waiting/Active/Full)
+- Manual refresh button with loading indicator
+- Auto-refresh at configurable interval
+- Create Room button with callback
+- Join button disabled for full/closed rooms
+- Empty state with prompt to create room
+- Error state with retry functionality
+- Loading state with spinner
+- Footer showing room count
+
+**Props:**
+- `onJoinRoom(roomId)` - Callback when joining
+- `onCreateRoom()` - Callback to create room
+- `fetchRooms(status?)` - Custom fetch function
+- `refreshInterval` - Auto-refresh interval (default 30s)
+- `showCreateButton` - Toggle create button visibility
+
+**Test Results:**
+✅ 32 tests passing (initial render, room display, search, filter, join, create, refresh, error handling, empty state)
 
 ---
 
