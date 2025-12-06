@@ -33,3 +33,6 @@ export type { AIStateIndicatorProps, AIStateIndicatorSize, AIStateIndicatorMode,
 
 export { VoiceModeSettings, VoiceModeSettingsCompact, VoiceModeSettingsFull } from './VoiceModeSettings';
 export type { VoiceModeSettingsProps, VoiceModeSettingsSize, VoiceModeSettingsCompactProps, VoiceModeSettingsFullProps } from './VoiceModeSettings';
+
+export { SwensyncOverlayRoom } from './SwensyncOverlayRoom';
+export type { SwensyncOverlayRoomProps, RoomParticipant, RoomAISession, RoomOverlayConnectionState } from './SwensyncOverlayRoom';

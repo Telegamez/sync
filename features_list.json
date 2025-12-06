@@ -642,7 +642,7 @@
       ],
       "testFile": "tests/unit/components/SwensyncOverlay-room.test.tsx",
       "dependencies": ["FEAT-303", "FEAT-205"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-400",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 37,
-    "pending": 14
+    "passed": 38,
+    "pending": 13
   }
 }

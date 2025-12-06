@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 6/9 | 67% |
+| Phase 4: Shared AI Session | In Progress | 7/9 | 78% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-306` - Enhanced SwensyncOverlay for rooms
+**Phase 4 In Progress!** Next Feature: `FEAT-157` - Server-side turn queue processing
 
 ---
 
@@ -1287,7 +1287,7 @@ All 13 Phase 3 features have been implemented and tested:
 4. `FEAT-303` - useSharedAI hook ✅
 5. `FEAT-304` - Shared context management ✅
 6. `FEAT-305` - AI personality configuration ✅
-7. `FEAT-306` - Enhanced SwensyncOverlay for rooms
+7. `FEAT-306` - Enhanced SwensyncOverlay for rooms ✅
 8. `FEAT-157` - Server-side turn queue processing
 9. `FEAT-158` - Interrupt handling for urgent overrides
 
@@ -1579,6 +1579,50 @@ Implemented AI personality configuration manager for per-room AI customization:
 
 **Test Results:**
 ✅ 81 tests passing (initialization, room management, personality presets, setPersonality, setCustomInstructions, voice/temperature configuration, additional context, participant context, generateInstructions, validation, callbacks, export/import, custom personality restrictions, clear/dispose, preset details, edge cases)
+
+---
+
+### FEAT-306: Enhanced SwensyncOverlay for Multi-Peer Rooms
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/SwensyncOverlay-room.test.tsx`
+
+Implemented enhanced full-screen overlay for multi-peer room voice conversations:
+
+**Files Created:**
+- `src/components/room/SwensyncOverlayRoom.tsx` - Enhanced room overlay component
+
+**Key Features:**
+- Room context with room name, ID, and participant display
+- AI state display with room awareness (idle, listening, processing, speaking)
+- Shows which peer AI is responding to with avatar and name
+- Speaking indicator for current speakers while AI listens
+- Shared audio visualizer with configurable modes
+- PTT button integration with MainPTTButton component
+- Mute/unmute control with visual feedback
+- Queue position indicator ("You're next" or "Position X of Y")
+- Session timer and expiring session warning
+- Unhealthy session warning indicator
+- Settings and participants buttons
+- Mobile landscape support with sidebar layout
+- Header participant avatars with overflow indicator
+- Close button with disconnect behavior
+- ESC key to close
+- Auto-connect on open, disconnect on close
+
+**Component Props:**
+- `isOpen` / `onClose` - Open state management
+- `roomId` / `roomName` - Room identification
+- `localPeerId` - Local user identification
+- `connectionState` - Connection state (idle, connecting, connected, reconnecting, error)
+- `participants` - Array of RoomParticipant with speaking/muted state
+- `aiSession` - RoomAISession with state, queue, speaker info
+- `analyserNode` / `isVisualizerActive` - Audio visualization
+- `onPTTStart` / `onPTTEnd` - Push-to-talk callbacks
+- `onToggleMute` / `isLocalMuted` - Mute controls
+- `onOpenSettings` / `onShowParticipants` - Navigation callbacks
+
+**Test Results:**
+✅ 48 tests passing (rendering, connection states, participant display, AI state display, responding to speaker, speaking indicators, queue position, session warnings, controls, close behavior, auto-connect, session timer, visualizer mode, accessibility, edge cases)
 
 ---
 
