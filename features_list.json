@@ -523,7 +523,7 @@
       ],
       "testFile": "tests/unit/audio/sync.test.ts",
       "dependencies": ["FEAT-202"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-300",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 29,
-    "pending": 22
+    "passed": 30,
+    "pending": 21
   }
 }

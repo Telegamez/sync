@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 6/13 | 46% |
+| Phase 3: Multi-Peer Audio | In Progress | 7/13 | 54% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-206` - Audio synchronization
+**Phase 3 In Progress!** Next Feature: `FEAT-151` - Push-to-Talk (PTT) implementation
 
 ---
 
@@ -960,14 +960,61 @@ Implemented a React component for displaying active speaker(s) with smooth trans
 
 ---
 
+### FEAT-206: Audio synchronization - Playback timing
+**Date:** 2024-12-06
+**Test:** `tests/unit/audio/sync.test.ts`
+
+Implemented audio synchronization class for managing playback timing across peers:
+
+**Files Created:**
+- `src/lib/audio/sync.ts` - AudioSync class for playback timing
+
+**Key Features:**
+- Jitter buffer implementation with adaptive sizing
+- Synchronized playback start time calculation
+- Sync status tracking per peer (synced, ahead, behind, unknown)
+- Sync accuracy measurement with statistics (average offset, max offset, std dev, synced percentage)
+- Manual and automatic resync mechanisms
+- Server time offset support for accurate timing
+- Buffer underrun/overrun detection with recovery
+- Periodic measurement mode for continuous monitoring
+- Callbacks: `onSyncStatusChange`, `onResyncNeeded`, `onSyncAccuracy`, `onBufferUnderrun`, `onBufferOverrun`
+
+**Jitter Buffer:**
+- Adaptive sizing based on network conditions
+- Min/max buffer limits (50-300ms default)
+- Jitter calculation from packet delay variance
+- Buffer target adjustment on underrun/overrun
+
+**API:**
+- `addPeer()` / `removePeer()` - Manage tracked peers
+- `reportPeerTiming(peerId, timing)` - Report timing info
+- `calculateSyncedStartTime()` - Get synchronized start time
+- `startPeerPlayback()` / `stopPeerPlayback()` - Control playback
+- `measureSyncAccuracy()` - Measure current sync accuracy
+- `requestResync()` / `requestResyncAll()` - Trigger resync
+- `startMeasuring()` / `stopMeasuring()` - Periodic measurement
+- `setServerTimeOffset()` / `setSyncThreshold()` - Configuration
+
+**Test Results:**
+✅ 52 tests passing (initialization, peer management, timing reports, sync status, jitter buffer, synchronized start, playback control, buffer events, sync accuracy, periodic measurement, resync, configuration, dispose)
+
+---
+
 ### Planned Features:
-1. `FEAT-200` - Audio mixer foundation
-2. `FEAT-201` - Per-peer volume control
-3. `FEAT-202` - useAudioMixer hook
-4. `FEAT-203` - Speaking detection per peer
-5. `FEAT-204` - Per-peer audio visualization
-6. `FEAT-205` - SpeakingIndicator component
-7. `FEAT-206` - Audio synchronization
+1. `FEAT-200` - Audio mixer foundation ✅
+2. `FEAT-201` - Per-peer volume control ✅
+3. `FEAT-202` - useAudioMixer hook ✅
+4. `FEAT-203` - Speaking detection per peer ✅
+5. `FEAT-204` - Per-peer audio visualization ✅
+6. `FEAT-205` - SpeakingIndicator component ✅
+7. `FEAT-206` - Audio synchronization ✅
+8. `FEAT-151` - Push-to-Talk (PTT) implementation
+9. `FEAT-152` - AI response locking mechanism
+10. `FEAT-153` - useTurnManager hook
+11. `FEAT-154` - PTTButton component
+12. `FEAT-155` - AIStateIndicator component
+13. `FEAT-156` - VoiceModeSettings component
 
 ---
 
