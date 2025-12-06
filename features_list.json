@@ -20,7 +20,7 @@
     },
     "phase3": {
       "name": "Multi-Peer Audio",
-      "status": "pending",
+      "status": "in_progress",
       "description": "Audio mixing, per-peer analysis, synchronization"
     },
     "phase4": {
@@ -421,7 +421,7 @@
       ],
       "testFile": "tests/unit/audio/mixer.test.ts",
       "dependencies": ["FEAT-121"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-201",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 23,
-    "pending": 28
+    "passed": 24,
+    "pending": 27
   }
 }

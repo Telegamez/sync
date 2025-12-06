@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 0/13 | 0% |
+| Phase 3: Multi-Peer Audio | In Progress | 1/13 | 8% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 2 Complete!** Next Feature: `FEAT-200` - Audio mixer foundation
+**Phase 3 Started!** Next Feature: `FEAT-201` - Per-peer volume control
 
 ---
 
@@ -745,9 +745,43 @@ Set up testing infrastructure:
 
 ---
 
-## Phase 3: Multi-Peer Audio (Pending)
+## Phase 3: Multi-Peer Audio (In Progress)
 
-*Blocked by Phase 2 completion.*
+### FEAT-200: Audio mixer - Multi-stream mixing foundation
+**Date:** 2024-12-06
+**Test:** `tests/unit/audio/mixer.test.ts`
+
+Implemented the core audio mixer class for combining multiple peer audio streams:
+
+**Files Created:**
+- `src/lib/audio/mixer.ts` - AudioMixer class using Web Audio API
+
+**Key Features:**
+- AudioContext initialization with configurable sample rate
+- GainNode per audio source for individual volume control
+- MediaStreamAudioDestinationNode for mixed output stream
+- `addStream(id, stream)` / `removeStream(id)` - Manage audio sources
+- `getMixedStream()` - Get combined output for AI input
+- `setVolume(id, volume)` / `getVolume(id)` - Per-source volume (0-1)
+- `mute(id)` / `unmute(id)` - Per-source muting with volume restoration
+- `setMasterVolume(volume)` - Master volume control
+- `muteMaster()` / `unmuteMaster()` - Master mute control
+- `suspend()` / `resume()` - AudioContext state management
+- `dispose()` - Full cleanup with context close
+- `getState()` - Current mixer state (initialized, running, sourceCount, etc.)
+- `createAudioMixer()` - Factory function
+
+**Architecture:**
+```
+[Peer Stream 1] → [GainNode 1] ↘
+[Peer Stream 2] → [GainNode 2] → [Master GainNode] → [Destination] → [Mixed Output]
+[Peer Stream N] → [GainNode N] ↗
+```
+
+**Test Results:**
+✅ 47 tests passing (initialization, adding/removing streams, volume control, muting, master volume, state, suspend/resume, dispose, factory)
+
+---
 
 ### Planned Features:
 1. `FEAT-200` - Audio mixer foundation
