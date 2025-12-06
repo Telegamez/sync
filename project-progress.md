@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 1/13 | 8% |
+| Phase 3: Multi-Peer Audio | In Progress | 2/13 | 15% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 Started!** Next Feature: `FEAT-201` - Per-peer volume control
+**Phase 3 Started!** Next Feature: `FEAT-202` - useAudioMixer hook
 
 ---
 
@@ -780,6 +780,38 @@ Implemented the core audio mixer class for combining multiple peer audio streams
 
 **Test Results:**
 ✅ 47 tests passing (initialization, adding/removing streams, volume control, muting, master volume, state, suspend/resume, dispose, factory)
+
+---
+
+### FEAT-201: Audio mixer - Per-peer volume control
+**Date:** 2024-12-06
+**Test:** `tests/unit/audio/mixer-volume.test.ts`
+
+Extended the audio mixer with advanced per-peer volume control and normalization:
+
+**Key Features:**
+- Per-source GainNode control (already in FEAT-200)
+- `setVolume(peerId, level)` with normalization support
+- `mute(id)` / `unmute(id)` with volume restoration
+- **Volume Normalization Modes:**
+  - `none`: No normalization (default)
+  - `constant`: Constant power normalization (1/√n scaling)
+  - `auto`: Dynamic normalization to target output level
+- `getAllVolumes()` - Get volume info for all sources (UI)
+- `getSourceVolumeInfo(id)` - Get single source volume info
+- `setNormalizationMode(mode)` / `getNormalizationMode()`
+- `setTargetOutputLevel(level)` / `getTargetOutputLevel()`
+- `getNormalizationFactor()` - Current normalization multiplier
+- `SourceVolumeInfo` interface with effectiveVolume for UI
+
+**Normalization Details:**
+- Constant mode: `1/√n` - maintains perceived loudness as peers join
+- Auto mode: scales to targetOutputLevel / totalVolume
+- Both modes respect `minSourceGain` floor (default 0.2)
+- Normalization applied automatically on add/remove/volume change
+
+**Test Results:**
+✅ 29 tests passing (per-source volume, volume info for UI, normalization modes, mode switching, volume with normalization)
 
 ---
 

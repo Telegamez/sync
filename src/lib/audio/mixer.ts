@@ -56,6 +56,37 @@ export interface AudioMixerState {
 }
 
 /**
+ * Source volume info for UI
+ */
+export interface SourceVolumeInfo {
+  /** Source ID */
+  id: PeerId;
+  /** Volume level (0-1) */
+  volume: number;
+  /** Whether source is muted */
+  isMuted: boolean;
+  /** Effective volume after normalization (0-1) */
+  effectiveVolume: number;
+}
+
+/**
+ * Volume normalization mode
+ */
+export type NormalizationMode = 'none' | 'auto' | 'constant';
+
+/**
+ * Extended mixer options with volume normalization
+ */
+export interface AudioMixerOptionsV2 extends AudioMixerOptions {
+  /** Volume normalization mode (default: 'none') */
+  normalizationMode?: NormalizationMode;
+  /** Target combined output level for auto normalization (0-1, default: 0.9) */
+  targetOutputLevel?: number;
+  /** Minimum gain per source for auto normalization (0-1, default: 0.2) */
+  minSourceGain?: number;
+}
+
+/**
  * AudioMixer class
  *
  * Manages multiple audio streams and mixes them into a single output.
@@ -89,11 +120,17 @@ export class AudioMixer {
   private masterVolume: number = 1.0;
   private isMasterMuted: boolean = false;
   private isInitialized: boolean = false;
-  private options: AudioMixerOptions;
+  private options: AudioMixerOptionsV2;
+  private normalizationMode: NormalizationMode = 'none';
+  private targetOutputLevel: number = 0.9;
+  private minSourceGain: number = 0.2;
 
-  constructor(options: AudioMixerOptions = {}) {
+  constructor(options: AudioMixerOptionsV2 = {}) {
     this.options = options;
     this.masterVolume = options.masterVolume ?? 1.0;
+    this.normalizationMode = options.normalizationMode ?? 'none';
+    this.targetOutputLevel = options.targetOutputLevel ?? 0.9;
+    this.minSourceGain = options.minSourceGain ?? 0.2;
   }
 
   /**
@@ -166,6 +203,11 @@ export class AudioMixer {
       isMuted: false,
       volume: 1.0,
     });
+
+    // Apply normalization after adding source
+    if (this.normalizationMode !== 'none') {
+      this.applyNormalization();
+    }
   }
 
   /**
@@ -183,6 +225,11 @@ export class AudioMixer {
 
     // Remove from map
     this.sources.delete(id);
+
+    // Re-apply normalization after removing source
+    if (this.normalizationMode !== 'none') {
+      this.applyNormalization();
+    }
 
     return true;
   }
@@ -213,9 +260,13 @@ export class AudioMixer {
     const clampedVolume = Math.max(0, Math.min(1, volume));
     source.volume = clampedVolume;
 
-    // Apply volume (respecting mute state)
+    // Apply volume (respecting mute state and normalization)
     if (!source.isMuted) {
-      source.gainNode.gain.value = clampedVolume;
+      if (this.normalizationMode !== 'none') {
+        this.applyNormalization();
+      } else {
+        source.gainNode.gain.value = clampedVolume;
+      }
     }
   }
 
@@ -249,7 +300,13 @@ export class AudioMixer {
     }
 
     source.isMuted = false;
-    source.gainNode.gain.value = source.volume;
+
+    // Apply normalization or direct volume
+    if (this.normalizationMode !== 'none') {
+      this.applyNormalization();
+    } else {
+      source.gainNode.gain.value = source.volume;
+    }
   }
 
   /**
@@ -330,6 +387,132 @@ export class AudioMixer {
       masterVolume: this.masterVolume,
       isMasterMuted: this.isMasterMuted,
     };
+  }
+
+  /**
+   * Get volume info for all sources (for UI display)
+   */
+  getAllVolumes(): SourceVolumeInfo[] {
+    const normalizationFactor = this.calculateNormalizationFactor();
+    const result: SourceVolumeInfo[] = [];
+
+    this.sources.forEach((source) => {
+      result.push({
+        id: source.id,
+        volume: source.volume,
+        isMuted: source.isMuted,
+        effectiveVolume: source.isMuted ? 0 : source.volume * normalizationFactor,
+      });
+    });
+
+    return result;
+  }
+
+  /**
+   * Get volume info for a specific source
+   */
+  getSourceVolumeInfo(id: PeerId): SourceVolumeInfo | null {
+    const source = this.sources.get(id);
+    if (!source) {
+      return null;
+    }
+
+    const normalizationFactor = this.calculateNormalizationFactor();
+    return {
+      id: source.id,
+      volume: source.volume,
+      isMuted: source.isMuted,
+      effectiveVolume: source.isMuted ? 0 : source.volume * normalizationFactor,
+    };
+  }
+
+  /**
+   * Set volume normalization mode
+   */
+  setNormalizationMode(mode: NormalizationMode): void {
+    this.normalizationMode = mode;
+    this.applyNormalization();
+  }
+
+  /**
+   * Get current normalization mode
+   */
+  getNormalizationMode(): NormalizationMode {
+    return this.normalizationMode;
+  }
+
+  /**
+   * Set target output level for auto normalization
+   */
+  setTargetOutputLevel(level: number): void {
+    this.targetOutputLevel = Math.max(0, Math.min(1, level));
+    if (this.normalizationMode !== 'none') {
+      this.applyNormalization();
+    }
+  }
+
+  /**
+   * Get current target output level
+   */
+  getTargetOutputLevel(): number {
+    return this.targetOutputLevel;
+  }
+
+  /**
+   * Calculate normalization factor based on mode and source count
+   */
+  private calculateNormalizationFactor(): number {
+    const sourceCount = this.sources.size;
+
+    if (sourceCount === 0 || this.normalizationMode === 'none') {
+      return 1.0;
+    }
+
+    if (this.normalizationMode === 'constant') {
+      // Constant power normalization: divide by sqrt(n)
+      // This maintains perceived loudness as sources are added
+      return Math.max(this.minSourceGain, 1 / Math.sqrt(sourceCount));
+    }
+
+    if (this.normalizationMode === 'auto') {
+      // Auto normalization: target output level divided by sum of volumes
+      let totalVolume = 0;
+      this.sources.forEach((source) => {
+        if (!source.isMuted) {
+          totalVolume += source.volume;
+        }
+      });
+
+      if (totalVolume === 0) {
+        return 1.0;
+      }
+
+      // Scale to target output level
+      const factor = this.targetOutputLevel / totalVolume;
+      return Math.max(this.minSourceGain, Math.min(1, factor));
+    }
+
+    return 1.0;
+  }
+
+  /**
+   * Apply normalization to all sources
+   */
+  private applyNormalization(): void {
+    const factor = this.calculateNormalizationFactor();
+
+    this.sources.forEach((source) => {
+      if (!source.isMuted) {
+        source.gainNode.gain.value = source.volume * factor;
+      }
+    });
+  }
+
+  /**
+   * Get the current normalization factor
+   */
+  getNormalizationFactor(): number {
+    return this.calculateNormalizationFactor();
   }
 
   /**

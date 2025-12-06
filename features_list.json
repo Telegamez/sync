@@ -438,7 +438,7 @@
       ],
       "testFile": "tests/unit/audio/mixer-volume.test.ts",
       "dependencies": ["FEAT-200"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-202",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 24,
-    "pending": 27
+    "passed": 25,
+    "pending": 26
   }
 }
