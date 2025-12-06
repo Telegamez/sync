@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 18/23 | 78% |
+| Phase 2: Room Infrastructure | In Progress | 19/23 | 83% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-117` - Room lobby page (/rooms)
+**Next Feature:** `FEAT-118` - Create room page (/rooms/create)
 
 ---
 
@@ -526,6 +526,36 @@ Implemented control bar component for room actions with keyboard accessibility:
 
 **Test Results:**
 ✅ 41 tests passing (mute, leave, settings, PTT, layout, sizes, accessibility, disabled states)
+
+---
+
+### FEAT-117: Room lobby page - /rooms
+**Date:** 2024-12-06
+**Test:** `tests/unit/pages/rooms.test.tsx`
+
+Implemented the main room lobby page for browsing and joining rooms:
+
+**Files Created:**
+- `src/app/rooms/page.tsx` - Room lobby page
+
+**Key Features:**
+- Integrates RoomLobby component for room list display
+- Header with back navigation and title
+- Page description for user guidance
+- Joining overlay with loading spinner
+- Navigation to create room page (/rooms/create)
+- Navigation to room experience page (/rooms/[roomId])
+- Responsive layout with max-width container
+- Footer with branding
+
+**Navigation Flow:**
+- Back to Home: Link to /
+- Create Room: Button navigates to /rooms/create
+- Join Room: Button navigates to /rooms/[roomId]
+- Joining state shows overlay during navigation
+
+**Test Results:**
+✅ 18 tests passing (page structure, room list, create navigation, join navigation, error handling, empty state, search/filter, refresh, responsive)
 
 ---
 

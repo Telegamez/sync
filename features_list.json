@@ -334,9 +334,9 @@
         "Add create room modal/page link",
         "Implement room joining navigation"
       ],
-      "testFile": "tests/e2e/rooms/lobby.spec.ts",
+      "testFile": "tests/unit/pages/rooms.test.tsx",
       "dependencies": ["FEAT-111", "FEAT-112"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-118",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 18,
-    "pending": 33
+    "passed": 19,
+    "pending": 32
   }
 }
