@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 8/13 | 62% |
+| Phase 3: Multi-Peer Audio | In Progress | 9/13 | 69% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-152` - AI response locking mechanism
+**Phase 3 In Progress!** Next Feature: `FEAT-153` - useTurnManager hook
 
 ---
 
@@ -1035,6 +1035,48 @@ Implemented the usePushToTalk hook for PTT functionality with keyboard, mouse, a
 
 ---
 
+### FEAT-152: AI response locking mechanism
+**Date:** 2024-12-06
+**Test:** `tests/unit/signaling/ai-locking.test.ts`
+
+Implemented AI response locking manager for preventing AI interruption chaos:
+
+**Files Created:**
+- `src/server/signaling/ai-locking.ts` - AI locking manager class
+
+**Key Features:**
+- AI state machine (idle, listening, processing, speaking, locked)
+- Turn request queue with priority sorting
+- Lock timeout as safety mechanism
+- Designated speaker support
+- Interrupt capability for owners/moderators
+- Session health tracking
+
+**State Transitions:**
+- `idle` → `listening` → `processing` → `speaking` → `idle`
+- `speaking`/`locked` → timeout → `idle` (safety release)
+- Any state → `interrupt` → `idle` (force release)
+
+**Queue Management:**
+- Priority-based sorting (higher first)
+- FIFO within same priority
+- Request expiration timeout
+- Max queue size limit
+- Auto-process on response complete
+
+**API:**
+- `initRoom()` / `removeRoom()` - Room lifecycle
+- `requestTurn()` / `cancelRequest()` - Turn management
+- `startListening()` / `startProcessing()` / `startSpeaking()` / `finishSpeaking()` - State transitions
+- `lock()` / `unlock()` / `interrupt()` - Control
+- `canRequestTurn()` / `getQueuePosition()` - Query
+- Callbacks: `onStateChange`, `onQueueUpdate`, `onTurnStart`, `onTurnEnd`, `onError`
+
+**Test Results:**
+✅ 53 tests passing (initialization, room management, AI state, turn requests, state transitions, locking, interrupt, queue processing, turn eligibility, queue position, error handling, callbacks, dispose)
+
+---
+
 ### Planned Features:
 1. `FEAT-200` - Audio mixer foundation ✅
 2. `FEAT-201` - Per-peer volume control ✅
@@ -1044,7 +1086,7 @@ Implemented the usePushToTalk hook for PTT functionality with keyboard, mouse, a
 6. `FEAT-205` - SpeakingIndicator component ✅
 7. `FEAT-206` - Audio synchronization ✅
 8. `FEAT-151` - Push-to-Talk (PTT) implementation ✅
-9. `FEAT-152` - AI response locking mechanism
+9. `FEAT-152` - AI response locking mechanism ✅
 10. `FEAT-153` - useTurnManager hook
 11. `FEAT-154` - PTTButton component
 12. `FEAT-155` - AIStateIndicator component

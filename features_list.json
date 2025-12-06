@@ -880,7 +880,7 @@
       ],
       "testFile": "tests/unit/signaling/ai-locking.test.ts",
       "dependencies": ["FEAT-107", "FEAT-150"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-153",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 31,
-    "pending": 20
+    "passed": 32,
+    "pending": 19
   }
 }
