@@ -302,7 +302,7 @@
       ],
       "testFile": "tests/unit/components/ParticipantAvatar.test.tsx",
       "dependencies": ["FEAT-100"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-116",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 16,
-    "pending": 35
+    "passed": 17,
+    "pending": 34
   }
 }

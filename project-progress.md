@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 16/23 | 70% |
+| Phase 2: Room Infrastructure | In Progress | 17/23 | 74% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-115` - ParticipantAvatar component - Peer avatar with status
+**Next Feature:** `FEAT-116` - RoomControls component - Mute/Leave controls
 
 ---
 
@@ -453,6 +453,44 @@ Implemented React component for displaying room participants with presence indic
 
 **Test Results:**
 ✅ 48 tests passing (empty state, display, indicators, layout, sorting, accessibility, overflow)
+
+---
+
+### FEAT-115: ParticipantAvatar component - Peer avatar with status
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/ParticipantAvatar.test.tsx`
+
+Implemented standalone avatar component with comprehensive status indicators:
+
+**Files Created:**
+- `src/components/room/ParticipantAvatar.tsx` - Avatar component
+
+**Key Features:**
+- Initials generation from display name (first + last initial)
+- Image avatar support with fallback to initials
+- Consistent color assignment based on name hash
+- Size variants: xs, sm, md, lg, xl
+- Speaking ring animation with audio level intensity
+- Muted indicator icon (bottom-right)
+- PTT/Addressing AI indicator (top-left, purple)
+- Connection status indicator (top-right)
+- Active speaker highlight ring
+- Local user indicator (blue dot)
+- Click handler support with focus/hover states
+- Comprehensive accessible aria-labels
+
+**Props:**
+- `displayName` - For initials and color
+- `avatarUrl` - Optional image
+- `size` - 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+- `isSpeaking` / `audioLevel` - Speaking animation
+- `isMuted` / `isAddressingAI` - Status indicators
+- `connectionState` / `showConnectionStatus` - Connection state
+- `isActiveSpeaker` / `isLocal` - Highlight indicators
+- `onClick` - Click handler
+
+**Test Results:**
+✅ 59 tests passing (initials, image, sizes, speaking, muted, PTT, connection, active speaker, local, click, accessibility, precedence)
 
 ---
 

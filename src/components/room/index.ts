@@ -15,3 +15,6 @@ export type { CreateRoomFormProps } from './CreateRoomForm';
 
 export { ParticipantList } from './ParticipantList';
 export type { ParticipantListProps, ParticipantInfo, ParticipantListLayout } from './ParticipantList';
+
+export { ParticipantAvatar } from './ParticipantAvatar';
+export type { ParticipantAvatarProps, AvatarSize } from './ParticipantAvatar';
