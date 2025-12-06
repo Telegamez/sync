@@ -296,6 +296,64 @@ export class SignalingClient {
   }
 
   /**
+   * Request a turn to address the AI
+   */
+  public requestTurn(
+    roomId: string,
+    peerId: string,
+    peerDisplayName: string,
+    priority: number = 0
+  ): Promise<import('@/types/voice-mode').TurnRequest | null> {
+    return new Promise((resolve) => {
+      if (!this.socket?.connected) {
+        resolve(null);
+        return;
+      }
+
+      this.socket.emit(
+        'ai:request_turn',
+        { roomId, peerId, peerDisplayName, priority },
+        (response: import('@/types/voice-mode').TurnRequest | null) => {
+          resolve(response);
+        }
+      );
+    });
+  }
+
+  /**
+   * Cancel a turn request
+   */
+  public cancelTurn(roomId: string, requestId: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit('ai:cancel_turn', { roomId, requestId });
+  }
+
+  /**
+   * Interrupt the current AI response (owner/moderator only)
+   */
+  public interruptAI(roomId: string, peerId: string, reason?: string): boolean {
+    if (!this.socket?.connected) return false;
+    this.socket.emit('ai:interrupt', { roomId, interruptedBy: peerId, reason });
+    return true;
+  }
+
+  /**
+   * Start PTT (Push-to-Talk)
+   */
+  public startPTT(roomId: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit('ai:ptt_start', { roomId });
+  }
+
+  /**
+   * End PTT (Push-to-Talk)
+   */
+  public endPTT(roomId: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit('ai:ptt_end', { roomId });
+  }
+
+  /**
    * Register event handler
    */
   public on<K extends keyof SignalingEventHandlers>(

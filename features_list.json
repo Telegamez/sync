@@ -3,7 +3,7 @@
   "metadata": {
     "project": "swensync",
     "version": "0.2.0",
-    "lastUpdated": "2024-12-05T00:00:00.000Z",
+    "lastUpdated": "2024-12-06T00:00:00.000Z",
     "protocol": "Long-Horizon Engineering Protocol v1.0",
     "currentPhase": "Phase 2: Room Infrastructure"
   },
@@ -897,7 +897,7 @@
       ],
       "testFile": "tests/unit/hooks/useTurnManager.test.ts",
       "dependencies": ["FEAT-152", "FEAT-108"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-154",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 32,
-    "pending": 19
+    "passed": 33,
+    "pending": 18
   }
 }

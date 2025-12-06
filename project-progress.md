@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 9/13 | 69% |
+| Phase 3: Multi-Peer Audio | In Progress | 10/13 | 77% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-153` - useTurnManager hook
+**Phase 3 In Progress!** Next Feature: `FEAT-154` - PTTButton component
 
 ---
 
@@ -1077,6 +1077,52 @@ Implemented AI response locking manager for preventing AI interruption chaos:
 
 ---
 
+### FEAT-153: useTurnManager hook - Turn-taking coordination
+**Date:** 2024-12-06
+**Test:** `tests/unit/hooks/useTurnManager.test.ts`
+
+Implemented React hook for client-side turn-taking coordination with AI locking:
+
+**Files Modified/Created:**
+- `src/hooks/useTurnManager.ts` - Turn manager hook (existing, enhanced)
+- `src/lib/signaling/client.ts` - Added turn management methods
+
+**Key Features:**
+- Client-side turn manager state tracking
+- `canRequestTurn` based on AI state and voice mode
+- `requestTurn()` method respecting locks and queue
+- `cancelTurn()` to cancel pending requests
+- `interruptAI()` for owner/moderator interrupt
+- Queue position tracking and notifications
+- PTT state derivation from turn state
+- Current speaker tracking
+- Session health monitoring
+- Socket event subscription for AI state updates
+- Callbacks: `onAIStateChange`, `onTurnGranted`, `onTurnEnded`, `onTurnRejected`, `onQueuePositionChange`, `onAIError`
+
+**SignalingClient Methods Added:**
+- `requestTurn(roomId, peerId, displayName, priority)` - Request AI turn
+- `cancelTurn(roomId, requestId)` - Cancel turn request
+- `interruptAI(roomId, peerId, reason)` - Interrupt AI response
+- `startPTT(roomId)` / `endPTT(roomId)` - PTT signaling
+
+**State Exposed:**
+- `state` - Full TurnManagerState object
+- `aiState` - Current AI response state
+- `canRequestTurn` - Whether local peer can request turn
+- `isMyTurn` - Whether local peer has active turn
+- `queuePosition` - Position in queue (0 = not in queue)
+- `queueLength` - Current queue size
+- `currentSpeakerId` - Peer currently addressing AI
+- `isSessionHealthy` - AI session health
+- `lastError` - Last error message
+- `fullAIState` - Complete RoomAIState object
+
+**Test Results:**
+✅ 43 tests passing (initial state, turn eligibility, queue tracking, turn requests, cancel, interrupt, PTT state, callbacks, AI events, session health, speaker tracking, queue length, factory function)
+
+---
+
 ### Planned Features:
 1. `FEAT-200` - Audio mixer foundation ✅
 2. `FEAT-201` - Per-peer volume control ✅
@@ -1087,7 +1133,7 @@ Implemented AI response locking manager for preventing AI interruption chaos:
 7. `FEAT-206` - Audio synchronization ✅
 8. `FEAT-151` - Push-to-Talk (PTT) implementation ✅
 9. `FEAT-152` - AI response locking mechanism ✅
-10. `FEAT-153` - useTurnManager hook
+10. `FEAT-153` - useTurnManager hook ✅
 11. `FEAT-154` - PTTButton component
 12. `FEAT-155` - AIStateIndicator component
 13. `FEAT-156` - VoiceModeSettings component
