@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 5/9 | 56% |
+| Phase 4: Shared AI Session | In Progress | 6/9 | 67% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-305` - AI personality configuration
+**Phase 4 In Progress!** Next Feature: `FEAT-306` - Enhanced SwensyncOverlay for rooms
 
 ---
 
@@ -1286,7 +1286,7 @@ All 13 Phase 3 features have been implemented and tested:
 3. `FEAT-302` - Response broadcasting ✅
 4. `FEAT-303` - useSharedAI hook ✅
 5. `FEAT-304` - Shared context management ✅
-6. `FEAT-305` - AI personality configuration
+6. `FEAT-305` - AI personality configuration ✅
 7. `FEAT-306` - Enhanced SwensyncOverlay for rooms
 8. `FEAT-157` - Server-side turn queue processing
 9. `FEAT-158` - Interrupt handling for urgent overrides
@@ -1534,6 +1534,51 @@ Implemented context manager for tracking conversation history with speaker attri
 
 **Test Results:**
 ✅ 61 tests passing (room initialization, participant management, message handling, speaker attribution, token counting, system prompts, context for AI, summarization, export/import, configuration, factory function, edge cases)
+
+---
+
+### FEAT-305: AI Personality Configuration - Per-room AI setup
+**Date:** 2024-12-06
+**Test:** `tests/unit/ai/personality.test.ts`
+
+Implemented AI personality configuration manager for per-room AI customization:
+
+**Files Created:**
+- `src/server/signaling/ai-personality.ts` - AIPersonalityManager class
+
+**Key Features:**
+- Personality presets: facilitator, assistant, expert, brainstorm, custom
+- Per-preset system instructions with best practices
+- Suggested voice and temperature per personality
+- Custom personality support with validation
+- Voice and temperature overrides
+- Additional context injection (project info, meeting purpose)
+- Participant context injection (names, roles)
+- Full instruction generation combining all parts
+- Configuration validation and error callbacks
+- Export/import for persistence
+
+**Personality Presets:**
+- `facilitator`: Discussion guide, summarizes points, keeps on track (voice: coral, temp: 0.7)
+- `assistant`: General helpful assistant (voice: alloy, temp: 0.8)
+- `expert`: Domain expert with technical depth (voice: sage, temp: 0.6)
+- `brainstorm`: Creative ideation partner (voice: shimmer, temp: 1.0)
+- `custom`: User-provided instructions
+
+**AIPersonalityManager Methods:**
+- `initRoom(roomId, personality?, customInstructions?)` - Initialize room
+- `setPersonality(roomId, personality, customInstructions?, changedBy?)` - Change personality
+- `setCustomInstructions(roomId, instructions)` - Update custom instructions
+- `setVoice(roomId, voice)` / `setTemperature(roomId, temp)` - Override settings
+- `setAdditionalContext(roomId, context)` - Add project context
+- `setParticipantContext(roomId, context)` - Add participant info
+- `generateInstructions(roomId)` - Generate full system instructions
+- `getSuggestedVoice(roomId)` / `getSuggestedTemperature(roomId)` - Get settings
+- `validatePersonality()` / `validateCustomInstructions()` / `validateConfig()` - Validation
+- `exportConfig(roomId)` / `importConfig(config)` - Persistence
+
+**Test Results:**
+✅ 81 tests passing (initialization, room management, personality presets, setPersonality, setCustomInstructions, voice/temperature configuration, additional context, participant context, generateInstructions, validation, callbacks, export/import, custom personality restrictions, clear/dispose, preset details, edge cases)
 
 ---
 
