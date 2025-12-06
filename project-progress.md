@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 14/23 | 61% |
+| Phase 2: Room Infrastructure | In Progress | 15/23 | 65% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-113` - CreateRoomForm component - Room creation UI
+**Next Feature:** `FEAT-114` - ParticipantList component - Room participant display
 
 ---
 
@@ -381,6 +381,41 @@ Implemented React component for displaying a single room preview card:
 
 **Test Results:**
 ✅ 42 tests passing (room display, AI personality, avatars, join button, loading state, relative time, accessibility)
+
+---
+
+### FEAT-113: CreateRoomForm component - Room creation form
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/CreateRoomForm.test.tsx`
+
+Implemented React component for creating a new room with validation:
+
+**Files Created:**
+- `src/components/room/CreateRoomForm.tsx` - Room creation form component
+
+**Key Features:**
+- Room name input with character counter (3-50 chars)
+- Optional description textarea with character counter (max 500 chars)
+- Max participants slider (2-10) with visual indicator
+- AI personality dropdown (professional/casual/creative/technical)
+- Voice mode toggle (Open Mic/Push-to-Talk)
+- Form validation with real-time error display
+- Validation triggers on blur and submit
+- Submit button disabled when form is invalid
+- Loading state with spinner during creation
+- Cancel button for aborting creation
+- Error message display for API errors
+- Success callback with form data
+
+**Props:**
+- `onSubmit(data)` - Callback with CreateRoomRequest data (supports async)
+- `onCancel()` - Callback when cancel button clicked
+- `isLoading` - External loading state control
+- `error` - External error message to display
+- `defaultValues` - Pre-populate form fields
+
+**Test Results:**
+✅ 41 tests passing (initial render, validation, form submission, loading state, cancel, AI personality, voice mode, error handling)
 
 ---
 

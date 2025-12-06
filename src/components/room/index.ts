@@ -9,3 +9,6 @@ export type { RoomLobbyProps } from './RoomLobby';
 
 export { RoomCard } from './RoomCard';
 export type { RoomCardProps } from './RoomCard';
+
+export { CreateRoomForm } from './CreateRoomForm';
+export type { CreateRoomFormProps } from './CreateRoomForm';
