@@ -251,7 +251,7 @@
       ],
       "testFile": "tests/unit/components/RoomCard.test.tsx",
       "dependencies": ["FEAT-100"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-113",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 13,
-    "pending": 38
+    "passed": 14,
+    "pending": 37
   }
 }

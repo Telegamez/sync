@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 13/23 | 57% |
+| Phase 2: Room Infrastructure | In Progress | 14/23 | 61% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-112` - RoomCard component - Room preview card
+**Next Feature:** `FEAT-113` - CreateRoomForm component - Room creation UI
 
 ---
 
@@ -348,6 +348,39 @@ Implemented React component for browsing and joining available rooms:
 
 **Test Results:**
 ✅ 32 tests passing (initial render, room display, search, filter, join, create, refresh, error handling, empty state)
+
+---
+
+### FEAT-112: RoomCard component - Room preview card
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/RoomCard.test.tsx`
+
+Implemented React component for displaying a single room preview card:
+
+**Files Created:**
+- `src/components/room/RoomCard.tsx` - Room card component
+
+**Key Features:**
+- Display room name and description (with line clamp)
+- Status badge with color coding (waiting/active/full/closed)
+- AI personality badge with color coding
+- Participant avatars (up to 4 with initials fallback)
+- Overflow indicator for 5+ participants (+N)
+- Participant count (X/max) display
+- Relative time formatting (Just now, Xm ago, Xh ago, Xd ago)
+- Join button with loading state and spinner
+- Disabled states for full/closed rooms
+- Accessible button labels
+
+**Props:**
+- `room` - RoomSummary data
+- `onJoin(roomId)` - Callback when joining (supports async)
+- `participantAvatars` - Array of participant avatar data
+- `showAIPersonality` - Toggle AI badge visibility
+- `className` - Custom styling
+
+**Test Results:**
+✅ 42 tests passing (room display, AI personality, avatars, join button, loading state, relative time, accessibility)
 
 ---
 
