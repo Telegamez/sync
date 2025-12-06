@@ -30,3 +30,6 @@ export type { PTTButtonProps, PTTButtonSize, PTTButtonVariant, InlinePTTButtonPr
 
 export { AIStateIndicator, AIStateBadge, AIStateDot, AIStateDisplay } from './AIStateIndicator';
 export type { AIStateIndicatorProps, AIStateIndicatorSize, AIStateIndicatorMode, AIStateBadgeProps, AIStateDotProps, AIStateDisplayProps } from './AIStateIndicator';
+
+export { VoiceModeSettings, VoiceModeSettingsCompact, VoiceModeSettingsFull } from './VoiceModeSettings';
+export type { VoiceModeSettingsProps, VoiceModeSettingsSize, VoiceModeSettingsCompactProps, VoiceModeSettingsFullProps } from './VoiceModeSettings';

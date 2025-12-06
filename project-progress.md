@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 12/13 | 92% |
+| Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-156` - VoiceModeSettings component
+**Phase 3 Complete!** Next Phase: `Phase 4` - Shared AI Session (FEAT-157: Server-side turn queue processing)
 
 ---
 
@@ -1136,7 +1136,7 @@ Implemented React hook for client-side turn-taking coordination with AI locking:
 10. `FEAT-153` - useTurnManager hook ✅
 11. `FEAT-154` - PTTButton component ✅
 12. `FEAT-155` - AIStateIndicator component ✅
-13. `FEAT-156` - VoiceModeSettings component
+13. `FEAT-156` - VoiceModeSettings component ✅
 
 ---
 
@@ -1221,9 +1221,64 @@ Implemented AI state indicator component for displaying current AI response stat
 
 ---
 
-## Phase 4: Shared AI Session (Pending)
+### FEAT-156: VoiceModeSettings component - Room voice configuration
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/VoiceModeSettings.test.tsx`
 
-*Blocked by Phase 3 completion.*
+Implemented comprehensive settings panel for room voice mode configuration:
+
+**Files Created:**
+- `src/components/room/VoiceModeSettings.tsx` - Main settings panel component
+- `src/components/room/index.ts` - Updated exports
+
+**Key Features:**
+- Voice mode selection: Open, Push-to-Talk, Designated Speaker
+- Mode cards with icons and descriptions
+- Designated speaker selector (peer selection chips)
+- Lock during AI response toggle
+- Enable peer audio toggle
+- Allow interrupt toggle
+- Advanced queue settings section (optional)
+  - Enable/disable queue
+  - Max queue size (increment/decrement with min/max bounds)
+  - Queue timeout (in seconds)
+- Saving indicator with spinner
+- Changes pending indicator
+- Layout modes: compact (single column) and expanded (3-column grid)
+- Read-only mode for non-owners
+
+**Convenience Components:**
+- `VoiceModeSettingsCompact` - Compact layout without advanced settings
+- `VoiceModeSettingsFull` - Full layout with advanced settings visible
+
+**Props:**
+- `settings` - Current RoomVoiceSettings
+- `onSettingsChange` - Callback when settings change
+- `canEdit` - Whether user can edit (owner/moderator)
+- `availablePeers` - List of peers for designated speaker selection
+- `showAdvanced` - Whether to show queue settings
+- `isSaving` - Whether settings are being saved
+- `layout` - compact or expanded
+
+**Test Results:**
+✅ 67 tests passing (initial rendering, voice mode selection, designated speakers, lock toggle, peer audio toggle, interrupt toggle, queue settings, number inputs, layout modes, saving state, changes pending, accessibility, custom styling, VoiceModeSettingsCompact, VoiceModeSettingsFull, settings persistence, mode-specific behavior)
+
+---
+
+## Phase 3 Complete!
+
+All 13 Phase 3 features have been implemented and tested:
+- Audio infrastructure: FEAT-200 (Audio mixer), FEAT-201 (Volume control), FEAT-202 (useAudioMixer)
+- Speaking detection: FEAT-203 (Per-peer detection), FEAT-204 (Visualization), FEAT-205 (SpeakingIndicator)
+- Synchronization: FEAT-206 (Audio sync)
+- Turn management: FEAT-151 (PTT hook), FEAT-152 (AI locking), FEAT-153 (useTurnManager)
+- UI Components: FEAT-154 (PTTButton), FEAT-155 (AIStateIndicator), FEAT-156 (VoiceModeSettings)
+
+**Total Tests in Phase 3:** 475+ tests passing
+
+---
+
+## Phase 4: Shared AI Session (Ready to Start)
 
 ### Planned Features:
 1. `FEAT-300` - Single OpenAI connection per room
