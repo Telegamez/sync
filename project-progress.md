@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 3/9 | 33% |
+| Phase 4: Shared AI Session | In Progress | 4/9 | 44% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-303` - useSharedAI hook
+**Phase 4 In Progress!** Next Feature: `FEAT-304` - Shared context management
 
 ---
 
@@ -1284,7 +1284,7 @@ All 13 Phase 3 features have been implemented and tested:
 1. `FEAT-300` - Single OpenAI connection per room ✅
 2. `FEAT-301` - Mixed audio input to AI ✅
 3. `FEAT-302` - Response broadcasting ✅
-4. `FEAT-303` - useSharedAI hook
+4. `FEAT-303` - useSharedAI hook ✅
 5. `FEAT-304` - Shared context management
 6. `FEAT-305` - AI personality configuration
 7. `FEAT-306` - Enhanced SwensyncOverlay for rooms
@@ -1439,6 +1439,57 @@ Implemented response broadcast manager for sending AI audio to all room particip
 
 **Test Results:**
 ✅ 57 tests passing (room initialization, peer management, response lifecycle, audio chunk handling, broadcasting, peer readiness, max wait timeout, late joiner catch-up, response info, buffer status, synchronized start time, max buffered chunks, cancellation, factory function, integration scenarios)
+
+---
+
+### FEAT-303: useSharedAI Hook - Client-side AI integration
+**Date:** 2024-12-06
+**Test:** `tests/unit/hooks/useSharedAI.test.ts`
+
+Implemented React hook for client-side integration with shared AI sessions:
+
+**Files Created:**
+- `src/hooks/useSharedAI.ts` - useSharedAI hook
+
+**Key Features:**
+- Subscribe to AI state events from signaling server
+- Receive broadcasted AI audio chunks
+- Track session connection state
+- Audio playback controls (start, stop, pause, resume)
+- Volume and mute controls
+- Buffer management with ready state detection
+- Response tracking (start, end, current info)
+- Reconnection support with attempt tracking
+- Current speaker tracking (id and name)
+- Mark ready notification to server
+
+**State Exposed:**
+- `state.isConnected` - Session connection status
+- `state.aiState` - Current AI response state (idle, listening, processing, speaking, locked)
+- `state.isSessionHealthy` - Session health status
+- `state.currentSpeakerId` / `state.currentSpeakerName` - Current speaker info
+- `state.isResponding` - Whether AI is currently responding
+- `state.currentResponse` - Current response info
+- `state.lastError` - Last error message
+- `state.reconnectAttempts` - Reconnection attempt count
+
+**Playback State:**
+- `playback.isPlaying` - Whether audio is playing
+- `playback.playbackPosition` - Current position (ms)
+- `playback.bufferedDuration` - Total buffered duration (ms)
+- `playback.chunksBuffered` - Number of chunks in buffer
+- `playback.isReady` - Whether buffer is full enough for playback
+
+**Actions:**
+- `startPlayback()` / `stopPlayback()` / `pausePlayback()` / `resumePlayback()`
+- `clearBuffer()` - Clear audio buffer
+- `setVolume(volume)` / `getVolume()` - Volume control
+- `mute()` / `unmute()` - Mute control
+- `markReady()` - Tell server ready for playback
+- `reconnect()` - Force reconnection to AI session
+
+**Test Results:**
+✅ 37 tests passing (initial state, session connection, AI state events, audio chunk handling, playback controls, volume controls, mark ready, reconnection, response state, factory function, cleanup)
 
 ---
 
