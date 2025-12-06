@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | Pending | 0/9 | 0% |
+| Phase 4: Shared AI Session | In Progress | 1/9 | 11% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 Complete!** Next Phase: `Phase 4` - Shared AI Session (FEAT-157: Server-side turn queue processing)
+**Phase 4 In Progress!** Next Feature: `FEAT-301` - Mixed audio input to AI
 
 ---
 
@@ -1278,16 +1278,60 @@ All 13 Phase 3 features have been implemented and tested:
 
 ---
 
-## Phase 4: Shared AI Session (Ready to Start)
+## Phase 4: Shared AI Session (In Progress)
 
 ### Planned Features:
-1. `FEAT-300` - Single OpenAI connection per room
+1. `FEAT-300` - Single OpenAI connection per room ✅
 2. `FEAT-301` - Mixed audio input to AI
 3. `FEAT-302` - Response broadcasting
 4. `FEAT-303` - useSharedAI hook
 5. `FEAT-304` - Shared context management
 6. `FEAT-305` - AI personality configuration
 7. `FEAT-306` - Enhanced SwensyncOverlay for rooms
+8. `FEAT-157` - Server-side turn queue processing
+9. `FEAT-158` - Interrupt handling for urgent overrides
+
+---
+
+### FEAT-300: AI Orchestrator - Single OpenAI connection per room
+**Date:** 2024-12-06
+**Test:** `tests/unit/ai/orchestrator.test.ts`
+
+Implemented AI Orchestrator for managing single OpenAI Realtime API connections per room:
+
+**Files Created:**
+- `src/server/signaling/ai-orchestrator.ts` - Main AIOrchestrator class
+
+**Key Features:**
+- Session lifecycle management (create, destroy, reconnect)
+- Turn management integration with AILockingManager
+- OpenAI configuration with voice, temperature, turn detection settings
+- Health check monitoring with automatic timeout detection
+- Token refresh support for long-running sessions
+- Reconnection with exponential backoff
+- Multiple room support (isolated sessions per room)
+- Audio input/output callbacks for real-time streaming
+- Transcription handling
+
+**AIOrchestrator Methods:**
+- `createSession(roomId, config?)` - Create AI session for a room
+- `destroySession(roomId)` - Destroy AI session
+- `requestTurn(roomId, peerId, name, priority?)` - Request turn to address AI
+- `cancelTurn(roomId, requestId)` - Cancel turn request
+- `startListening/startProcessing/startSpeaking/finishSpeaking` - State transitions
+- `interrupt(roomId, interruptedBy, reason?)` - Interrupt AI response
+- `sendAudioInput(roomId, audioData)` - Send audio to AI
+- `handleAudioResponse/handleTranscription` - Process AI responses
+
+**Session States:**
+- `disconnected` - Not connected to OpenAI
+- `connecting` - Connection in progress
+- `connected` - Active connection
+- `error` - Connection error
+- `reconnecting` - Reconnection attempt in progress
+
+**Test Results:**
+✅ 47 tests passing (session creation, destruction, queries, turn management, AI state transitions, audio I/O, configuration, reconnection, health checks, dispose, factory, defaults, multiple rooms, error handling, activity tracking, integration tests)
 
 ---
 
