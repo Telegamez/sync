@@ -387,7 +387,7 @@
       ],
       "testFile": "tests/unit/webrtc/mesh.test.ts",
       "dependencies": ["FEAT-106", "FEAT-109"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-121",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 21,
-    "pending": 30
+    "passed": 22,
+    "pending": 29
   }
 }

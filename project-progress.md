@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 21/23 | 91% |
+| Phase 2: Room Infrastructure | In Progress | 22/23 | 96% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-120` - Multi-peer WebRTC mesh connections
+**Next Feature:** `FEAT-121` - Multi-peer audio track management
 
 ---
 
@@ -623,6 +623,37 @@ Implemented the main room collaboration experience page:
 
 **Test Results:**
 ✅ 31 tests passing (loading states, error states, connected room, controls, leave, share, participants, AI status, responsive)
+
+---
+
+### FEAT-120: Multi-peer WebRTC mesh - Peer connection management
+**Date:** 2024-12-06
+**Test:** `tests/unit/webrtc/mesh.test.ts`
+
+Verified and tested the WebRTC mesh topology implementation in useRoomPeers hook:
+
+**Implementation Already Complete in:**
+- `src/hooks/useRoomPeers.ts` - Full mesh WebRTC connection management
+
+**Key Features:**
+- Creates RTCPeerConnection for each peer in room
+- Full mesh topology (each peer connects to every other peer)
+- Higher ID initiates pattern to avoid race conditions
+- Offer/answer exchange via signaling server
+- ICE candidate exchange with queuing for early candidates
+- Per-peer connection state tracking (new, connecting, connected, failed, closed)
+- Audio stream management per peer
+- Reconnection support via reconnectPeer()
+- Cleanup on peer leave and component unmount
+- setLocalStream to add local audio to all connections
+
+**Mesh Topology:**
+- Local peer initiates connections to all peers with higher IDs
+- Receives connections from all peers with lower IDs
+- Each peer maintains N-1 connections (where N = room size)
+
+**Test Results:**
+✅ 27 tests passing (full mesh pattern, offer/answer, ICE exchange, connection states, peer lifecycle, audio tracks, reconnection, local stream, multiple peers)
 
 ---
 
