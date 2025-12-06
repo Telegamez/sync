@@ -965,7 +965,7 @@
       ],
       "testFile": "tests/unit/ai/turn-queue.test.ts",
       "dependencies": ["FEAT-152", "FEAT-300"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-158",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 38,
-    "pending": 13
+    "passed": 39,
+    "pending": 12
   }
 }

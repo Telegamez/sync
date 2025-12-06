@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 7/9 | 78% |
+| Phase 4: Shared AI Session | In Progress | 8/9 | 89% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-157` - Server-side turn queue processing
+**Phase 4 In Progress!** Next Feature: `FEAT-158` - Interrupt handling for urgent overrides
 
 ---
 
@@ -1288,7 +1288,7 @@ All 13 Phase 3 features have been implemented and tested:
 5. `FEAT-304` - Shared context management ✅
 6. `FEAT-305` - AI personality configuration ✅
 7. `FEAT-306` - Enhanced SwensyncOverlay for rooms ✅
-8. `FEAT-157` - Server-side turn queue processing
+8. `FEAT-157` - Server-side turn queue processing ✅
 9. `FEAT-158` - Interrupt handling for urgent overrides
 
 ---
@@ -1623,6 +1623,56 @@ Implemented enhanced full-screen overlay for multi-peer room voice conversations
 
 **Test Results:**
 ✅ 48 tests passing (rendering, connection states, participant display, AI state display, responding to speaker, speaking indicators, queue position, session warnings, controls, close behavior, auto-connect, session timer, visualizer mode, accessibility, edge cases)
+
+---
+
+### FEAT-157: Server-side Turn Queue Processing
+**Date:** 2024-12-06
+**Test:** `tests/unit/ai/turn-queue.test.ts`
+
+Implemented server-side FIFO queue processor for turn management:
+
+**Files Created:**
+- `src/server/signaling/turn-queue-processor.ts` - TurnQueueProcessor class
+
+**Key Features:**
+- FIFO queue with priority-based ordering
+- Role-based priority (owner > moderator > member)
+- Automatic queue advancement after AI response.done
+- Request timeout and expiration handling
+- Client notification of queue position changes
+- "Bump to front" for priority override
+- Minimum turn interval enforcement
+- Statistics tracking (processed, expired, rejected)
+- Cancel by request ID or by peer
+- Multiple room support
+
+**TurnQueueProcessor Methods:**
+- `initRoom(roomId)` / `removeRoom(roomId)` - Room lifecycle
+- `enqueue(roomId, peerId, displayName, role?, priority?)` - Add to queue
+- `dequeue(roomId)` - Remove and return first entry
+- `cancel(roomId, requestId)` - Cancel specific request
+- `cancelAllForPeer(roomId, peerId)` - Cancel all requests from peer
+- `processNext(roomId)` - Process next entry, grant turn
+- `onResponseDone(roomId)` - Called when AI response completes
+- `endTurn(roomId, wasInterrupted?)` - End current turn
+- `bumpToFront(roomId, requestId)` - Priority override
+- `getPosition(roomId, peerId)` - Get queue position
+- `getQueueState(roomId)` - Get full queue state
+- `getStatistics(roomId)` - Get queue statistics
+- `clearQueue(roomId)` - Clear all entries
+
+**Callbacks:**
+- `onPositionChange` - Queue position changes
+- `onTurnGranted` - Turn granted to peer
+- `onTurnCompleted` - Turn completed
+- `onRequestRejected` - Request rejected (max attempts)
+- `onRequestExpired` - Request timeout
+- `onQueueUpdate` - Queue state updated
+- `onProcessingStart` / `onProcessingComplete` - Processing lifecycle
+
+**Test Results:**
+✅ 53 tests passing (initialization, enqueue, priority ordering, dequeue, cancel, processNext, onResponseDone, endTurn, timeout handling, callbacks, getPosition, statistics, clearQueue, edge cases, getRoomCount, getQueueState)
 
 ---
 
