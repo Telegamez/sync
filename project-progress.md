@@ -13,9 +13,9 @@
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
 | Phase 4: Shared AI Session | **Complete** | 9/9 | 100% |
-| Phase 5: Production Polish | In Progress | 1/11 | 9% |
+| Phase 5: Production Polish | In Progress | 2/11 | 18% |
 
-**Phase 5 In Progress!** Next Feature: `FEAT-401` - Room persistence - Database schema
+**Phase 5 In Progress!** Next Feature: `FEAT-402` - Room persistence - CRUD operations
 
 ---
 
@@ -1787,6 +1787,47 @@ Implemented Supabase authentication with mock mode for development/testing:
 
 **Test Results:**
 ✅ 73 tests passing (auth types, Supabase client, transformers, storage, auth context, hooks, session persistence, integration)
+
+---
+
+### FEAT-401: Room Persistence - Database Schema
+**Date:** 2024-12-06
+**Test:** `tests/unit/db/schema.test.ts`
+
+Implemented database schema for room persistence using Drizzle ORM-compatible patterns:
+
+**Files Created:**
+- `src/server/db/schema.ts` - Complete database schema
+- `src/server/db/index.ts` - Schema exports
+
+**Table Schemas:**
+- `RoomsTable`: rooms with owner, voice settings, AI personality, status
+- `ParticipantsTable`: room participants with roles and presence
+- `RoomHistoryTable`: audit log for room events
+
+**Key Features:**
+- PostgreSQL-compatible schema definitions
+- Drizzle ORM-style table schemas with types
+- JSONB columns for voice_settings and event_data
+- Partial indexes for query optimization (active rooms, room participants)
+- Insert and Update type definitions
+- Query result types (RoomWithCount, RoomWithParticipants)
+- Full migration SQL with CREATE TABLE, indexes, and functions
+- Validation functions for all fields
+- Type guards for enums
+- Default value generators
+
+**Validation Functions:**
+- `validateRoomName()` - 3-50 chars, alphanumeric with spaces
+- `validateMaxParticipants()` - 2-10 range
+- `validateAIPersonality()` - Valid personality enum
+- `validateRoomStatus()` - Valid status enum
+- `validatePeerRole()` - Valid role enum
+- `validateEventType()` - Valid event type enum
+- `validateInsertRoom()` / `validateInsertParticipant()` - Full object validation
+
+**Test Results:**
+✅ 82 tests passing (SQL definitions, defaults, validation functions, type guards, type interfaces)
 
 ---
 

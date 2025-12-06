@@ -676,7 +676,7 @@
       ],
       "testFile": "tests/unit/db/schema.test.ts",
       "dependencies": ["FEAT-400"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-402",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 41,
-    "pending": 10
+    "passed": 42,
+    "pending": 9
   }
 }
