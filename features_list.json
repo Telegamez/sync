@@ -455,7 +455,7 @@
       ],
       "testFile": "tests/unit/hooks/useAudioMixer.test.ts",
       "dependencies": ["FEAT-200", "FEAT-121"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-203",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 25,
-    "pending": 26
+    "passed": 26,
+    "pending": 25
   }
 }

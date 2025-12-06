@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 2/13 | 15% |
+| Phase 3: Multi-Peer Audio | In Progress | 3/13 | 23% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 Started!** Next Feature: `FEAT-202` - useAudioMixer hook
+**Phase 3 Started!** Next Feature: `FEAT-203` - Speaking detection per peer
 
 ---
 
@@ -812,6 +812,38 @@ Extended the audio mixer with advanced per-peer volume control and normalization
 
 **Test Results:**
 ✅ 29 tests passing (per-source volume, volume info for UI, normalization modes, mode switching, volume with normalization)
+
+---
+
+### FEAT-202: useAudioMixer hook - React integration
+**Date:** 2024-12-06
+**Test:** `tests/unit/hooks/useAudioMixer.test.ts`
+
+Implemented React hook for managing audio mixing in a room:
+
+**Files Created:**
+- `src/hooks/useAudioMixer.ts` - Audio mixer React hook
+
+**Key Features:**
+- Auto-initialize on mount (configurable)
+- `addStream(peerId, stream)` / `removeStream(peerId)` - Manage sources
+- `setVolume()` / `mute()` / `unmute()` - Per-peer control
+- `setMasterVolume()` / `muteMaster()` / `unmuteMaster()` - Master control
+- `setNormalizationMode(mode)` - Dynamic normalization switching
+- `getMixedStream()` - Get combined output for AI
+- `suspend()` / `resume()` - AudioContext lifecycle
+- `dispose()` - Full cleanup
+- `getSourceVolumeInfo()` / `getSourceIds()` - Query methods
+- Callbacks: `onInitialized`, `onStateChange`, `onSourceAdded`, `onSourceRemoved`
+
+**State Exposed:**
+- `isInitialized`, `isRunning`, `sourceCount`
+- `masterVolume`, `isMasterMuted`
+- `normalizationMode`, `normalizationFactor`
+- `volumes` - Array of SourceVolumeInfo for all sources
+
+**Test Results:**
+✅ 33 tests passing (initialization, adding/removing streams, volume control, master volume, normalization, mixed stream, suspend/resume, dispose, cleanup, callbacks)
 
 ---
 
