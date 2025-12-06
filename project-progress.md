@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 11/23 | 48% |
+| Phase 2: Room Infrastructure | In Progress | 12/23 | 52% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-110` - usePresence hook - Real-time presence state
+**Next Feature:** `FEAT-111` - RoomLobby component - Room list and join interface
 
 ---
 
@@ -280,6 +280,38 @@ Implemented React hook for WebRTC peer connection management in mesh topology:
 
 **Test Results:**
 ✅ 18 tests passing (initial state, peer events, WebRTC connection, signaling, connection state, audio streams, cleanup, reconnection)
+
+---
+
+### FEAT-110: usePresence hook - Real-time presence state
+**Date:** 2024-12-06
+**Test:** `tests/unit/hooks/usePresence.test.ts`
+
+Implemented React hook for managing real-time presence state in a room:
+
+**Files Created:**
+- `src/hooks/usePresence.ts` - Full presence state management hook
+
+**Key Features:**
+- Track speaking/muted state per peer
+- `updatePresence()` - Update local presence and broadcast to server
+- `setMuted()` / `toggleMute()` - Mute control with server sync
+- `setSpeaking()` - Speaking state from VAD
+- `setAddressingAI()` - PTT state for AI interaction
+- `setAudioLevel()` - Audio level from analyzer (clamped 0-1)
+- `getPeerPresence()` / `isPeerSpeaking()` / `isPeerMuted()` - Query peer state
+- Debounced presence updates to reduce server traffic
+- Audio level threshold to filter insignificant changes
+- Derived state: `speakingPeers`, `mutedPeers`, `activeSpeaker`, `anyAddressingAI`
+- Callbacks: `onLocalPresenceChange`, `onPeerPresenceChange`, `onActiveSpeakerChange`
+
+**State Exposed:**
+- `localPresence`: { isMuted, isSpeaking, isAddressingAI, audioLevel }
+- `peerPresence`: Map<PeerId, PeerPresenceState>
+- `speakingPeers`, `mutedPeers`, `activeSpeaker`, `anyAddressingAI`
+
+**Test Results:**
+✅ 37 tests passing (initial state, local updates, peer events, derived state, helpers, callbacks, cleanup, debouncing)
 
 ---
 

@@ -217,7 +217,7 @@
       ],
       "testFile": "tests/unit/hooks/usePresence.test.ts",
       "dependencies": ["FEAT-109"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-111",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 11,
-    "pending": 40
+    "passed": 12,
+    "pending": 39
   }
 }
