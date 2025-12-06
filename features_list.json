@@ -506,7 +506,7 @@
       ],
       "testFile": "tests/unit/components/SpeakingIndicator.test.tsx",
       "dependencies": ["FEAT-203"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-206",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 28,
-    "pending": 23
+    "passed": 29,
+    "pending": 22
   }
 }

@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 5/13 | 38% |
+| Phase 3: Multi-Peer Audio | In Progress | 6/13 | 46% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-205` - SpeakingIndicator component
+**Phase 3 In Progress!** Next Feature: `FEAT-206` - Audio synchronization
 
 ---
 
@@ -918,6 +918,45 @@ Implemented per-peer audio visualization using AnalyserNode for frequency and ti
 
 **Test Results:**
 ✅ 45 tests passing (initialization, adding/removing streams, visualization data, audio level, frequency/time domain data, callbacks, configuration, pause/resume, dispose, local vs remote)
+
+---
+
+### FEAT-205: SpeakingIndicator component - Active speaker display
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/SpeakingIndicator.test.tsx`
+
+Implemented a React component for displaying active speaker(s) with smooth transitions:
+
+**Files Created:**
+- `src/components/room/SpeakingIndicator.tsx` - Active speaker display component
+
+**Key Features:**
+- Display current active speaker(s) with avatars
+- Three display modes: compact (default), detailed, minimal
+- Smooth animations for speaker enter/leave transitions
+- Multi-speaker state with overflow indicator (+N)
+- Audio level waveform visualization
+- Primary speaker detection (highest audio level)
+- Click handlers for speaker selection
+- Keyboard navigation support in detailed mode
+- Callbacks: `onSpeakerClick`, `onSpeakersChange`
+- Accessible with aria-live for screen readers
+
+**Display Modes:**
+- `compact`: Avatar(s) + name + waveform
+- `detailed`: Full speaker cards with individual waveforms
+- `minimal`: Text only (e.g., "Alice is speaking")
+
+**Props:**
+- `speakers` - Array of SpeakerInfo (id, displayName, audioLevel, isLocal)
+- `mode` - 'compact' | 'detailed' | 'minimal'
+- `maxDisplayed` - Max speakers before overflow (default: 3)
+- `showAudioLevel` - Toggle waveform visualization
+- `idleText` - Custom text when no one is speaking
+- `animationDuration` - Transition duration in ms
+
+**Test Results:**
+✅ 42 tests passing (idle state, single/multiple speakers, display modes, transitions, click handlers, callbacks, audio level, edge cases)
 
 ---
 

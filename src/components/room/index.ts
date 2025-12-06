@@ -21,3 +21,6 @@ export type { ParticipantAvatarProps, AvatarSize } from './ParticipantAvatar';
 
 export { RoomControls } from './RoomControls';
 export type { RoomControlsProps } from './RoomControls';
+
+export { SpeakingIndicator } from './SpeakingIndicator';
+export type { SpeakingIndicatorProps, SpeakerInfo, SpeakingIndicatorMode } from './SpeakingIndicator';
