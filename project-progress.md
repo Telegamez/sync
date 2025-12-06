@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 8/9 | 89% |
+| Phase 4: Shared AI Session | **Complete** | 9/9 | 100% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-158` - Interrupt handling for urgent overrides
+**Phase 4 Complete!** Next Phase: Phase 5 - Production Polish
 
 ---
 
@@ -1278,7 +1278,7 @@ All 13 Phase 3 features have been implemented and tested:
 
 ---
 
-## Phase 4: Shared AI Session (In Progress)
+## Phase 4: Shared AI Session (Complete)
 
 ### Planned Features:
 1. `FEAT-300` - Single OpenAI connection per room ✅
@@ -1289,7 +1289,7 @@ All 13 Phase 3 features have been implemented and tested:
 6. `FEAT-305` - AI personality configuration ✅
 7. `FEAT-306` - Enhanced SwensyncOverlay for rooms ✅
 8. `FEAT-157` - Server-side turn queue processing ✅
-9. `FEAT-158` - Interrupt handling for urgent overrides
+9. `FEAT-158` - Interrupt handling for urgent overrides ✅
 
 ---
 
@@ -1676,9 +1676,64 @@ Implemented server-side FIFO queue processor for turn management:
 
 ---
 
+### FEAT-158: Interrupt Handling for Urgent Overrides
+**Date:** 2024-12-06
+**Test:** `tests/unit/ai/interrupt.test.ts`
+
+Implemented interrupt handler for allowing room owners/moderators to interrupt AI responses:
+
+**Files Created:**
+- `src/server/signaling/interrupt-handler.ts` - InterruptHandler class
+
+**Key Features:**
+- Role-based permissions (owner, moderator, member)
+- Cooldown enforcement between interrupts (configurable, default 2s)
+- Rate limiting (max interrupts per minute)
+- Interrupt request/process/cancel lifecycle
+- Event logging for analytics
+- Room-scoped state management
+- Callbacks for OpenAI response.cancel, clear response, unlock AI
+- History tracking with statistics
+- Pending interrupt queue per room
+
+**InterruptHandler Methods:**
+- `initRoom(roomId, enabled?)` / `removeRoom(roomId)` - Room lifecycle
+- `canInterrupt(roomId, peerId, role)` - Check if peer can interrupt
+- `requestInterrupt(roomId, peerId, name, role, aiState, interruptedPeerId?, reason?)` - Request interrupt
+- `processInterrupt(roomId, requestId, aiState, interruptedPeerId?, duration?)` - Process pending interrupt
+- `cancelInterrupt(roomId, requestId)` - Cancel pending interrupt
+- `getPendingInterrupt(roomId)` / `hasPendingInterrupt(roomId)` - Query pending
+- `getHistory(roomId, limit?)` - Get interrupt event history
+- `getStatistics(roomId)` - Get interrupt stats (total, successful, rejected, cooldown)
+- `setEnabled(roomId, enabled)` - Enable/disable interrupts
+- `updateOptions(options)` - Update global options
+
+**Interrupt Events:**
+- `requested` - Interrupt requested
+- `processed` - Interrupt successfully processed
+- `rejected` - Interrupt rejected (permissions, cooldown, rate limit)
+- `cancelled` - Interrupt cancelled before processing
+
+**Test Results:**
+✅ 46 tests passing (initialization, room management, canInterrupt, requestInterrupt, processInterrupt, cancelInterrupt, history, statistics, setEnabled, updateOptions, edge cases, dispose)
+
+---
+
+## Phase 4 Complete!
+
+All 9 Phase 4 features have been implemented and tested:
+- AI Session: FEAT-300 (Orchestrator), FEAT-301 (Mixed input), FEAT-302 (Broadcasting), FEAT-303 (useSharedAI)
+- Context: FEAT-304 (Context manager), FEAT-305 (AI personality)
+- UI: FEAT-306 (SwensyncOverlayRoom)
+- Turn Management: FEAT-157 (Turn queue), FEAT-158 (Interrupt handler)
+
+**Total Tests in Phase 4:** 414+ tests passing
+
+---
+
 ## Phase 5: Production Polish (Pending)
 
-*Blocked by Phase 4 completion.*
+*Ready to start!*
 
 ### Planned Features:
 1. `FEAT-400` - Supabase authentication
