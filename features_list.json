@@ -931,7 +931,7 @@
       ],
       "testFile": "tests/unit/components/AIStateIndicator.test.tsx",
       "dependencies": ["FEAT-152"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-156",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 34,
-    "pending": 17
+    "passed": 35,
+    "pending": 16
   }
 }

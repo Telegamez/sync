@@ -27,3 +27,6 @@ export type { SpeakingIndicatorProps, SpeakerInfo, SpeakingIndicatorMode } from 
 
 export { PTTButton, InlinePTTButton, MainPTTButton } from './PTTButton';
 export type { PTTButtonProps, PTTButtonSize, PTTButtonVariant, InlinePTTButtonProps, MainPTTButtonProps } from './PTTButton';
+
+export { AIStateIndicator, AIStateBadge, AIStateDot, AIStateDisplay } from './AIStateIndicator';
+export type { AIStateIndicatorProps, AIStateIndicatorSize, AIStateIndicatorMode, AIStateBadgeProps, AIStateDotProps, AIStateDisplayProps } from './AIStateIndicator';

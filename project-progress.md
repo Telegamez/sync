@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 11/13 | 85% |
+| Phase 3: Multi-Peer Audio | In Progress | 12/13 | 92% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-155` - AIStateIndicator component
+**Phase 3 In Progress!** Next Feature: `FEAT-156` - VoiceModeSettings component
 
 ---
 
@@ -1135,7 +1135,7 @@ Implemented React hook for client-side turn-taking coordination with AI locking:
 9. `FEAT-152` - AI response locking mechanism ✅
 10. `FEAT-153` - useTurnManager hook ✅
 11. `FEAT-154` - PTTButton component ✅
-12. `FEAT-155` - AIStateIndicator component
+12. `FEAT-155` - AIStateIndicator component ✅
 13. `FEAT-156` - VoiceModeSettings component
 
 ---
@@ -1179,6 +1179,45 @@ Implemented Push-to-Talk button component with hold-to-talk interaction:
 
 **Test Results:**
 ✅ 61 tests passing (rendering, sizes, variants, disabled states, mouse/touch/keyboard interaction, duration display, minimum/maximum duration, callbacks, visual states, tooltips, accessibility, voice mode integration, InlinePTTButton, MainPTTButton)
+
+---
+
+### FEAT-155: AIStateIndicator component - Response state display
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/AIStateIndicator.test.tsx`
+
+Implemented AI state indicator component for displaying current AI response state:
+
+**Files Created:**
+- `src/components/room/AIStateIndicator.tsx` - Main component with variants
+- `src/components/room/index.ts` - Updated exports
+
+**Key Features:**
+- Display all AI states: idle (Ready), listening, processing (Thinking), speaking, locked
+- Color-coded states: gray (idle), blue (listening), amber (processing), green (speaking), red (locked)
+- Three size variants: sm, md, lg
+- Three display modes: compact, minimal, expanded
+- Queue position display when waiting (Position X of Y, "You're next")
+- Speaker info display (Listening to X, Responding to X, "Listening to you...")
+- Animated state transitions (pulse, bounce)
+- Icons for each state (circle, microphone, lightbulb, speaker, lock)
+- Data attributes for styling (data-state)
+- Accessible with role="status" and aria-live="polite"
+
+**Convenience Components:**
+- `AIStateBadge` - Small compact badge for headers
+- `AIStateDot` - Minimal dot indicator with short label
+- `AIStateDisplay` - Large expanded display for main room area
+
+**Props:**
+- `state` - Current AIResponseState
+- `queuePosition` / `queueLength` - Queue info
+- `isCurrentSpeaker` / `currentSpeakerName` - Speaker info
+- `size` / `mode` - Visual configuration
+- `showQueue` / `showSpeaker` / `animate` - Feature toggles
+
+**Test Results:**
+✅ 68 tests passing (initial rendering, state display, size variants, display modes, speaker info, queue info, animations, color coding, custom styling, icons, AIStateBadge, AIStateDot, AIStateDisplay)
 
 ---
 
