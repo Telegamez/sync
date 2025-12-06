@@ -13,9 +13,9 @@
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
 | Phase 4: Shared AI Session | **Complete** | 9/9 | 100% |
-| Phase 5: Production Polish | In Progress | 3/11 | 27% |
+| Phase 5: Production Polish | In Progress | 4/11 | 36% |
 
-**Phase 5 In Progress!** Next Feature: `FEAT-403` - Room permissions - Owner and participant roles
+**Phase 5 In Progress!** Next Feature: `FEAT-404` - Error recovery - Reconnection handling
 
 ---
 
@@ -1869,6 +1869,53 @@ Implemented database CRUD operations with support for both mock and database mod
 
 **Test Results:**
 ✅ 67 tests passing (room CRUD, participant CRUD, history, factory, integration tests)
+
+---
+
+### FEAT-403: Room Permissions - Owner and Participant Roles
+**Date:** 2024-12-06
+**Test:** `tests/unit/permissions/roles.test.ts`
+
+Implemented comprehensive role-based permission system for room management:
+
+**Files Created:**
+- `src/lib/permissions/index.ts` - Complete permission system
+
+**Role Hierarchy:**
+- `owner`: Full permissions (level 2)
+- `moderator`: Limited management permissions (level 1)
+- `participant`: No special permissions (level 0)
+
+**Permission Types:**
+- Room: `room:update`, `room:close`, `room:delete`, `room:voice_settings`
+- Participant: `participant:kick`, `participant:ban`, `participant:mute`, `participant:role`
+- AI: `ai:interrupt`, `ai:personality`, `ai:settings`
+- Moderator: `moderator:assign`, `moderator:revoke`
+
+**Permission Checking Functions:**
+- `hasPermission(role, permission)` - Check if role has permission
+- `isHigherRole(roleA, roleB)` - Compare role hierarchy
+- `canPerformAction(role, permission)` - Get detailed result
+- `canKick()`, `canBan()`, `canChangeRole()` - Specific checks
+- `canInterruptAI()`, `canChangeAISettings()`, `canUpdateRoom()`, etc.
+
+**PermissionManager Class:**
+- Room and participant tracking
+- Ban management with expiration
+- Permission checking by peer ID
+- Kick, ban, unban, changeRole actions
+- Event callbacks: onKick, onBan, onRoleChanged, onPermissionDenied
+- Ban expiration cleanup
+
+**Key Features:**
+- Cannot kick/ban owner
+- Cannot kick/ban yourself
+- Role hierarchy enforcement (can only manage lower roles)
+- Temporary bans with auto-expiration
+- Banned users cannot rejoin room
+
+**Test Results:**
+✅ 72 tests passing (role hierarchy, permissions, canKick, canBan, canChangeRole, PermissionManager, integration)
 
 ---
 
