@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 4/9 | 44% |
+| Phase 4: Shared AI Session | In Progress | 5/9 | 56% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-304` - Shared context management
+**Phase 4 In Progress!** Next Feature: `FEAT-305` - AI personality configuration
 
 ---
 
@@ -1285,7 +1285,7 @@ All 13 Phase 3 features have been implemented and tested:
 2. `FEAT-301` - Mixed audio input to AI ✅
 3. `FEAT-302` - Response broadcasting ✅
 4. `FEAT-303` - useSharedAI hook ✅
-5. `FEAT-304` - Shared context management
+5. `FEAT-304` - Shared context management ✅
 6. `FEAT-305` - AI personality configuration
 7. `FEAT-306` - Enhanced SwensyncOverlay for rooms
 8. `FEAT-157` - Server-side turn queue processing
@@ -1490,6 +1490,50 @@ Implemented React hook for client-side integration with shared AI sessions:
 
 **Test Results:**
 ✅ 37 tests passing (initial state, session connection, AI state events, audio chunk handling, playback controls, volume controls, mark ready, reconnection, response state, factory function, cleanup)
+
+---
+
+### FEAT-304: Shared Context Management - Conversation history
+**Date:** 2024-12-06
+**Test:** `tests/unit/ai/context.test.ts`
+
+Implemented context manager for tracking conversation history with speaker attribution:
+
+**Files Created:**
+- `src/server/signaling/context-manager.ts` - ContextManager class
+
+**Key Features:**
+- Room-based conversation context management
+- Speaker attribution (maps peer IDs to display names)
+- Token count estimation for context limits
+- System prompt management with token tracking
+- Message roles: system, user, assistant
+- Context summarization for long sessions
+- Context export/import for persistence
+- Configurable max tokens and message limits
+- Audio duration tracking per message
+- Timestamps for all messages
+
+**ContextManager Methods:**
+- `initRoom(roomId, systemPrompt?)` / `removeRoom(roomId)` - Room lifecycle
+- `addParticipant(roomId, peerId, displayName)` / `removeParticipant(roomId, peerId)` - Participant management
+- `addUserMessage(roomId, content, speakerId?, audioDurationMs?)` - Add user message with attribution
+- `addAssistantMessage(roomId, content, audioDurationMs?)` - Add AI response
+- `setSystemPrompt(roomId, prompt)` - Update system prompt
+- `getMessagesForAI(roomId)` - Get formatted messages for AI request
+- `getTokenCount(roomId)` - Get estimated token count
+- `summarize(roomId)` - Generate context summary (async)
+- `exportContext(roomId)` / `importContext(context)` - Context persistence
+- `clearContext(roomId)` - Clear all messages
+
+**Token Estimation:**
+- Simple word-based estimation (~4 chars per token average)
+- Tracks system prompt + all messages
+- Respects maxTokens limit
+- Truncates oldest messages when limit exceeded
+
+**Test Results:**
+✅ 61 tests passing (room initialization, participant management, message handling, speaker attribution, token counting, system prompts, context for AI, summarization, export/import, configuration, factory function, edge cases)
 
 ---
 
