@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 17/23 | 74% |
+| Phase 2: Room Infrastructure | In Progress | 18/23 | 78% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-116` - RoomControls component - Mute/Leave controls
+**Next Feature:** `FEAT-117` - Room lobby page (/rooms)
 
 ---
 
@@ -491,6 +491,41 @@ Implemented standalone avatar component with comprehensive status indicators:
 
 **Test Results:**
 ✅ 59 tests passing (initials, image, sizes, speaking, muted, PTT, connection, active speaker, local, click, accessibility, precedence)
+
+---
+
+### FEAT-116: RoomControls component - Mute/Leave controls
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/RoomControls.test.tsx`
+
+Implemented control bar component for room actions with keyboard accessibility:
+
+**Files Created:**
+- `src/components/room/RoomControls.tsx` - Room controls component
+
+**Key Features:**
+- Mute/Unmute toggle with microphone icons
+- Leave room button with loading state
+- Optional PTT (Push-to-Talk) button for AI addressing
+- Optional settings button
+- Keyboard shortcuts (M for mute, Space/Enter for PTT)
+- Touch support for mobile PTT
+- Size variants: sm, md, lg
+- Layout modes: horizontal, vertical
+- Full keyboard navigation (Tab through buttons)
+- aria-pressed state for PTT toggle
+- Loading spinner during leave operation
+
+**Props:**
+- `isMuted` / `onMuteToggle` - Mute state and handler
+- `onLeaveRoom` / `isLeaving` - Leave with loading state
+- `showPTT` / `onPTTStart` / `onPTTEnd` - PTT controls
+- `showSettings` / `onSettingsClick` - Settings button
+- `isAddressingAI` - External PTT state
+- `layout` / `size` - Visual configuration
+
+**Test Results:**
+✅ 41 tests passing (mute, leave, settings, PTT, layout, sizes, accessibility, disabled states)
 
 ---
 

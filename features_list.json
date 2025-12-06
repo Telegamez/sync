@@ -319,7 +319,7 @@
       ],
       "testFile": "tests/unit/components/RoomControls.test.tsx",
       "dependencies": ["FEAT-108"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-117",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 17,
-    "pending": 34
+    "passed": 18,
+    "pending": 33
   }
 }

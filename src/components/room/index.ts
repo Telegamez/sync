@@ -18,3 +18,6 @@ export type { ParticipantListProps, ParticipantInfo, ParticipantListLayout } fro
 
 export { ParticipantAvatar } from './ParticipantAvatar';
 export type { ParticipantAvatarProps, AvatarSize } from './ParticipantAvatar';
+
+export { RoomControls } from './RoomControls';
+export type { RoomControlsProps } from './RoomControls';
