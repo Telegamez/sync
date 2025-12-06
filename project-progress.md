@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 20/23 | 87% |
+| Phase 2: Room Infrastructure | In Progress | 21/23 | 91% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-119` - Room experience page (/rooms/[roomId])
+**Next Feature:** `FEAT-120` - Multi-peer WebRTC mesh connections
 
 ---
 
@@ -588,6 +588,41 @@ Implemented the create room page for creating new collaboration rooms:
 
 **Test Results:**
 ✅ 20 tests passing (page structure, form integration, submission, error handling, cancel navigation, validation, responsive)
+
+---
+
+### FEAT-119: Room experience page - /rooms/[roomId]
+**Date:** 2024-12-06
+**Test:** `tests/unit/pages/room-experience.test.tsx`
+
+Implemented the main room collaboration experience page:
+
+**Files Created:**
+- `src/app/rooms/[roomId]/page.tsx` - Room experience page
+
+**Key Features:**
+- Fetches room details from API on mount
+- Displays room name, description, participant count
+- Error states: not found (404), room full, room closed, connection error
+- Loading states: loading room, joining room, connected
+- ParticipantList integration with local user display
+- RoomControls integration with mute, leave, PTT buttons
+- Share button to copy room link to clipboard
+- Leave button in header and controls
+- AI addressing status indicator
+- Responsive layout with sticky header and footer controls
+
+**States Handled:**
+- Loading: Spinner with "Loading room..."
+- Joining: Spinner with "Joining room..."
+- Connected: Full room experience UI
+- Not Found: Error page with link to lobby
+- Full: Error page indicating room is full
+- Closed: Error page indicating room was closed
+- Error: Error page with connection failure message
+
+**Test Results:**
+✅ 31 tests passing (loading states, error states, connected room, controls, leave, share, participants, AI status, responsive)
 
 ---
 

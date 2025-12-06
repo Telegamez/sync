@@ -368,9 +368,9 @@
         "Handle room not found (404)",
         "Handle room full error"
       ],
-      "testFile": "tests/e2e/rooms/room-experience.spec.ts",
+      "testFile": "tests/unit/pages/room-experience.test.tsx",
       "dependencies": ["FEAT-108", "FEAT-114", "FEAT-116"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-120",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 20,
-    "pending": 31
+    "passed": 21,
+    "pending": 30
   }
 }
