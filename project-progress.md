@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 10/13 | 77% |
+| Phase 3: Multi-Peer Audio | In Progress | 11/13 | 85% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-154` - PTTButton component
+**Phase 3 In Progress!** Next Feature: `FEAT-155` - AIStateIndicator component
 
 ---
 
@@ -1134,9 +1134,51 @@ Implemented React hook for client-side turn-taking coordination with AI locking:
 8. `FEAT-151` - Push-to-Talk (PTT) implementation ✅
 9. `FEAT-152` - AI response locking mechanism ✅
 10. `FEAT-153` - useTurnManager hook ✅
-11. `FEAT-154` - PTTButton component
+11. `FEAT-154` - PTTButton component ✅
 12. `FEAT-155` - AIStateIndicator component
 13. `FEAT-156` - VoiceModeSettings component
+
+---
+
+### FEAT-154: PTTButton component - Push-to-talk interface
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/PTTButton.test.tsx`
+
+Implemented Push-to-Talk button component with hold-to-talk interaction:
+
+**Files Created:**
+- `src/components/room/PTTButton.tsx` - Main PTTButton component with variants
+- `src/components/room/index.ts` - Updated exports
+
+**Key Features:**
+- Hold-to-talk button with visual feedback
+- Four size variants: sm, md, lg, xl
+- Three style variants: default, primary, minimal
+- Visual states: idle, active, disabled
+- Duration display while active (optional)
+- Block reason tooltip when disabled
+- Icons for each state (microphone, speaking wave, lock)
+- Keyboard accessibility (Space key activation)
+- Touch support with touch-none class
+- Mobile-friendly with haptic feedback option
+- Integration with usePushToTalk hook
+- Data attributes for styling (data-state, data-ptt-active)
+
+**Convenience Components:**
+- `InlinePTTButton` - Small minimal button for inline use
+- `MainPTTButton` - Large primary button for main room interface
+
+**Props:**
+- `aiState` - Current AI response state
+- `isDesignatedSpeaker` / `voiceMode` - Voice mode integration
+- `size` / `variant` - Visual configuration
+- `showDuration` / `showBlockReason` - Feature toggles
+- `enableKeyboard` / `enableHapticFeedback` - Input options
+- `minHoldTimeMs` / `maxDurationMs` - Timing configuration
+- Callbacks: `onPTTStart`, `onPTTEnd`, `onPTTBlocked`, `onPTTStateChange`
+
+**Test Results:**
+✅ 61 tests passing (rendering, sizes, variants, disabled states, mouse/touch/keyboard interaction, duration display, minimum/maximum duration, callbacks, visual states, tooltips, accessibility, voice mode integration, InlinePTTButton, MainPTTButton)
 
 ---
 

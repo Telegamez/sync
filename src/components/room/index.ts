@@ -24,3 +24,6 @@ export type { RoomControlsProps } from './RoomControls';
 
 export { SpeakingIndicator } from './SpeakingIndicator';
 export type { SpeakingIndicatorProps, SpeakerInfo, SpeakingIndicatorMode } from './SpeakingIndicator';
+
+export { PTTButton, InlinePTTButton, MainPTTButton } from './PTTButton';
+export type { PTTButtonProps, PTTButtonSize, PTTButtonVariant, InlinePTTButtonProps, MainPTTButtonProps } from './PTTButton';
