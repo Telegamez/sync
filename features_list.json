@@ -489,7 +489,7 @@
       ],
       "testFile": "tests/unit/audio/peer-visualization.test.ts",
       "dependencies": ["FEAT-203"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-205",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 27,
-    "pending": 24
+    "passed": 28,
+    "pending": 23
   }
 }

@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 4/13 | 31% |
+| Phase 3: Multi-Peer Audio | In Progress | 5/13 | 38% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 Started!** Next Feature: `FEAT-204` - Per-peer audio visualization
+**Phase 3 In Progress!** Next Feature: `FEAT-205` - SpeakingIndicator component
 
 ---
 
@@ -877,6 +877,47 @@ Implemented speaking detection using AnalyserNode for per-peer audio analysis:
 
 **Test Results:**
 ✅ 45 tests passing (initialization, adding/removing streams, speaking detection, audio level, speaking state, callbacks, thresholds, pause/resume, dispose)
+
+---
+
+### FEAT-204: Per-peer audio visualization
+**Date:** 2024-12-06
+**Test:** `tests/unit/audio/peer-visualization.test.ts`
+
+Implemented per-peer audio visualization using AnalyserNode for frequency and time domain data:
+
+**Files Created:**
+- `src/lib/audio/peer-visualizer.ts` - PeerVisualizer class
+
+**Key Features:**
+- AnalyserNode per peer for visualization data
+- Frequency data (getByteFrequencyData) for spectrum visualization
+- Time domain data (getByteTimeDomainData) for waveform visualization
+- RMS-based audio level calculation (0-1 normalized)
+- `addStream()` / `removeStream()` - Manage visualized sources
+- `getVisualizationData(peerId)` - Get data for single peer
+- `getAllVisualizationData()` - Get data for all peers
+- `getAudioLevel()` / `getFrequencyData()` / `getTimeDomainData()` - Query methods
+- `setFftSize()` / `setSmoothingTimeConstant()` - Runtime config
+- `pause()` / `resume()` - Control visualization loop
+- `isLocal` flag to distinguish local vs remote streams
+- Animation frame mode for smooth updates (default)
+- Interval mode for lower resource usage
+- Callbacks: `onVisualizationUpdate`, `onPeerUpdate`
+
+**Visualization Data Structure:**
+```typescript
+{
+  peerId: PeerId;
+  audioLevel: number;       // 0-1 normalized
+  frequencyData: Uint8Array; // Frequency spectrum
+  timeDomainData: Uint8Array; // Time domain waveform
+  isLocal: boolean;
+}
+```
+
+**Test Results:**
+✅ 45 tests passing (initialization, adding/removing streams, visualization data, audio level, frequency/time domain data, callbacks, configuration, pause/resume, dispose, local vs remote)
 
 ---
 
