@@ -574,7 +574,7 @@
       ],
       "testFile": "tests/unit/ai/broadcast.test.ts",
       "dependencies": ["FEAT-300"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-303",

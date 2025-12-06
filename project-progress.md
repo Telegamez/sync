@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 2/9 | 22% |
+| Phase 4: Shared AI Session | In Progress | 3/9 | 33% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-302` - Response broadcasting
+**Phase 4 In Progress!** Next Feature: `FEAT-303` - useSharedAI hook
 
 ---
 
@@ -1283,7 +1283,7 @@ All 13 Phase 3 features have been implemented and tested:
 ### Planned Features:
 1. `FEAT-300` - Single OpenAI connection per room ✅
 2. `FEAT-301` - Mixed audio input to AI ✅
-3. `FEAT-302` - Response broadcasting
+3. `FEAT-302` - Response broadcasting ✅
 4. `FEAT-303` - useSharedAI hook
 5. `FEAT-304` - Shared context management
 6. `FEAT-305` - AI personality configuration
@@ -1387,6 +1387,58 @@ Implemented mixed audio input manager for routing combined peer audio to the AI 
 
 **Test Results:**
 ✅ 45 tests passing (room initialization, peer count tracking, audio processing, VAD detection, manual speech control, prefix buffer, statistics, configuration, factory function, integration scenarios)
+
+---
+
+### FEAT-302: Response Broadcasting - AI audio to all participants
+**Date:** 2024-12-06
+**Test:** `tests/unit/ai/broadcast.test.ts`
+
+Implemented response broadcast manager for sending AI audio to all room participants:
+
+**Files Created:**
+- `src/server/signaling/response-broadcast.ts` - ResponseBroadcastManager class
+
+**Key Features:**
+- Room and peer management for broadcast subscriptions
+- Response lifecycle (start, addChunk, end, cancel)
+- Buffering before broadcast start (configurable buffer size)
+- Peer readiness tracking (wait for peers to be ready)
+- Max wait timeout to prevent infinite buffering
+- Late joiner catch-up (send buffered chunks to new peers)
+- Synchronized playback start time calculation
+- Broadcast state machine (idle, buffering, broadcasting, completed, cancelled)
+- Chunk sequencing for ordering
+- Multiple rooms support (isolated state per room)
+
+**ResponseBroadcastManager Methods:**
+- `initRoom(roomId)` / `removeRoom(roomId)` - Room lifecycle
+- `addPeer(roomId, peerId)` / `removePeer(roomId, peerId)` - Peer management
+- `setPeerReady(roomId, peerId)` - Mark peer ready for playback
+- `startResponse(roomId, triggerPeerId)` - Start new AI response
+- `addChunk(roomId, audioData, durationMs, isLast?)` - Add audio chunk
+- `endResponse(roomId)` - End current response
+- `cancelResponse(roomId)` - Cancel current response
+- `getCurrentResponse(roomId)` - Get response info
+- `getBroadcastState(roomId)` / `isBroadcasting(roomId)` - State queries
+- `getBufferStatus(roomId)` - Get buffer fill status
+- `getSyncedStartTime(roomId)` - Get synchronized start time
+
+**Broadcast Flow:**
+1. `startResponse()` - Initialize response, enter buffering state
+2. `addChunk()` - Add audio chunks, buffer accumulates
+3. Buffer fills → check peer readiness → start broadcasting
+4. Send buffered chunks to all peers
+5. New chunks sent immediately during broadcasting
+6. `endResponse()` or last chunk → complete
+
+**Late Joiner Support:**
+- When peer joins during active broadcast, sends all buffered chunks
+- Callback notifies of catch-up operation
+- Can be disabled via options
+
+**Test Results:**
+✅ 57 tests passing (room initialization, peer management, response lifecycle, audio chunk handling, broadcasting, peer readiness, max wait timeout, late joiner catch-up, response info, buffer status, synchronized start time, max buffered chunks, cancellation, factory function, integration scenarios)
 
 ---
 
