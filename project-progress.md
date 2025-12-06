@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 15/23 | 65% |
+| Phase 2: Room Infrastructure | In Progress | 16/23 | 70% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-114` - ParticipantList component - Room participant display
+**Next Feature:** `FEAT-115` - ParticipantAvatar component - Peer avatar with status
 
 ---
 
@@ -416,6 +416,43 @@ Implemented React component for creating a new room with validation:
 
 **Test Results:**
 ✅ 41 tests passing (initial render, validation, form submission, loading state, cancel, AI personality, voice mode, error handling)
+
+---
+
+### FEAT-114: ParticipantList component - Active participants display
+**Date:** 2024-12-06
+**Test:** `tests/unit/components/ParticipantList.test.tsx`
+
+Implemented React component for displaying room participants with presence indicators:
+
+**Files Created:**
+- `src/components/room/ParticipantList.tsx` - Participant list component
+
+**Key Features:**
+- Display all room participants with avatars (initials fallback)
+- Speaking indicator with audio level visualization (pulsing ring)
+- Muted indicator icon overlay
+- Active speaker highlighting (green ring)
+- PTT (addressing AI) indicator
+- Role badges (Host, Mod) with color coding
+- Connection status indicator (connecting, reconnecting, failed)
+- Layout modes: vertical, horizontal, grid
+- Sorting: local first, then by role, then alphabetically
+- Max visible limit with overflow indicator (+N more)
+- Click handler for participant selection
+- Accessible aria-labels with state descriptions
+
+**Props:**
+- `participants` - Array of ParticipantInfo
+- `activeSpeakerId` - Highlighted active speaker
+- `localPeerId` - For "(You)" label
+- `layout` - 'vertical' | 'horizontal' | 'grid'
+- `maxVisible` - Limit visible participants
+- `showConnectionStatus` / `showRoleBadge` - Toggle indicators
+- `onParticipantClick` - Click callback
+
+**Test Results:**
+✅ 48 tests passing (empty state, display, indicators, layout, sorting, accessibility, overflow)
 
 ---
 

@@ -12,3 +12,6 @@ export type { RoomCardProps } from './RoomCard';
 
 export { CreateRoomForm } from './CreateRoomForm';
 export type { CreateRoomFormProps } from './CreateRoomForm';
+
+export { ParticipantList } from './ParticipantList';
+export type { ParticipantListProps, ParticipantInfo, ParticipantListLayout } from './ParticipantList';

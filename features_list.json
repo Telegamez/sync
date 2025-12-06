@@ -285,7 +285,7 @@
       ],
       "testFile": "tests/unit/components/ParticipantList.test.tsx",
       "dependencies": ["FEAT-110"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-115",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 15,
-    "pending": 36
+    "passed": 16,
+    "pending": 35
   }
 }
