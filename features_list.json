@@ -863,7 +863,7 @@
       ],
       "testFile": "tests/unit/audio/push-to-talk.test.ts",
       "dependencies": ["FEAT-150", "FEAT-202"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-152",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 30,
-    "pending": 21
+    "passed": 31,
+    "pending": 20
   }
 }

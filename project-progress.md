@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 7/13 | 54% |
+| Phase 3: Multi-Peer Audio | In Progress | 8/13 | 62% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 In Progress!** Next Feature: `FEAT-151` - Push-to-Talk (PTT) implementation
+**Phase 3 In Progress!** Next Feature: `FEAT-152` - AI response locking mechanism
 
 ---
 
@@ -1001,6 +1001,40 @@ Implemented audio synchronization class for managing playback timing across peer
 
 ---
 
+### FEAT-151: Push-to-Talk (PTT) implementation
+**Date:** 2024-12-06
+**Test:** `tests/unit/audio/push-to-talk.test.ts`
+
+Implemented the usePushToTalk hook for PTT functionality with keyboard, mouse, and touch support:
+
+**Files Created:**
+- `src/hooks/usePushToTalk.ts` - Push-to-Talk React hook
+
+**Key Features:**
+- Keyboard activation (Space key by default, configurable)
+- Mouse hold-to-talk support
+- Touch hold-to-talk support for mobile
+- Minimum hold time option (prevents accidental taps)
+- Maximum duration auto-release
+- Haptic feedback on mobile devices
+- AI state blocking (prevents PTT when AI is speaking/locked)
+- Voice mode support (pushToTalk, designatedSpeaker, open)
+- Duration tracking with callbacks
+- Button props helper for easy integration
+- Global keyboard event listeners
+
+**API:**
+- `startPTT()` / `endPTT()` / `togglePTT()` - Programmatic control
+- `isActive` / `canActivate` / `blockReason` - State
+- `activeDuration` - How long PTT has been held
+- `buttonProps` - Props to spread on PTT button
+- Callbacks: `onPTTStart`, `onPTTEnd`, `onPTTBlocked`, `onPTTStateChange`
+
+**Test Results:**
+✅ 52 tests passing (initialization, programmatic activation, AI state blocking, voice mode blocking, min/max duration, duration tracking, haptic feedback, button props, mouse/touch/keyboard events, callbacks, state updates, cleanup)
+
+---
+
 ### Planned Features:
 1. `FEAT-200` - Audio mixer foundation ✅
 2. `FEAT-201` - Per-peer volume control ✅
@@ -1009,7 +1043,7 @@ Implemented audio synchronization class for managing playback timing across peer
 5. `FEAT-204` - Per-peer audio visualization ✅
 6. `FEAT-205` - SpeakingIndicator component ✅
 7. `FEAT-206` - Audio synchronization ✅
-8. `FEAT-151` - Push-to-Talk (PTT) implementation
+8. `FEAT-151` - Push-to-Talk (PTT) implementation ✅
 9. `FEAT-152` - AI response locking mechanism
 10. `FEAT-153` - useTurnManager hook
 11. `FEAT-154` - PTTButton component
