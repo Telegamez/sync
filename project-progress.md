@@ -11,11 +11,11 @@
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | In Progress | 3/13 | 23% |
+| Phase 3: Multi-Peer Audio | In Progress | 4/13 | 31% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 3 Started!** Next Feature: `FEAT-203` - Speaking detection per peer
+**Phase 3 Started!** Next Feature: `FEAT-204` - Per-peer audio visualization
 
 ---
 
@@ -844,6 +844,39 @@ Implemented React hook for managing audio mixing in a room:
 
 **Test Results:**
 ✅ 33 tests passing (initialization, adding/removing streams, volume control, master volume, normalization, mixed stream, suspend/resume, dispose, cleanup, callbacks)
+
+---
+
+### FEAT-203: Per-peer audio analysis - Speaking detection
+**Date:** 2024-12-06
+**Test:** `tests/unit/audio/speaking-detection.test.ts`
+
+Implemented speaking detection using AnalyserNode for per-peer audio analysis:
+
+**Files Created:**
+- `src/lib/audio/speaking-detector.ts` - SpeakingDetector class
+
+**Key Features:**
+- AnalyserNode per peer for audio level analysis
+- RMS-based volume level detection (0-1 normalized)
+- Configurable speaking threshold with hysteresis
+- Silence debounce to prevent rapid state flickering
+- `addStream()` / `removeStream()` - Manage monitored sources
+- `isSpeaking(peerId)` / `getAudioLevel(peerId)` - Query state
+- `getSpeakingPeers()` - Get all currently speaking peers
+- `getState()` / `getAllStates()` - Full state info
+- `setSpeakingThreshold()` / `setSilenceThreshold()` - Runtime config
+- `pause()` / `resume()` - Control analysis loop
+- Callbacks: `onSpeakingStart`, `onSpeakingEnd`, `onAudioLevelChange`, `onSpeakingStateChange`
+
+**Detection Algorithm:**
+1. Calculate RMS from FFT frequency data
+2. Speaking starts when level ≥ speakingThreshold
+3. Speaking continues while level ≥ silenceThreshold (hysteresis)
+4. Speaking ends after silenceDebounceMs of silence
+
+**Test Results:**
+✅ 45 tests passing (initialization, adding/removing streams, speaking detection, audio level, speaking state, callbacks, thresholds, pause/resume, dispose)
 
 ---
 

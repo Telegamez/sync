@@ -472,7 +472,7 @@
       ],
       "testFile": "tests/unit/audio/speaking-detection.test.ts",
       "dependencies": ["FEAT-202"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-204",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 26,
-    "pending": 25
+    "passed": 27,
+    "pending": 24
   }
 }
