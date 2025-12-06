@@ -12,10 +12,10 @@
 | Phase 1: Foundation | Complete | 5/5 | 100% |
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | In Progress | 1/9 | 11% |
+| Phase 4: Shared AI Session | In Progress | 2/9 | 22% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Phase 4 In Progress!** Next Feature: `FEAT-301` - Mixed audio input to AI
+**Phase 4 In Progress!** Next Feature: `FEAT-302` - Response broadcasting
 
 ---
 
@@ -1282,7 +1282,7 @@ All 13 Phase 3 features have been implemented and tested:
 
 ### Planned Features:
 1. `FEAT-300` - Single OpenAI connection per room ✅
-2. `FEAT-301` - Mixed audio input to AI
+2. `FEAT-301` - Mixed audio input to AI ✅
 3. `FEAT-302` - Response broadcasting
 4. `FEAT-303` - useSharedAI hook
 5. `FEAT-304` - Shared context management
@@ -1332,6 +1332,61 @@ Implemented AI Orchestrator for managing single OpenAI Realtime API connections 
 
 **Test Results:**
 ✅ 47 tests passing (session creation, destruction, queries, turn management, AI state transitions, audio I/O, configuration, reconnection, health checks, dispose, factory, defaults, multiple rooms, error handling, activity tracking, integration tests)
+
+---
+
+### FEAT-301: Mixed Audio Input - Routing mixed audio to AI
+**Date:** 2024-12-06
+**Test:** `tests/unit/ai/mixed-input.test.ts`
+
+Implemented mixed audio input manager for routing combined peer audio to the AI Orchestrator:
+
+**Files Created:**
+- `src/server/signaling/mixed-audio-input.ts` - MixedAudioInputManager class
+
+**Key Features:**
+- Room initialization and peer count tracking
+- Audio processing with resampling to target sample rate (24kHz for OpenAI)
+- Stereo to mono downmixing
+- Audio quality optimization with normalization and noise gate
+- VAD (Voice Activity Detection) with energy-based speech detection
+- Speech start/end detection with configurable thresholds
+- Prefix buffer for capturing audio before speech start (padding)
+- Silence duration tracking for speech end detection
+- Manual speech control (forceStartSpeech, forceEndSpeech)
+- Empty room state handling (skips processing when no peers)
+- Audio statistics tracking (energy, speech duration)
+- Multiple rooms support (isolated state per room)
+
+**MixedAudioInputManager Methods:**
+- `initRoom(roomId)` / `removeRoom(roomId)` - Room lifecycle
+- `setPeerCount(roomId, count)` - Track active peers
+- `processAudio(roomId, audioData, sampleRate, channels?)` - Process mixed audio
+- `getVADState(roomId)` / `isSpeechActive(roomId)` - VAD queries
+- `forceStartSpeech(roomId)` / `forceEndSpeech(roomId)` - Manual control
+- `getStats(roomId)` - Get processing statistics
+- `clearPrefixBuffer(roomId)` - Clear prefix buffer
+
+**Audio Processing Pipeline:**
+1. Skip if room is empty (no peers)
+2. Convert PCM16 to Int16Array
+3. Downmix stereo to mono if needed
+4. Resample to target sample rate (linear interpolation)
+5. Apply optimization (normalization, noise gate)
+6. Run VAD analysis
+7. Buffer during silence (prefix padding)
+8. Send audio on speech detection
+
+**VAD Algorithm:**
+- RMS-based energy calculation
+- Speech probability from energy level
+- Configurable thresholds (energy, speech probability)
+- Hysteresis with separate speaking/silence thresholds
+- Silence debounce to prevent rapid state flickering
+- Prefix buffer for pre-speech audio capture
+
+**Test Results:**
+✅ 45 tests passing (room initialization, peer count tracking, audio processing, VAD detection, manual speech control, prefix buffer, statistics, configuration, factory function, integration scenarios)
 
 ---
 

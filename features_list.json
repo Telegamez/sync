@@ -557,7 +557,7 @@
       ],
       "testFile": "tests/unit/ai/mixed-input.test.ts",
       "dependencies": ["FEAT-300", "FEAT-202"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-302",
