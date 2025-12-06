@@ -15,7 +15,7 @@
     },
     "phase2": {
       "name": "Room Infrastructure",
-      "status": "in_progress",
+      "status": "complete",
       "description": "Room creation, signaling, and multi-peer WebRTC"
     },
     "phase3": {
@@ -404,7 +404,7 @@
       ],
       "testFile": "tests/unit/webrtc/audio-tracks.test.ts",
       "dependencies": ["FEAT-120"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-200",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 22,
-    "pending": 29
+    "passed": 23,
+    "pending": 28
   }
 }

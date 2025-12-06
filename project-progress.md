@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 22/23 | 96% |
-| Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
+| Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
+| Phase 3: Multi-Peer Audio | In Progress | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-121` - Multi-peer audio track management
+**Phase 2 Complete!** Next Feature: `FEAT-200` - Audio mixer foundation
 
 ---
 
@@ -654,6 +654,59 @@ Verified and tested the WebRTC mesh topology implementation in useRoomPeers hook
 
 **Test Results:**
 ✅ 27 tests passing (full mesh pattern, offer/answer, ICE exchange, connection states, peer lifecycle, audio tracks, reconnection, local stream, multiple peers)
+
+---
+
+### FEAT-121: Multi-peer WebRTC mesh - Audio track management
+**Date:** 2024-12-06
+**Test:** `tests/unit/webrtc/audio-tracks.test.ts`
+
+Implemented React hook for managing audio playback for all peers in a room:
+
+**Files Created:**
+- `src/hooks/useRoomAudio.ts` - Audio track management hook
+
+**Key Features:**
+- Creates HTMLAudioElement for each peer's audio stream
+- Auto-play support with fallback handling
+- Per-peer mute/unmute control
+- Per-peer volume control (0-1 range)
+- Master volume control affecting all peers
+- Mute all / unmute all functionality
+- Playing state tracking per peer
+- Audio element access via getAudioElement()
+- Cleanup on peer disconnect and component unmount
+- Callbacks for audio start/end/error events
+- New peers inherit mute-all state
+
+**API:**
+- `addPeerStream(peerId, stream)` - Add audio stream
+- `removePeerStream(peerId)` - Remove audio stream
+- `mutePeer(peerId)` / `unmutePeer(peerId)` - Individual mute
+- `togglePeerMute(peerId)` - Toggle mute
+- `setPeerVolume(peerId, volume)` - Set peer volume
+- `muteAll()` / `unmuteAll()` - Global mute
+- `setMasterVolume(volume)` - Master volume
+- `getAudioElement(peerId)` - Get audio element
+- `isPeerPlaying(peerId)` - Check playing state
+
+**Test Results:**
+✅ 38 tests passing (initial state, add/remove streams, muting, volume control, audio element access, playing state, callbacks, cleanup, multiple operations)
+
+---
+
+## Phase 2: Room Infrastructure (Complete)
+
+All 23 features in Phase 2 have been implemented and tested. The room infrastructure now includes:
+- Room and Peer TypeScript types
+- Room CRUD API endpoints
+- Socket.io signaling server with room management
+- Presence and state synchronization
+- React hooks for room connections and peer management
+- UI components for room lobby, cards, forms, participants, avatars, and controls
+- Pages for room lobby, room creation, and room experience
+- WebRTC mesh topology with full offer/answer/ICE exchange
+- Audio track management with playback, muting, and volume control
 
 ---
 
