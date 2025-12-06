@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 19/23 | 83% |
+| Phase 2: Room Infrastructure | In Progress | 20/23 | 87% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-118` - Create room page (/rooms/create)
+**Next Feature:** `FEAT-119` - Room experience page (/rooms/[roomId])
 
 ---
 
@@ -556,6 +556,38 @@ Implemented the main room lobby page for browsing and joining rooms:
 
 **Test Results:**
 ✅ 18 tests passing (page structure, room list, create navigation, join navigation, error handling, empty state, search/filter, refresh, responsive)
+
+---
+
+### FEAT-118: Create room page - /rooms/create
+**Date:** 2024-12-06
+**Test:** `tests/unit/pages/create-room.test.tsx`
+
+Implemented the create room page for creating new collaboration rooms:
+
+**Files Created:**
+- `src/app/rooms/create/page.tsx` - Create room page
+
+**Key Features:**
+- Integrates CreateRoomForm component with cancel button
+- Header with back navigation and title
+- Page description for user guidance
+- Form submission to POST /api/rooms
+- Error display for API errors
+- Navigation to new room on success (/rooms/[roomId])
+- Navigation back to lobby on cancel (/rooms)
+- Responsive layout with centered max-width container
+- Footer with branding
+- Help text explaining post-creation redirect
+
+**Navigation Flow:**
+- Back to Rooms: Link to /rooms
+- Cancel: Button navigates to /rooms
+- Create Success: Navigates to /rooms/[newRoomId]
+- Error: Displays error message, allows retry
+
+**Test Results:**
+✅ 20 tests passing (page structure, form integration, submission, error handling, cancel navigation, validation, responsive)
 
 ---
 

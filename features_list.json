@@ -351,9 +351,9 @@
         "Show validation errors",
         "Add back/cancel navigation"
       ],
-      "testFile": "tests/e2e/rooms/create.spec.ts",
+      "testFile": "tests/unit/pages/create-room.test.tsx",
       "dependencies": ["FEAT-113"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-119",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 19,
-    "pending": 32
+    "passed": 20,
+    "pending": 31
   }
 }
