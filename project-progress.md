@@ -10,12 +10,12 @@
 | Phase | Status | Features | Passed |
 |-------|--------|----------|--------|
 | Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | In Progress | 10/23 | 43% |
+| Phase 2: Room Infrastructure | In Progress | 11/23 | 48% |
 | Phase 3: Multi-Peer Audio | Pending | 0/13 | 0% |
 | Phase 4: Shared AI Session | Pending | 0/9 | 0% |
 | Phase 5: Production Polish | Pending | 0/11 | 0% |
 
-**Next Feature:** `FEAT-109` - useRoomPeers hook - Peer state management
+**Next Feature:** `FEAT-110` - usePresence hook - Real-time presence state
 
 ---
 
@@ -249,6 +249,37 @@ Implemented React hook for Socket.io connection lifecycle management:
 
 **Test Results:**
 ✅ 19 tests passing (connection, join/leave, peer events, error handling, cleanup)
+
+---
+
+### FEAT-109: useRoomPeers hook - Peer state management
+**Date:** 2024-12-05
+**Test:** `tests/unit/hooks/useRoomPeers.test.ts`
+
+Implemented React hook for WebRTC peer connection management in mesh topology:
+
+**Files Created:**
+- `src/hooks/useRoomPeers.ts` - Full peer connection management hook
+
+**Key Features:**
+- WebRTC mesh topology connections (higher ID initiates)
+- Peer connection lifecycle (create, connect, close)
+- ICE candidate exchange via signaling
+- Offer/answer exchange via signaling
+- Remote audio stream handling
+- Connection state tracking per peer
+- `setLocalStream()` - Add local audio to all connections
+- `getPeer()` - Get peer with WebRTC state
+- `getAudioStreams()` - Get all remote audio streams
+- `reconnectPeer()` - Force reconnection to specific peer
+
+**State Exposed:**
+- `peers`: ConnectedPeer[] with webrtcState, hasAudio, audioStream
+- `peerCount`, `connectedCount`, `allConnected`
+- `localPeerId`
+
+**Test Results:**
+✅ 18 tests passing (initial state, peer events, WebRTC connection, signaling, connection state, audio streams, cleanup, reconnection)
 
 ---
 

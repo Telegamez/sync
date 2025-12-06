@@ -200,7 +200,7 @@
       ],
       "testFile": "tests/unit/hooks/useRoomPeers.test.ts",
       "dependencies": ["FEAT-108"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-110",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 10,
-    "pending": 41
+    "passed": 11,
+    "pending": 40
   }
 }
