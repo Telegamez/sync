@@ -761,7 +761,7 @@
       ],
       "testFile": "tests/unit/performance/audio.test.ts",
       "dependencies": ["FEAT-202"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-407",

@@ -182,17 +182,15 @@ describe('Room Store - Status Updates', () => {
       expect(updated?.status).toBe('active');
     });
 
-    it('updates lastActivityAt on status change', () => {
+    it('updates lastActivityAt on status change', async () => {
       const room = createRoom({ name: 'Activity Test' }, 'owner');
       const originalActivity = room.lastActivityAt.getTime();
 
       // Small delay to ensure time difference
-      const later = new Promise<void>((resolve) => setTimeout(resolve, 10));
-      later.then(() => {
-        updateRoomStatus(room.id, 'active');
-        const updated = getAllRooms().find((r) => r.id === room.id);
-        expect(updated?.lastActivityAt.getTime()).toBeGreaterThanOrEqual(originalActivity);
-      });
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      updateRoomStatus(room.id, 'active');
+      const updated = getAllRooms().find((r) => r.id === room.id);
+      expect(updated?.lastActivityAt.getTime()).toBeGreaterThanOrEqual(originalActivity);
     });
 
     it('returns undefined for non-existent room', () => {
