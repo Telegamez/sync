@@ -6,11 +6,12 @@
  *
  * Part of the Long-Horizon Engineering Protocol - FEAT-119
  * Updated in FEAT-411 to integrate real Socket.io signaling
+ * Updated in FEAT-412 to integrate WebRTC voice communication
  */
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,11 +22,16 @@ import {
   LogOut,
   Copy,
   Check,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { ParticipantList, RoomControls } from "@/components/room";
 import type { ParticipantInfo } from "@/components/room";
 import type { Room } from "@/types/room";
 import { useRoomConnection } from "@/hooks/useRoomConnection";
+import { useRoomPeers } from "@/hooks/useRoomPeers";
+import { useRoomAudio } from "@/hooks/useRoomAudio";
+import { usePresence } from "@/hooks/usePresence";
 
 /**
  * Room loading states
@@ -122,6 +128,13 @@ export default function RoomPage() {
   const [isAddressingAI, setIsAddressingAI] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+
+  // Track local mute state - start muted by default
+  const [localIsMuted, setLocalIsMuted] = useState(true);
+
+  // Local media stream ref
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   // Socket.io room connection hook - provides real signaling
   const {
@@ -152,9 +165,57 @@ export default function RoomPage() {
     },
   });
 
+  // WebRTC peer connections hook - manages mesh topology
+  const {
+    peers: webrtcPeers,
+    setLocalStream,
+    getAudioStreams,
+  } = useRoomPeers({
+    client: getClient(),
+    roomId: isInRoom ? roomId : null,
+    localPeerId: localPeer?.id || null,
+    initialPeers: peers,
+    onPeerAudioStream: (peerId, stream) => {
+      console.log("[Room] Peer audio stream received:", peerId);
+      addPeerStream(peerId, stream);
+    },
+    onPeerConnectionStateChange: (peerId, state) => {
+      console.log(`[Room] Peer ${peerId} connection state:`, state);
+    },
+  });
+
+  // Audio playback hook - manages audio elements for each peer
+  const { addPeerStream, removePeerStream, peerAudio } = useRoomAudio({
+    autoPlay: true,
+    onPeerAudioStart: (peerId) => {
+      console.log("[Room] Peer audio started:", peerId);
+    },
+    onAudioError: (peerId, error) => {
+      console.error(`[Room] Audio error for peer ${peerId}:`, error);
+    },
+  });
+
+  // Presence hook - manages speaking/muted state
+  const {
+    localPresence,
+    activeSpeaker,
+    setMuted: setPresenceMuted,
+    setAddressingAI: setPresenceAddressingAI,
+    setSpeaking,
+  } = usePresence({
+    client: getClient(),
+    roomId: isInRoom ? roomId : null,
+    localPeerId: localPeer?.id || null,
+    initialPeers: peers,
+    onActiveSpeakerChange: (peerId) => {
+      console.log("[Room] Active speaker:", peerId);
+    },
+  });
+
   // Convert signaling peers to ParticipantInfo format
+  // Use local mute state for accurate UI and WebRTC peer states for remote peers
   const participants: ParticipantInfo[] = [
-    // Add local peer first
+    // Add local peer first with actual local mute state
     ...(localPeer
       ? [
           {
@@ -162,22 +223,97 @@ export default function RoomPage() {
             displayName: localPeer.displayName,
             avatarUrl: localPeer.avatarUrl,
             role: localPeer.role as "owner" | "moderator" | "participant",
-            isMuted: localPeer.presence.audio.isMuted,
-            isSpeaking: localPeer.presence.audio.isSpeaking,
+            isMuted: localIsMuted, // Use actual local mute state
+            isSpeaking: localPresence.isSpeaking || isAddressingAI,
             isLocal: true,
             connectionState: "connected" as const,
           },
         ]
       : []),
-    // Add remote peers
-    ...convertPeersToParticipants(peers, localPeer?.id || null),
+    // Add remote peers with WebRTC connection states
+    ...webrtcPeers.map((peer) => ({
+      id: peer.id,
+      displayName: peer.displayName,
+      avatarUrl: peer.avatarUrl,
+      role: peer.role as "owner" | "moderator" | "participant",
+      isMuted: peer.isMuted,
+      isSpeaking: peer.isSpeaking,
+      isLocal: false,
+      connectionState: peer.webrtcState,
+    })),
   ];
 
   /**
-   * Connect to signaling server and join room
+   * Request microphone access and initialize local audio stream
    */
+  const initializeMicrophone =
+    useCallback(async (): Promise<MediaStream | null> => {
+      try {
+        console.log("[Room] Requesting microphone access...");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false,
+        });
+        console.log("[Room] Microphone access granted");
+        localStreamRef.current = stream;
+        setMicError(null);
+        return stream;
+      } catch (err) {
+        console.error("[Room] Microphone access error:", err);
+        const errorMessage =
+          err instanceof Error ? err.message : "Microphone access denied";
+        setMicError(errorMessage);
+        return null;
+      }
+    }, []);
+
+  /**
+   * Stop local audio stream
+   */
+  const stopMicrophone = useCallback(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+      localStreamRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Connect to signaling server and join room
+   * Note: Using refs to avoid useEffect dependency issues
+   */
+  const connectRef = useRef(connect);
+  const joinRoomRef = useRef(joinRoom);
+  const leaveRoomRef = useRef(leaveRoom);
+  const initializeMicrophoneRef = useRef(initializeMicrophone);
+  const stopMicrophoneRef = useRef(stopMicrophone);
+  const setLocalStreamRef = useRef(setLocalStream);
+
+  // Keep refs updated
+  useEffect(() => {
+    connectRef.current = connect;
+    joinRoomRef.current = joinRoom;
+    leaveRoomRef.current = leaveRoom;
+    initializeMicrophoneRef.current = initializeMicrophone;
+    stopMicrophoneRef.current = stopMicrophone;
+    setLocalStreamRef.current = setLocalStream;
+  }, [
+    connect,
+    joinRoom,
+    leaveRoom,
+    initializeMicrophone,
+    stopMicrophone,
+    setLocalStream,
+  ]);
+
   useEffect(() => {
     let mounted = true;
+    let hasJoined = false;
 
     async function connectAndJoin() {
       try {
@@ -185,7 +321,22 @@ export default function RoomPage() {
 
         // Connect to Socket.io signaling server
         console.log("[Room] Connecting to signaling server...");
-        await connect();
+        await connectRef.current();
+
+        if (!mounted) return;
+
+        // Initialize microphone for WebRTC
+        console.log("[Room] Initializing microphone...");
+        const stream = await initializeMicrophoneRef.current();
+        if (stream) {
+          // Set local stream for WebRTC peer connections
+          setLocalStreamRef.current(stream);
+          // Start muted by default
+          stream.getAudioTracks().forEach((track) => {
+            track.enabled = false;
+          });
+          console.log("[Room] Local stream set for WebRTC");
+        }
 
         if (!mounted) return;
 
@@ -193,12 +344,19 @@ export default function RoomPage() {
 
         // Join the room
         console.log("[Room] Joining room:", roomId);
-        await joinRoom(roomId, displayName);
+        await joinRoomRef.current(roomId, displayName);
+        hasJoined = true;
 
-        if (!mounted) return;
+        if (!mounted) {
+          // Component unmounted during join, leave the room
+          console.log("[Room] Component unmounted, leaving room...");
+          await leaveRoomRef.current();
+          stopMicrophoneRef.current();
+          return;
+        }
 
         setRoomState("connected");
-        console.log("[Room] Successfully joined room");
+        console.log("[Room] Successfully joined room with voice enabled");
       } catch (err) {
         if (!mounted) return;
 
@@ -231,27 +389,39 @@ export default function RoomPage() {
 
     connectAndJoin();
 
+    // Cleanup: Leave room and stop microphone when component unmounts
     return () => {
       mounted = false;
+      if (hasJoined) {
+        console.log("[Room] Cleanup: leaving room and stopping microphone...");
+        leaveRoomRef.current().catch((err) => {
+          console.error("[Room] Error leaving room:", err);
+        });
+      }
+      stopMicrophoneRef.current();
     };
-  }, [roomId, displayName, connect, joinRoom]);
-
-  // Track local mute state
-  const [localIsMuted, setLocalIsMuted] = useState(false);
+  }, [roomId, displayName]); // Only depend on roomId and displayName
 
   /**
-   * Handle mute toggle
+   * Handle mute toggle - controls actual microphone track
    */
   const handleMuteToggle = useCallback(() => {
     const newMuted = !localIsMuted;
     setLocalIsMuted(newMuted);
 
-    // Send presence update to signaling server
-    const client = getClient();
-    if (client) {
-      client.updatePresence({ isMuted: newMuted });
+    // Actually enable/disable the microphone track
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = !newMuted;
+        console.log(
+          `[Room] Microphone track ${newMuted ? "disabled" : "enabled"}`,
+        );
+      });
     }
-  }, [localIsMuted, getClient]);
+
+    // Update presence state for signaling
+    setPresenceMuted(newMuted);
+  }, [localIsMuted, setPresenceMuted]);
 
   /**
    * Handle leave room
@@ -259,39 +429,51 @@ export default function RoomPage() {
   const handleLeaveRoom = useCallback(async () => {
     setIsLeaving(true);
     try {
+      // Stop microphone
+      stopMicrophone();
       // Leave room via signaling
       await leaveRoom();
       router.push("/rooms");
     } catch {
       setIsLeaving(false);
     }
-  }, [router, leaveRoom]);
+  }, [router, leaveRoom, stopMicrophone]);
 
   /**
-   * Handle PTT start
+   * Handle PTT start - unmute and address AI
    */
   const handlePTTStart = useCallback(() => {
     setIsAddressingAI(true);
 
-    // Send presence update to signaling server
-    const client = getClient();
-    if (client) {
-      client.updatePresence({ isAddressingAI: true });
+    // Unmute microphone when PTT is active
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+      });
     }
-  }, [getClient]);
+
+    // Update presence for signaling
+    setPresenceAddressingAI(true);
+    setSpeaking(true);
+  }, [setPresenceAddressingAI, setSpeaking]);
 
   /**
-   * Handle PTT end
+   * Handle PTT end - restore mute state
    */
   const handlePTTEnd = useCallback(() => {
     setIsAddressingAI(false);
 
-    // Send presence update to signaling server
-    const client = getClient();
-    if (client) {
-      client.updatePresence({ isAddressingAI: false });
+    // Restore previous mute state
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = !localIsMuted;
+      });
     }
-  }, [getClient]);
+
+    // Update presence for signaling
+    setPresenceAddressingAI(false);
+    setSpeaking(false);
+  }, [localIsMuted, setPresenceAddressingAI, setSpeaking]);
 
   /**
    * Copy room link to clipboard
@@ -463,7 +645,7 @@ export default function RoomPage() {
             <ParticipantList
               participants={participants}
               localPeerId={localPeer?.id || ""}
-              activeSpeakerId={null}
+              activeSpeakerId={activeSpeaker}
               layout="grid"
               showConnectionStatus
               showRoleBadge
@@ -471,11 +653,59 @@ export default function RoomPage() {
             />
 
             {/* Room status */}
-            <div className="mt-8 text-center">
+            <div className="mt-8 text-center space-y-3">
+              {/* Connection status */}
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-full text-green-400 text-sm">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Connected
               </div>
+
+              {/* Microphone status */}
+              <div className="block">
+                {micError ? (
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 text-sm">
+                    <MicOff className="w-4 h-4" />
+                    Microphone error: {micError}
+                  </div>
+                ) : localStreamRef.current ? (
+                  <div
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm ${
+                      localIsMuted
+                        ? "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400"
+                        : "bg-blue-500/10 border border-blue-500/30 text-blue-400"
+                    }`}
+                  >
+                    {localIsMuted ? (
+                      <>
+                        <MicOff className="w-4 h-4" />
+                        Microphone muted
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-4 h-4" />
+                        Microphone active
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500/10 border border-gray-500/30 rounded-full text-gray-400 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Initializing microphone...
+                  </div>
+                )}
+              </div>
+
+              {/* Active speaker indicator */}
+              {activeSpeaker && activeSpeaker !== localPeer?.id && (
+                <div className="block">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full text-purple-400 text-sm">
+                    <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                    {webrtcPeers.find((p) => p.id === activeSpeaker)
+                      ?.displayName || "Someone"}{" "}
+                    is speaking
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

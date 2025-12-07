@@ -1001,6 +1001,24 @@
       "testFile": "tests/unit/signaling/custom-server.test.ts",
       "dependencies": ["FEAT-104", "FEAT-105", "FEAT-106", "FEAT-107"],
       "passes": true
+    },
+    {
+      "id": "FEAT-412",
+      "phase": 3,
+      "category": "webrtc",
+      "description": "Room page WebRTC voice integration - Enable actual peer-to-peer audio",
+      "priority": "critical",
+      "steps": [
+        "Integrate useRoomPeers hook into room page for WebRTC mesh connections",
+        "Add microphone access request via getUserMedia()",
+        "Integrate useRoomAudio hook for playing remote peer audio",
+        "Integrate usePresence hook for speaking detection and presence sync",
+        "Wire mute button to control actual microphone track",
+        "Add PTT button integration for addressing AI"
+      ],
+      "testFile": "tests/unit/webrtc/room-voice-integration.test.ts",
+      "dependencies": ["FEAT-109", "FEAT-110", "FEAT-121", "FEAT-411"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1023,12 +1041,12 @@
     "e2e": "End-to-end testing"
   },
   "statistics": {
-    "total": 52,
+    "total": 53,
     "phase2": 23,
-    "phase3": 13,
+    "phase3": 14,
     "phase4": 9,
     "phase5": 12,
-    "passed": 52,
+    "passed": 53,
     "pending": 0
   }
 }

@@ -2299,6 +2299,45 @@ Implemented custom Next.js server with integrated Socket.io for real-time signal
 
 ---
 
+### FEAT-412: Room Page WebRTC Voice Integration
+
+**Date:** 2024-12-07
+**Test:** `tests/unit/webrtc/room-voice-integration.test.ts`
+
+Integrated WebRTC voice communication into the room experience page for actual peer-to-peer audio:
+
+**Files Modified:**
+
+- `src/app/rooms/[roomId]/page.tsx` - Full WebRTC voice integration
+
+**Key Features:**
+
+- Integrated `useRoomPeers` hook for WebRTC mesh connections between peers
+- Added microphone access request via `getUserMedia()` with echo cancellation, noise suppression
+- Integrated `useRoomAudio` hook for playing remote peer audio via HTMLAudioElements
+- Integrated `usePresence` hook for speaking detection and presence sync
+- Wired mute button to actually enable/disable microphone track
+- PTT (Push-to-Talk) button now unmutes and updates presence state
+- Added microphone status indicator (active, muted, error, initializing)
+- Added active speaker indicator showing who is speaking
+- Remote peers now have WebRTC connection state displayed
+- Cleanup microphone on leave and component unmount
+
+**WebRTC Flow:**
+
+1. User joins room via Socket.io signaling
+2. Microphone access requested and local stream created
+3. Local stream set for WebRTC peer connections (mesh topology)
+4. Remote peer audio streams received and played via useRoomAudio
+5. Mute button toggles actual microphone track.enabled
+6. PTT temporarily unmutes for AI addressing
+7. Presence updates broadcast speaking/muted state
+
+**Test Results:**
+⏳ Tests pending verification
+
+---
+
 ## Protocol Compliance
 
 This project follows the **Long-Horizon Engineering Protocol**:
