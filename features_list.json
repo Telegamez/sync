@@ -829,7 +829,7 @@
       ],
       "testFile": "tests/e2e/multi-peer.spec.ts",
       "dependencies": ["FEAT-119", "FEAT-303"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-150",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 50,
-    "pending": 1
+    "passed": 51,
+    "pending": 0
   }
 }
