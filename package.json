@@ -16,7 +16,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@radix-ui/react-toggle-group": "^1.1.11",
@@ -33,6 +34,22 @@
     "socket.io-client": "^4.8.1",
     "tailwind-merge": "^2.5.4"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.css": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -48,6 +65,9 @@
     "jsdom": "^27.0.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
     "typescript": "^5.6.3",
     "vitest": "^4.0.15"
   }

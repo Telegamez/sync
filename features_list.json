@@ -812,7 +812,7 @@
       ],
       "testFile": ".husky/pre-commit",
       "dependencies": [],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-410",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 45,
-    "pending": 6
+    "passed": 50,
+    "pending": 1
   }
 }
