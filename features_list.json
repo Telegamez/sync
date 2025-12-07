@@ -744,7 +744,7 @@
       ],
       "testFile": "tests/unit/reliability/degradation.test.ts",
       "dependencies": ["FEAT-404"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-406",
