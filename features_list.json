@@ -1019,6 +1019,24 @@
       "testFile": "tests/unit/webrtc/room-voice-integration.test.ts",
       "dependencies": ["FEAT-109", "FEAT-110", "FEAT-121", "FEAT-411"],
       "passes": true
+    },
+    {
+      "id": "FEAT-413",
+      "phase": 4,
+      "category": "ai",
+      "description": "End-to-end AI PTT integration - Connect room page to AI orchestrator",
+      "priority": "critical",
+      "steps": [
+        "Wire room page PTT handlers to signaling client startPTT/endPTT",
+        "Integrate AI Orchestrator into server.ts Socket.io handlers",
+        "Route PTT audio to OpenAI Realtime API during PTT",
+        "Integrate useSharedAI hook for AI response playback",
+        "Add AI state indicator to room UI",
+        "Test end-to-end PTT to AI response flow"
+      ],
+      "testFile": "tests/unit/ai/ptt-integration.test.ts",
+      "dependencies": ["FEAT-300", "FEAT-303", "FEAT-151", "FEAT-412"],
+      "passes": false
     }
   ],
   "categories": {
@@ -1041,12 +1059,12 @@
     "e2e": "End-to-end testing"
   },
   "statistics": {
-    "total": 53,
+    "total": 54,
     "phase2": 23,
     "phase3": 14,
-    "phase4": 9,
+    "phase4": 10,
     "phase5": 12,
     "passed": 53,
-    "pending": 0
+    "pending": 1
   }
 }

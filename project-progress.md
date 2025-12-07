@@ -2338,6 +2338,54 @@ Integrated WebRTC voice communication into the room experience page for actual p
 
 ---
 
+### FEAT-413: End-to-End AI PTT Integration
+
+**Date:** 2024-12-07
+**Test:** `tests/unit/ai/ptt-integration.test.ts`
+
+Connected room page PTT (Push-to-Talk) to AI orchestrator for end-to-end AI interaction:
+
+**Files Modified:**
+
+- `src/app/rooms/[roomId]/page.tsx` - PTT handlers + useSharedAI integration
+- `server.ts` - AI state event handlers for PTT
+- `features_list.json` - Added FEAT-413
+
+**Key Features:**
+
+- Room page PTT handlers now call signaling client `startPTT()`/`endPTT()`
+- Integrated `useSharedAI` hook for AI state tracking and response playback
+- Server broadcasts `ai:state` events when PTT starts/ends
+- AI state indicator in room UI shows: idle, listening, processing, speaking
+- PTT is blocked when AI is speaking/processing
+- Server simulates AI response cycle (2 second delay then returns to idle)
+
+**PTT→AI Flow:**
+
+1. User presses PTT button in room
+2. Room page calls `client.startPTT(roomId)`
+3. Server receives `ai:ptt_start` event
+4. Server broadcasts `ai:state` with `listening` to all room participants
+5. User releases PTT button
+6. Room page calls `client.endPTT(roomId)`
+7. Server receives `ai:ptt_end` event
+8. Server broadcasts `ai:state` with `processing` to room
+9. (When OpenAI configured) Audio sent to OpenAI Realtime API
+10. Server broadcasts `ai:state` with `speaking` + audio chunks
+11. Server broadcasts `ai:state` with `idle` when complete
+
+**Next Steps (requires OPENAI_API_KEY):**
+
+- Integrate AIOrchestrator for actual OpenAI Realtime API connection
+- Route peer audio to OpenAI during PTT
+- Receive and broadcast AI audio responses
+- Full end-to-end voice AI conversation
+
+**Test Results:**
+⏳ Tests pending verification
+
+---
+
 ## Protocol Compliance
 
 This project follows the **Long-Horizon Engineering Protocol**:

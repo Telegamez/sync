@@ -32,6 +32,8 @@ import { useRoomConnection } from "@/hooks/useRoomConnection";
 import { useRoomPeers } from "@/hooks/useRoomPeers";
 import { useRoomAudio } from "@/hooks/useRoomAudio";
 import { usePresence } from "@/hooks/usePresence";
+import { useSharedAI } from "@/hooks/useSharedAI";
+import type { AIResponseState } from "@/types/voice-mode";
 
 /**
  * Room loading states
@@ -211,6 +213,35 @@ export default function RoomPage() {
       console.log("[Room] Active speaker:", peerId);
     },
   });
+
+  // Shared AI hook - manages AI state and response playback
+  const {
+    state: aiState,
+    playback: aiPlayback,
+    startPlayback: startAIPlayback,
+    stopPlayback: stopAIPlayback,
+  } = useSharedAI(
+    {
+      signalingClient: getClient(),
+      roomId: isInRoom ? roomId : undefined,
+      localPeerId: localPeer?.id,
+    },
+    {
+      onAIStateChange: (state, prevState) => {
+        console.log(`[Room] AI state changed: ${prevState} -> ${state}`);
+      },
+      onResponseStart: (response) => {
+        console.log("[Room] AI response started:", response.responseId);
+        startAIPlayback();
+      },
+      onResponseEnd: (response) => {
+        console.log("[Room] AI response ended:", response.responseId);
+      },
+      onError: (error) => {
+        console.error("[Room] AI error:", error);
+      },
+    },
+  );
 
   // Convert signaling peers to ParticipantInfo format
   // Use local mute state for accurate UI and WebRTC peer states for remote peers
@@ -443,7 +474,14 @@ export default function RoomPage() {
    * Handle PTT start - unmute and address AI
    */
   const handlePTTStart = useCallback(() => {
+    // Check if AI is already speaking/processing - don't allow PTT
+    if (aiState.aiState === "speaking" || aiState.aiState === "processing") {
+      console.log("[Room] PTT blocked - AI is", aiState.aiState);
+      return;
+    }
+
     setIsAddressingAI(true);
+    console.log("[Room] PTT started - addressing AI");
 
     // Unmute microphone when PTT is active
     if (localStreamRef.current) {
@@ -455,13 +493,29 @@ export default function RoomPage() {
     // Update presence for signaling
     setPresenceAddressingAI(true);
     setSpeaking(true);
-  }, [setPresenceAddressingAI, setSpeaking]);
+
+    // Notify server that PTT started - this triggers AI listening
+    const client = getClient();
+    if (client) {
+      client.startPTT(roomId);
+      console.log("[Room] Sent ai:ptt_start to server");
+    }
+  }, [
+    aiState.aiState,
+    setPresenceAddressingAI,
+    setSpeaking,
+    getClient,
+    roomId,
+  ]);
 
   /**
    * Handle PTT end - restore mute state
    */
   const handlePTTEnd = useCallback(() => {
+    if (!isAddressingAI) return; // Not in PTT mode
+
     setIsAddressingAI(false);
+    console.log("[Room] PTT ended");
 
     // Restore previous mute state
     if (localStreamRef.current) {
@@ -473,7 +527,21 @@ export default function RoomPage() {
     // Update presence for signaling
     setPresenceAddressingAI(false);
     setSpeaking(false);
-  }, [localIsMuted, setPresenceAddressingAI, setSpeaking]);
+
+    // Notify server that PTT ended - this triggers AI processing
+    const client = getClient();
+    if (client) {
+      client.endPTT(roomId);
+      console.log("[Room] Sent ai:ptt_end to server");
+    }
+  }, [
+    isAddressingAI,
+    localIsMuted,
+    setPresenceAddressingAI,
+    setSpeaking,
+    getClient,
+    roomId,
+  ]);
 
   /**
    * Copy room link to clipboard
@@ -710,16 +778,51 @@ export default function RoomPage() {
           </div>
         </div>
 
-        {/* AI status placeholder */}
+        {/* AI status */}
         <div className="px-4 sm:px-6 lg:px-8 py-4 border-t border-border bg-card/50">
           <div className="max-w-7xl mx-auto text-center">
-            <p className="text-sm text-muted-foreground">
-              {isAddressingAI ? (
-                <span className="text-purple-400">Addressing AI...</span>
-              ) : (
-                "Hold the Talk button to address the AI assistant"
+            <div className="flex items-center justify-center gap-2">
+              {/* AI state indicator */}
+              {aiState.aiState === "idle" && !isAddressingAI && (
+                <p className="text-sm text-muted-foreground">
+                  Hold the Talk button to address the AI assistant
+                </p>
               )}
-            </p>
+              {aiState.aiState === "idle" && isAddressingAI && (
+                <div className="flex items-center gap-2 text-purple-400">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                  <span className="text-sm">Listening... Release to send</span>
+                </div>
+              )}
+              {aiState.aiState === "listening" && (
+                <div className="flex items-center gap-2 text-purple-400">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                  <span className="text-sm">
+                    AI is listening
+                    {aiState.currentSpeakerName &&
+                      ` to ${aiState.currentSpeakerName}`}
+                  </span>
+                </div>
+              )}
+              {aiState.aiState === "processing" && (
+                <div className="flex items-center gap-2 text-yellow-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">AI is thinking...</span>
+                </div>
+              )}
+              {aiState.aiState === "speaking" && (
+                <div className="flex items-center gap-2 text-green-400">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-sm">AI is speaking</span>
+                </div>
+              )}
+              {aiState.lastError && (
+                <div className="flex items-center gap-2 text-red-400">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-sm">{aiState.lastError}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>

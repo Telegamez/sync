@@ -421,11 +421,10 @@ app
       });
 
       // ============================================================
-      // AI EVENTS (Placeholders for future implementation)
+      // AI EVENTS
       // ============================================================
 
       socket.on("ai:request_turn", (payload, callback) => {
-        // TODO: Implement turn queue in FEAT-157
         console.log(`[Socket.io] AI turn request from ${peerId}:`, payload);
         callback(null);
       });
@@ -438,12 +437,84 @@ app
         console.log(`[Socket.io] AI interrupt from ${peerId}:`, payload);
       });
 
+      // Handle PTT start - user is addressing AI
       socket.on("ai:ptt_start", (payload) => {
-        console.log(`[Socket.io] PTT start from ${peerId}:`, payload);
+        const roomId = payload.roomId || (socket as any).roomId;
+        if (!roomId) return;
+
+        const displayName = (socket as any).displayName || "User";
+        console.log(
+          `[Socket.io] PTT START from ${peerId} (${displayName}) in room ${roomId}`,
+        );
+
+        // Broadcast AI state change to room: listening
+        const aiStateEvent = {
+          type: "ai:listening",
+          roomId,
+          state: {
+            state: "listening" as const,
+            stateStartedAt: new Date(),
+            activeSpeakerId: peerId,
+            activeSpeakerName: displayName,
+            isSessionHealthy: true,
+            queue: { queue: [], totalProcessed: 0, totalExpired: 0 },
+          },
+        };
+        io.to(roomId).emit("ai:state", aiStateEvent);
+        console.log(`[Socket.io] Broadcast AI state: listening`);
+
+        // TODO: When OPENAI_API_KEY is configured:
+        // 1. Create/get AI session for this room via AIOrchestrator
+        // 2. Call orchestrator.startListening(roomId, peerId)
+        // 3. Start routing peer audio to OpenAI
       });
 
+      // Handle PTT end - user finished speaking, process with AI
       socket.on("ai:ptt_end", (payload) => {
-        console.log(`[Socket.io] PTT end from ${peerId}:`, payload);
+        const roomId = payload.roomId || (socket as any).roomId;
+        if (!roomId) return;
+
+        console.log(`[Socket.io] PTT END from ${peerId} in room ${roomId}`);
+
+        // Broadcast AI state change to room: processing
+        const processingEvent = {
+          type: "ai:processing",
+          roomId,
+          state: {
+            state: "processing" as const,
+            stateStartedAt: new Date(),
+            activeSpeakerId: peerId,
+            activeSpeakerName: (socket as any).displayName || "User",
+            isSessionHealthy: true,
+            queue: { queue: [], totalProcessed: 0, totalExpired: 0 },
+          },
+        };
+        io.to(roomId).emit("ai:state", processingEvent);
+        console.log(`[Socket.io] Broadcast AI state: processing`);
+
+        // TODO: When OPENAI_API_KEY is configured:
+        // 1. Call orchestrator.startProcessing(roomId) to commit audio
+        // 2. Wait for AI response
+        // 3. Broadcast ai:speaking state and audio chunks
+        // 4. When done, broadcast ai:idle state
+
+        // For now, simulate AI response cycle (2 second delay then idle)
+        setTimeout(() => {
+          const idleEvent = {
+            type: "ai:idle",
+            roomId,
+            state: {
+              state: "idle" as const,
+              stateStartedAt: new Date(),
+              activeSpeakerId: null,
+              activeSpeakerName: null,
+              isSessionHealthy: true,
+              queue: { queue: [], totalProcessed: 1, totalExpired: 0 },
+            },
+          };
+          io.to(roomId).emit("ai:state", idleEvent);
+          console.log(`[Socket.io] Broadcast AI state: idle (simulated)`);
+        }, 2000);
       });
 
       // ============================================================
