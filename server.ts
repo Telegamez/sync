@@ -18,6 +18,9 @@ import { Server as SocketIOServer } from "socket.io";
 import { nanoid } from "nanoid";
 import { WebSocket } from "ws";
 
+// Import API room store to get room configuration
+import { getRoom as getApiRoom } from "./src/server/store/rooms";
+
 // Types for signaling (inline to avoid module resolution in standalone)
 interface Peer {
   id: string;
@@ -693,8 +696,27 @@ app
         // Get or create room (auto-create for testing convenience)
         let room = getRoom(roomId);
         if (!room) {
-          room = createRoom(roomId, `Room ${roomId}`);
-          console.log(`[Socket.io] Auto-created room ${roomId}`);
+          // Check if room exists in API store (created via REST API)
+          const apiRoom = getApiRoom(roomId);
+          if (apiRoom) {
+            // Create socket room with API room's configuration
+            room = createRoom(
+              roomId,
+              apiRoom.name,
+              apiRoom.aiPersonality,
+              apiRoom.aiTopic,
+              apiRoom.customInstructions,
+            );
+            console.log(
+              `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, topic: ${apiRoom.aiTopic || "none"}`,
+            );
+          } else {
+            // Auto-create with defaults for testing
+            room = createRoom(roomId, `Room ${roomId}`);
+            console.log(
+              `[Socket.io] Auto-created room ${roomId} with defaults`,
+            );
+          }
         }
 
         // Check room capacity

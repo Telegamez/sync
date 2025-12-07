@@ -7,16 +7,16 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-101
  */
 
-import { nanoid } from 'nanoid';
+import { nanoid } from "nanoid";
 import type {
   Room,
   RoomId,
   RoomStatus,
   CreateRoomRequest,
   RoomSummary,
-} from '@/types/room';
-import type { Peer, PeerId } from '@/types/peer';
-import { DEFAULT_VOICE_SETTINGS } from '@/types/voice-mode';
+} from "@/types/room";
+import type { Peer, PeerId } from "@/types/peer";
+import { DEFAULT_VOICE_SETTINGS } from "@/types/voice-mode";
 
 /**
  * In-memory room storage
@@ -42,8 +42,10 @@ export function createRoom(request: CreateRoomRequest, ownerId: PeerId): Room {
     name: request.name,
     description: request.description,
     maxParticipants: request.maxParticipants ?? 6,
-    status: 'waiting',
-    aiPersonality: request.aiPersonality ?? 'facilitator',
+    status: "waiting",
+    aiPersonality: request.aiPersonality ?? "facilitator",
+    customInstructions: request.customInstructions,
+    aiTopic: request.aiTopic,
     voiceSettings: {
       ...DEFAULT_VOICE_SETTINGS,
       ...request.voiceSettings,
@@ -102,7 +104,10 @@ export function getRoomSummaries(status?: RoomStatus): RoomSummary[] {
 /**
  * Update room status
  */
-export function updateRoomStatus(roomId: RoomId, status: RoomStatus): Room | undefined {
+export function updateRoomStatus(
+  roomId: RoomId,
+  status: RoomStatus,
+): Room | undefined {
   const room = rooms.get(roomId);
   if (!room) return undefined;
 
@@ -124,9 +129,9 @@ export function addParticipant(roomId: RoomId, peer: Peer): Room | undefined {
 
   // Update status based on capacity
   if (room.participantCount >= room.maxParticipants) {
-    room.status = 'full';
-  } else if (room.participantCount > 0 && room.status === 'waiting') {
-    room.status = 'active';
+    room.status = "full";
+  } else if (room.participantCount > 0 && room.status === "waiting") {
+    room.status = "active";
   }
 
   return room;
@@ -135,7 +140,10 @@ export function addParticipant(roomId: RoomId, peer: Peer): Room | undefined {
 /**
  * Remove a participant from a room
  */
-export function removeParticipant(roomId: RoomId, peerId: PeerId): Room | undefined {
+export function removeParticipant(
+  roomId: RoomId,
+  peerId: PeerId,
+): Room | undefined {
   const room = rooms.get(roomId);
   if (!room) return undefined;
 
@@ -145,9 +153,12 @@ export function removeParticipant(roomId: RoomId, peerId: PeerId): Room | undefi
 
   // Update status based on capacity
   if (room.participantCount === 0) {
-    room.status = 'waiting';
-  } else if (room.participantCount < room.maxParticipants && room.status === 'full') {
-    room.status = 'active';
+    room.status = "waiting";
+  } else if (
+    room.participantCount < room.maxParticipants &&
+    room.status === "full"
+  ) {
+    room.status = "active";
   }
 
   return room;
@@ -167,7 +178,7 @@ export function closeRoom(roomId: RoomId): Room | undefined {
   const room = rooms.get(roomId);
   if (!room) return undefined;
 
-  room.status = 'closed';
+  room.status = "closed";
   room.lastActivityAt = new Date();
   return room;
 }
