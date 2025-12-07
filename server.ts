@@ -87,7 +87,7 @@ console.log(
 );
 
 /** Default system instructions for Swensync rooms */
-const SWENSYNC_INSTRUCTIONS = `You are Swensync — the voice of synchronized intelligence for collaborative teams.
+const SWENSYNC_BASE_INSTRUCTIONS = `You are Swensync — the voice of synchronized intelligence for collaborative teams.
 
 ## CORE MISSION
 You are an AI facilitator in a shared voice room where multiple participants can hear you simultaneously.
@@ -101,8 +101,23 @@ Never mention OpenAI, GPT, or third-party providers.
 ## STYLE
 - Conversational, concise, warm
 - Brief responses optimized for voice (2-3 sentences typically)
-- Address the speaker by name when known
+- IMPORTANT: Always address the current speaker by name in your response
 - Be helpful to the entire group`;
+
+/**
+ * Generate instructions that include the current speaker's name
+ */
+function getInstructionsForSpeaker(speakerName: string | null): string {
+  if (!speakerName) {
+    return SWENSYNC_BASE_INSTRUCTIONS;
+  }
+  return `${SWENSYNC_BASE_INSTRUCTIONS}
+
+## CURRENT SPEAKER
+The person currently speaking to you is named "${speakerName}".
+You MUST address them by name ("${speakerName}") in your response.
+For example, start with "Hey ${speakerName}," or "${speakerName}, ..." or include their name naturally in your response.`;
+}
 
 // In-memory stores
 const rooms = new Map<string, Room>();
@@ -259,7 +274,7 @@ function connectOpenAI(
         type: "session.update",
         session: {
           modalities: ["text", "audio"],
-          instructions: SWENSYNC_INSTRUCTIONS,
+          instructions: getInstructionsForSpeaker(session.activeSpeakerName),
           voice: "marin",
           input_audio_format: "pcm16",
           output_audio_format: "pcm16",
@@ -793,6 +808,20 @@ app
             console.error(`[Socket.io] Failed to connect OpenAI:`, error);
           }
         }
+
+        // Update session instructions with current speaker's name
+        if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+          const updateConfig = {
+            type: "session.update",
+            session: {
+              instructions: getInstructionsForSpeaker(displayName),
+            },
+          };
+          session.ws.send(JSON.stringify(updateConfig));
+          console.log(
+            `[OpenAI] Updated session instructions for speaker: ${displayName}`,
+          );
+        }
       });
 
       // Handle PTT audio data - stream to OpenAI
@@ -840,19 +869,20 @@ app
           };
           session.ws.send(JSON.stringify(commitEvent));
 
-          // Trigger response
+          // Trigger response with explicit speaker name instruction
+          const speakerName = session.activeSpeakerName;
           const responseEvent = {
             type: "response.create",
             response: {
               modalities: ["audio", "text"],
-              instructions: session.activeSpeakerName
-                ? `The user ${session.activeSpeakerName} just spoke. Respond helpfully to what they said.`
+              instructions: speakerName
+                ? `IMPORTANT: ${speakerName} just spoke to you. You MUST address them by name ("${speakerName}") in your response. Respond helpfully to what ${speakerName} said.`
                 : undefined,
             },
           };
           session.ws.send(JSON.stringify(responseEvent));
           console.log(
-            `[Socket.io] Triggered OpenAI response for room ${roomId}`,
+            `[Socket.io] Triggered OpenAI response for room ${roomId}, speaker: ${speakerName || "unknown"}`,
           );
         } else {
           // Simulate AI response if OpenAI not connected

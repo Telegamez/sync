@@ -2492,7 +2492,18 @@ ParticipantList shows updated name
 Next PTT → Server sends activeSpeakerName = newName → AI addresses by name
 ```
 
-**Bug Fix:** Fixed issue where changing username created a duplicate participant entry. The `onPeerUpdated` handler now checks if the update is for the local peer and updates `localPeer.displayName` accordingly.
+**Bug Fix 1:** Fixed issue where changing username created a duplicate participant entry. The `onPeerUpdated` handler now checks if the update is for the local peer and updates `localPeer.displayName` accordingly.
+
+**Bug Fix 2:** Fixed issue where AI wasn't using the speaker's vanity username. The issue was that the OpenAI Realtime API session instructions were static and didn't include the speaker's name. The fix:
+
+1. Created `getInstructionsForSpeaker()` function that generates instructions including the speaker's name
+2. When PTT starts, send a `session.update` to OpenAI with updated instructions containing the speaker's name
+3. Made `response.create` instructions more explicit: `"IMPORTANT: ${speakerName} just spoke to you. You MUST address them by name..."`
+
+The AI now receives the speaker's name in two places:
+
+- The session-level instructions (updated on each PTT start)
+- The per-response instructions (with explicit directive to use the name)
 
 ---
 
