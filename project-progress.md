@@ -13,9 +13,9 @@
 | Phase 2: Room Infrastructure | **Complete** | 23/23    | 100%   |
 | Phase 3: Multi-Peer Audio    | **Complete** | 13/13    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 10/10    | 100%   |
-| Phase 5: Production Polish   | In Progress  | 7/12     | 58%    |
+| Phase 5: Production Polish   | In Progress  | 8/13     | 62%    |
 
-**All Features Complete!** FEAT-413 (End-to-End AI PTT Integration) now connects to OpenAI Realtime API.
+**Latest:** FEAT-414 (Vanity Username) - Users can now set a custom username that persists and is used by the AI.
 
 ---
 
@@ -2437,6 +2437,62 @@ Connected room page PTT (Push-to-Talk) to OpenAI Realtime API for end-to-end AI 
 3. Reset `nextPlaybackTimeRef` in `stopPlayback` and `clearBuffer`
 
 **Result:** Audio chunks now play sequentially without overlap, making AI responses clear and understandable.
+
+---
+
+### FEAT-414: Vanity Username Support with AI Name Recognition
+
+**Date:** 2024-12-07
+**Test:** `tests/unit/components/UsernameModal.test.tsx`
+
+Implemented vanity username feature allowing participants to set a custom display name that persists across sessions and is used by the AI when addressing the user.
+
+**Files Created:**
+
+- `src/components/room/UsernameModal.tsx` - Modal component for username editing
+- `tests/unit/components/UsernameModal.test.tsx` - Unit tests (22 test cases)
+
+**Files Modified:**
+
+- `server.ts` - Added `peer:update_name` socket event handler
+- `src/lib/signaling/client.ts` - Added `updateDisplayName()` method
+- `src/hooks/useRoomConnection.ts` - Fixed `onPeerUpdated` to update `localPeer` when local user changes name
+- `src/app/rooms/[roomId]/page.tsx` - Added username state, edit UI, and modal integration
+- `src/components/room/index.ts` - Exported UsernameModal component
+- `features_list.json` - Added FEAT-414 entry
+
+**Key Features:**
+
+- UsernameModal with validation (2-30 chars, alphanumeric/spaces/hyphens/underscores)
+- Username persists to localStorage across browser sessions
+- Server-side validation and broadcast via `peer:update_name` event
+- Real-time sync to all peers in room via `peer:updated` event
+- Fixed duplicate participant bug when local user updates name
+- AI addresses user by their custom name during PTT responses
+- Edit button in room header with pencil icon
+- Accessible modal with keyboard support (Escape to close, Enter to save)
+
+**Data Flow:**
+
+```
+User clicks edit → Modal opens → User enters new name → Save
+    ↓
+localStorage.setItem("swensync_vanityUsername", newName)
+    ↓
+signalingClient.updateDisplayName(newName)
+    ↓
+Server updates peer.displayName and socket.displayName
+    ↓
+Server broadcasts "peer:updated" to room (including sender)
+    ↓
+Client updates localPeer.displayName (prevents duplicate)
+    ↓
+ParticipantList shows updated name
+    ↓
+Next PTT → Server sends activeSpeakerName = newName → AI addresses by name
+```
+
+**Bug Fix:** Fixed issue where changing username created a duplicate participant entry. The `onPeerUpdated` handler now checks if the update is for the local peer and updates `localPeer.displayName` accordingly.
 
 ---
 

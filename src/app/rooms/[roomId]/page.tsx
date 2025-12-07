@@ -24,8 +24,13 @@ import {
   Check,
   Mic,
   MicOff,
+  Pencil,
 } from "lucide-react";
-import { ParticipantList, RoomControls } from "@/components/room";
+import {
+  ParticipantList,
+  RoomControls,
+  UsernameModal,
+} from "@/components/room";
 import type { ParticipantInfo } from "@/components/room";
 import type { Room } from "@/types/room";
 import { useRoomConnection } from "@/hooks/useRoomConnection";
@@ -115,18 +120,23 @@ export default function RoomPage() {
   const [roomState, setRoomState] = useState<RoomState>("loading");
   const [error, setError] = useState<RoomError | null>(null);
 
-  // Local user state (generate stable display name on client only)
-  const [displayName] = useState(() => {
+  // Local user state - prioritize localStorage vanity name, fall back to session
+  const [displayName, setDisplayName] = useState(() => {
     if (typeof window !== "undefined") {
-      // Check sessionStorage for existing name
+      // Check localStorage first for persisted vanity username
+      const vanity = localStorage.getItem("swensync_vanityUsername");
+      if (vanity) return vanity;
+      // Fall back to sessionStorage for temporary name
       const stored = sessionStorage.getItem("swensync_displayName");
       if (stored) return stored;
+      // Generate new temporary name
       const newName = `User-${Math.random().toString(36).slice(2, 6)}`;
       sessionStorage.setItem("swensync_displayName", newName);
       return newName;
     }
     return "User";
   });
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [isAddressingAI, setIsAddressingAI] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -654,6 +664,24 @@ export default function RoomPage() {
   }, [roomId]);
 
   /**
+   * Handle username change from modal
+   */
+  const handleUsernameChange = useCallback(
+    (newName: string) => {
+      setDisplayName(newName);
+      // Persist to localStorage for future sessions
+      localStorage.setItem("swensync_vanityUsername", newName);
+      // Update via signaling to broadcast to peers
+      const client = getClient();
+      if (client) {
+        client.updateDisplayName(newName);
+      }
+      setShowUsernameModal(false);
+    },
+    [getClient],
+  );
+
+  /**
    * Render loading state
    */
   if (roomState === "loading" || roomState === "joining") {
@@ -785,6 +813,23 @@ export default function RoomPage() {
                   <span className="hidden sm:inline">Share</span>
                 </>
               )}
+            </button>
+          </div>
+
+          {/* Username row */}
+          <div className="flex items-center justify-center py-2 border-t border-border/50">
+            <button
+              onClick={() => setShowUsernameModal(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors group"
+              aria-label="Edit your username"
+            >
+              <span>
+                You:{" "}
+                <span className="text-foreground font-medium">
+                  {displayName}
+                </span>
+              </span>
+              <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
           </div>
         </div>
@@ -940,6 +985,14 @@ export default function RoomPage() {
           </div>
         </div>
       </footer>
+
+      {/* Username edit modal */}
+      <UsernameModal
+        isOpen={showUsernameModal}
+        currentName={displayName}
+        onSave={handleUsernameChange}
+        onClose={() => setShowUsernameModal(false)}
+      />
     </div>
   );
 }

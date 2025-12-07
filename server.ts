@@ -700,6 +700,54 @@ app
       });
 
       // ============================================================
+      // PEER UPDATE EVENTS
+      // ============================================================
+
+      // Handle peer:update_name - user changed their display name
+      socket.on("peer:update_name", (payload) => {
+        const { displayName } = payload;
+        const roomId = (socket as any).roomId;
+        if (!roomId) return;
+
+        // Validate display name
+        if (!displayName || typeof displayName !== "string") {
+          console.log(
+            `[Socket.io] Invalid display name from ${peerId}:`,
+            displayName,
+          );
+          return;
+        }
+
+        const trimmed = displayName.trim();
+        if (trimmed.length < 2 || trimmed.length > 30) {
+          console.log(
+            `[Socket.io] Display name out of range from ${peerId}:`,
+            trimmed.length,
+          );
+          return;
+        }
+
+        const peers = roomPeers.get(roomId);
+        const peer = peers?.get(peerId);
+        if (!peer) return;
+
+        const oldName = peer.displayName;
+
+        // Update peer display name
+        peer.displayName = trimmed;
+        (socket as any).displayName = trimmed;
+
+        // Broadcast to room (including self for confirmation)
+        const summary = toPeerSummary(peer);
+        socket.to(roomId).emit("peer:updated", summary);
+        socket.emit("peer:updated", summary);
+
+        console.log(
+          `[Socket.io] Peer ${peerId} changed name: "${oldName}" -> "${trimmed}"`,
+        );
+      });
+
+      // ============================================================
       // AI EVENTS
       // ============================================================
 

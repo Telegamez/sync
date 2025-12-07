@@ -7,23 +7,23 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-108
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   SignalingClient,
   createSignalingClient,
   SignalingClientOptions,
-} from '@/lib/signaling/client';
+} from "@/lib/signaling/client";
 import type {
   SocketConnectionState,
   RoomJoinedPayload,
   RoomErrorPayload,
   SignalingEventHandlers,
-} from '@/types/signaling';
-import type { Peer, PeerId, PeerSummary } from '@/types/peer';
-import type { Room, RoomId } from '@/types/room';
-import type { RoomAIState } from '@/types/voice-mode';
+} from "@/types/signaling";
+import type { Peer, PeerId, PeerSummary } from "@/types/peer";
+import type { Room, RoomId } from "@/types/room";
+import type { RoomAIState } from "@/types/voice-mode";
 
 /**
  * Connection error with additional context
@@ -68,7 +68,11 @@ export interface RoomConnectionActions {
   /** Disconnect from signaling server */
   disconnect: () => void;
   /** Join a room */
-  joinRoom: (roomId: RoomId, displayName: string, avatarUrl?: string) => Promise<RoomJoinedPayload>;
+  joinRoom: (
+    roomId: RoomId,
+    displayName: string,
+    avatarUrl?: string,
+  ) => Promise<RoomJoinedPayload>;
   /** Leave current room */
   leaveRoom: () => Promise<void>;
   /** Clear error state */
@@ -104,7 +108,7 @@ const DEFAULT_OPTIONS: UseRoomConnectionOptions = {
  * Initial state
  */
 const INITIAL_STATE: RoomConnectionState = {
-  connectionState: 'disconnected',
+  connectionState: "disconnected",
   room: null,
   localPeer: null,
   peers: [],
@@ -134,7 +138,7 @@ const INITIAL_STATE: RoomConnectionState = {
  * ```
  */
 export function useRoomConnection(
-  options: UseRoomConnectionOptions = {}
+  options: UseRoomConnectionOptions = {},
 ): RoomConnectionState & RoomConnectionActions {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
@@ -149,12 +153,15 @@ export function useRoomConnection(
   /**
    * Create error object
    */
-  const createError = useCallback((code: string, message: string, roomId?: RoomId): ConnectionError => ({
-    code,
-    message,
-    timestamp: new Date(),
-    roomId,
-  }), []);
+  const createError = useCallback(
+    (code: string, message: string, roomId?: RoomId): ConnectionError => ({
+      code,
+      message,
+      timestamp: new Date(),
+      roomId,
+    }),
+    [],
+  );
 
   /**
    * Start heartbeat
@@ -165,7 +172,7 @@ export function useRoomConnection(
     }
 
     heartbeatRef.current = setInterval(() => {
-      if (clientRef.current?.getConnectionState() === 'connected') {
+      if (clientRef.current?.getConnectionState() === "connected") {
         clientRef.current.sendHeartbeat();
       }
     }, opts.heartbeatInterval);
@@ -184,77 +191,64 @@ export function useRoomConnection(
   /**
    * Setup client event handlers
    */
-  const setupEventHandlers = useCallback((client: SignalingClient) => {
-    // Connection events
-    client.on('onConnect', () => {
-      setState((prev) => ({
-        ...prev,
-        connectionState: 'connected',
-        error: null,
-        reconnectAttempts: 0,
-      }));
-      opts.handlers?.onConnect?.();
-    });
+  const setupEventHandlers = useCallback(
+    (client: SignalingClient) => {
+      // Connection events
+      client.on("onConnect", () => {
+        setState((prev) => ({
+          ...prev,
+          connectionState: "connected",
+          error: null,
+          reconnectAttempts: 0,
+        }));
+        opts.handlers?.onConnect?.();
+      });
 
-    client.on('onDisconnect', (reason) => {
-      setState((prev) => ({
-        ...prev,
-        connectionState: reason === 'io server disconnect' ? 'disconnected' : 'reconnecting',
-      }));
-      opts.handlers?.onDisconnect?.(reason);
-    });
+      client.on("onDisconnect", (reason) => {
+        setState((prev) => ({
+          ...prev,
+          connectionState:
+            reason === "io server disconnect" ? "disconnected" : "reconnecting",
+        }));
+        opts.handlers?.onDisconnect?.(reason);
+      });
 
-    client.on('onError', (error) => {
-      setState((prev) => ({
-        ...prev,
-        connectionState: 'error',
-        error: createError('CONNECTION_ERROR', error.message),
-      }));
-      opts.handlers?.onError?.(error);
-    });
+      client.on("onError", (error) => {
+        setState((prev) => ({
+          ...prev,
+          connectionState: "error",
+          error: createError("CONNECTION_ERROR", error.message),
+        }));
+        opts.handlers?.onError?.(error);
+      });
 
-    client.on('onReconnect', (attempt) => {
-      setState((prev) => ({
-        ...prev,
-        connectionState: 'connected',
-        reconnectAttempts: 0,
-        error: null,
-      }));
-      opts.handlers?.onReconnect?.(attempt);
-    });
+      client.on("onReconnect", (attempt) => {
+        setState((prev) => ({
+          ...prev,
+          connectionState: "connected",
+          reconnectAttempts: 0,
+          error: null,
+        }));
+        opts.handlers?.onReconnect?.(attempt);
+      });
 
-    // Room events
-    client.on('onRoomJoined', (payload) => {
-      setState((prev) => ({
-        ...prev,
-        room: payload.room,
-        localPeer: payload.localPeer,
-        peers: payload.peers,
-        aiState: payload.aiState,
-        isInRoom: true,
-        isLoading: false,
-      }));
-      currentRoomIdRef.current = payload.room.id;
-      startHeartbeat();
-      opts.handlers?.onRoomJoined?.(payload);
-    });
+      // Room events
+      client.on("onRoomJoined", (payload) => {
+        setState((prev) => ({
+          ...prev,
+          room: payload.room,
+          localPeer: payload.localPeer,
+          peers: payload.peers,
+          aiState: payload.aiState,
+          isInRoom: true,
+          isLoading: false,
+        }));
+        currentRoomIdRef.current = payload.room.id;
+        startHeartbeat();
+        opts.handlers?.onRoomJoined?.(payload);
+      });
 
-    client.on('onRoomLeft', (payload) => {
-      setState((prev) => ({
-        ...prev,
-        room: null,
-        localPeer: null,
-        peers: [],
-        aiState: null,
-        isInRoom: false,
-      }));
-      currentRoomIdRef.current = null;
-      stopHeartbeat();
-      opts.handlers?.onRoomLeft?.(payload);
-    });
-
-    client.on('onRoomClosed', (roomId) => {
-      if (currentRoomIdRef.current === roomId) {
+      client.on("onRoomLeft", (payload) => {
         setState((prev) => ({
           ...prev,
           room: null,
@@ -262,95 +256,130 @@ export function useRoomConnection(
           peers: [],
           aiState: null,
           isInRoom: false,
-          error: createError('ROOM_CLOSED', 'Room was closed', roomId),
         }));
         currentRoomIdRef.current = null;
         stopHeartbeat();
+        opts.handlers?.onRoomLeft?.(payload);
+      });
+
+      client.on("onRoomClosed", (roomId) => {
+        if (currentRoomIdRef.current === roomId) {
+          setState((prev) => ({
+            ...prev,
+            room: null,
+            localPeer: null,
+            peers: [],
+            aiState: null,
+            isInRoom: false,
+            error: createError("ROOM_CLOSED", "Room was closed", roomId),
+          }));
+          currentRoomIdRef.current = null;
+          stopHeartbeat();
+        }
+        opts.handlers?.onRoomClosed?.(roomId);
+      });
+
+      client.on("onRoomError", (payload) => {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: createError(payload.code, payload.message, payload.roomId),
+        }));
+        opts.handlers?.onRoomError?.(payload);
+      });
+
+      // Peer events
+      client.on("onPeerJoined", (peer) => {
+        setState((prev) => ({
+          ...prev,
+          peers: [...prev.peers, peer],
+          room: prev.room
+            ? { ...prev.room, participantCount: prev.room.participantCount + 1 }
+            : null,
+        }));
+        opts.handlers?.onPeerJoined?.(peer);
+      });
+
+      client.on("onPeerLeft", (peerId) => {
+        setState((prev) => ({
+          ...prev,
+          peers: prev.peers.filter((p) => p.id !== peerId),
+          room: prev.room
+            ? {
+                ...prev.room,
+                participantCount: Math.max(0, prev.room.participantCount - 1),
+              }
+            : null,
+        }));
+        opts.handlers?.onPeerLeft?.(peerId);
+      });
+
+      client.on("onPeerUpdated", (peer) => {
+        setState((prev) => {
+          // Check if this is the local peer being updated (e.g., name change)
+          const isLocalPeer = prev.localPeer?.id === peer.id;
+
+          return {
+            ...prev,
+            // Update localPeer if it's us
+            localPeer:
+              isLocalPeer && prev.localPeer
+                ? {
+                    ...prev.localPeer,
+                    displayName: peer.displayName,
+                    avatarUrl: peer.avatarUrl,
+                  }
+                : prev.localPeer,
+            // Update in peers array (for remote peers)
+            peers: prev.peers.map((p) => (p.id === peer.id ? peer : p)),
+          };
+        });
+        opts.handlers?.onPeerUpdated?.(peer);
+      });
+
+      // Presence events
+      client.on("onPresenceUpdate", (peer) => {
+        setState((prev) => ({
+          ...prev,
+          peers: prev.peers.map((p) => (p.id === peer.id ? peer : p)),
+        }));
+        opts.handlers?.onPresenceUpdate?.(peer);
+      });
+
+      // AI state events
+      client.on("onAIState", (aiState) => {
+        setState((prev) => ({
+          ...prev,
+          aiState,
+        }));
+        opts.handlers?.onAIState?.(aiState);
+      });
+
+      // Pass through signaling events
+      if (opts.handlers?.onSignalOffer) {
+        client.on("onSignalOffer", opts.handlers.onSignalOffer);
       }
-      opts.handlers?.onRoomClosed?.(roomId);
-    });
-
-    client.on('onRoomError', (payload) => {
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: createError(payload.code, payload.message, payload.roomId),
-      }));
-      opts.handlers?.onRoomError?.(payload);
-    });
-
-    // Peer events
-    client.on('onPeerJoined', (peer) => {
-      setState((prev) => ({
-        ...prev,
-        peers: [...prev.peers, peer],
-        room: prev.room
-          ? { ...prev.room, participantCount: prev.room.participantCount + 1 }
-          : null,
-      }));
-      opts.handlers?.onPeerJoined?.(peer);
-    });
-
-    client.on('onPeerLeft', (peerId) => {
-      setState((prev) => ({
-        ...prev,
-        peers: prev.peers.filter((p) => p.id !== peerId),
-        room: prev.room
-          ? { ...prev.room, participantCount: Math.max(0, prev.room.participantCount - 1) }
-          : null,
-      }));
-      opts.handlers?.onPeerLeft?.(peerId);
-    });
-
-    client.on('onPeerUpdated', (peer) => {
-      setState((prev) => ({
-        ...prev,
-        peers: prev.peers.map((p) => (p.id === peer.id ? peer : p)),
-      }));
-      opts.handlers?.onPeerUpdated?.(peer);
-    });
-
-    // Presence events
-    client.on('onPresenceUpdate', (peer) => {
-      setState((prev) => ({
-        ...prev,
-        peers: prev.peers.map((p) => (p.id === peer.id ? peer : p)),
-      }));
-      opts.handlers?.onPresenceUpdate?.(peer);
-    });
-
-    // AI state events
-    client.on('onAIState', (aiState) => {
-      setState((prev) => ({
-        ...prev,
-        aiState,
-      }));
-      opts.handlers?.onAIState?.(aiState);
-    });
-
-    // Pass through signaling events
-    if (opts.handlers?.onSignalOffer) {
-      client.on('onSignalOffer', opts.handlers.onSignalOffer);
-    }
-    if (opts.handlers?.onSignalAnswer) {
-      client.on('onSignalAnswer', opts.handlers.onSignalAnswer);
-    }
-    if (opts.handlers?.onSignalIce) {
-      client.on('onSignalIce', opts.handlers.onSignalIce);
-    }
-  }, [opts.handlers, createError, startHeartbeat, stopHeartbeat]);
+      if (opts.handlers?.onSignalAnswer) {
+        client.on("onSignalAnswer", opts.handlers.onSignalAnswer);
+      }
+      if (opts.handlers?.onSignalIce) {
+        client.on("onSignalIce", opts.handlers.onSignalIce);
+      }
+    },
+    [opts.handlers, createError, startHeartbeat, stopHeartbeat],
+  );
 
   /**
    * Connect to signaling server
    */
   const connect = useCallback(async (): Promise<void> => {
-    if (clientRef.current?.getConnectionState() === 'connected') {
+    if (clientRef.current?.getConnectionState() === "connected") {
       return;
     }
 
     setState((prev) => ({
       ...prev,
-      connectionState: 'connecting',
+      connectionState: "connecting",
       isLoading: true,
       error: null,
     }));
@@ -371,16 +400,17 @@ export function useRoomConnection(
 
       setState((prev) => ({
         ...prev,
-        connectionState: 'connected',
+        connectionState: "connected",
         isLoading: false,
       }));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
+      const errorMessage =
+        error instanceof Error ? error.message : "Connection failed";
       setState((prev) => ({
         ...prev,
-        connectionState: 'error',
+        connectionState: "error",
         isLoading: false,
-        error: createError('CONNECTION_FAILED', errorMessage),
+        error: createError("CONNECTION_FAILED", errorMessage),
       }));
       throw error;
     }
@@ -405,44 +435,48 @@ export function useRoomConnection(
   /**
    * Join a room
    */
-  const joinRoom = useCallback(async (
-    roomId: RoomId,
-    displayName: string,
-    avatarUrl?: string
-  ): Promise<RoomJoinedPayload> => {
-    if (!clientRef.current) {
-      throw new Error('Not connected to signaling server');
-    }
+  const joinRoom = useCallback(
+    async (
+      roomId: RoomId,
+      displayName: string,
+      avatarUrl?: string,
+    ): Promise<RoomJoinedPayload> => {
+      if (!clientRef.current) {
+        throw new Error("Not connected to signaling server");
+      }
 
-    if (currentRoomIdRef.current) {
-      throw new Error('Already in a room. Leave current room first.');
-    }
+      if (currentRoomIdRef.current) {
+        throw new Error("Already in a room. Leave current room first.");
+      }
 
-    setState((prev) => ({
-      ...prev,
-      isLoading: true,
-      error: null,
-    }));
-
-    try {
-      const response = await clientRef.current.joinRoom({
-        roomId,
-        displayName,
-        avatarUrl,
-      });
-
-      // State updated via event handler
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Join failed';
       setState((prev) => ({
         ...prev,
-        isLoading: false,
-        error: createError('JOIN_FAILED', errorMessage, roomId),
+        isLoading: true,
+        error: null,
       }));
-      throw error;
-    }
-  }, [createError]);
+
+      try {
+        const response = await clientRef.current.joinRoom({
+          roomId,
+          displayName,
+          avatarUrl,
+        });
+
+        // State updated via event handler
+        return response;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Join failed";
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: createError("JOIN_FAILED", errorMessage, roomId),
+        }));
+        throw error;
+      }
+    },
+    [createError],
+  );
 
   /**
    * Leave current room

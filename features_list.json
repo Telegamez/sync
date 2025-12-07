@@ -1037,6 +1037,24 @@
       "testFile": "tests/unit/ai/ptt-integration.test.ts",
       "dependencies": ["FEAT-300", "FEAT-303", "FEAT-151", "FEAT-412"],
       "passes": true
+    },
+    {
+      "id": "FEAT-414",
+      "phase": 5,
+      "category": "user-experience",
+      "description": "Vanity username support with persistence and AI name recognition",
+      "priority": "medium",
+      "steps": [
+        "Create UsernameModal component with validation",
+        "Add updateDisplayName method to signaling client",
+        "Add peer:update_name handler to server.ts",
+        "Update room page with username state and edit UI",
+        "Persist username to localStorage across sessions",
+        "Ensure AI addresses user by their custom name during PTT"
+      ],
+      "testFile": "tests/unit/components/UsernameModal.test.tsx",
+      "dependencies": ["FEAT-413"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1056,15 +1074,16 @@
     "performance": "Optimization and profiling",
     "ci": "Continuous integration",
     "quality": "Code quality tools",
-    "e2e": "End-to-end testing"
+    "e2e": "End-to-end testing",
+    "user-experience": "User experience and personalization"
   },
   "statistics": {
-    "total": 54,
+    "total": 55,
     "phase2": 23,
     "phase3": 14,
     "phase4": 10,
-    "phase5": 12,
-    "passed": 54,
+    "phase5": 13,
+    "passed": 55,
     "pending": 0
   }
 }

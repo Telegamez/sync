@@ -6,7 +6,7 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-104
  */
 
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from "socket.io-client";
 import type {
   JoinRoomPayload,
   LeaveRoomPayload,
@@ -19,10 +19,10 @@ import type {
   RoomErrorPayload,
   SocketConnectionState,
   SignalingEventHandlers,
-} from '@/types/signaling';
-import type { PeerId, PeerSummary } from '@/types/peer';
-import type { RoomId, Room } from '@/types/room';
-import type { RoomAIState } from '@/types/voice-mode';
+} from "@/types/signaling";
+import type { PeerId, PeerSummary } from "@/types/peer";
+import type { RoomId, Room } from "@/types/room";
+import type { RoomAIState } from "@/types/voice-mode";
 
 /**
  * Signaling client options
@@ -39,7 +39,7 @@ export interface SignalingClientOptions {
  * Default options
  */
 const DEFAULT_OPTIONS: Required<SignalingClientOptions> = {
-  url: typeof window !== 'undefined' ? window.location.origin : '',
+  url: typeof window !== "undefined" ? window.location.origin : "",
   autoConnect: false,
   reconnection: true,
   reconnectionAttempts: 5,
@@ -53,7 +53,7 @@ export class SignalingClient {
   private socket: Socket | null = null;
   private options: Required<SignalingClientOptions>;
   private handlers: Partial<SignalingEventHandlers> = {};
-  private connectionState: SocketConnectionState = 'disconnected';
+  private connectionState: SocketConnectionState = "disconnected";
 
   constructor(options?: SignalingClientOptions) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -76,7 +76,7 @@ export class SignalingClient {
         return;
       }
 
-      this.connectionState = 'connecting';
+      this.connectionState = "connecting";
 
       this.socket = io(this.options.url, {
         autoConnect: true,
@@ -88,19 +88,19 @@ export class SignalingClient {
       this.setupSocketHandlers();
 
       const timeout = setTimeout(() => {
-        reject(new Error('Connection timeout'));
+        reject(new Error("Connection timeout"));
       }, 10000);
 
-      this.socket.once('connect', () => {
+      this.socket.once("connect", () => {
         clearTimeout(timeout);
-        this.connectionState = 'connected';
+        this.connectionState = "connected";
         this.handlers.onConnect?.();
         resolve();
       });
 
-      this.socket.once('connect_error', (error) => {
+      this.socket.once("connect_error", (error) => {
         clearTimeout(timeout);
-        this.connectionState = 'error';
+        this.connectionState = "error";
         this.handlers.onError?.(error);
         reject(error);
       });
@@ -114,7 +114,7 @@ export class SignalingClient {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      this.connectionState = 'disconnected';
+      this.connectionState = "disconnected";
     }
   }
 
@@ -124,75 +124,84 @@ export class SignalingClient {
   private setupSocketHandlers(): void {
     if (!this.socket) return;
 
-    this.socket.on('connect', () => {
-      this.connectionState = 'connected';
+    this.socket.on("connect", () => {
+      this.connectionState = "connected";
       this.handlers.onConnect?.();
     });
 
-    this.socket.on('disconnect', (reason) => {
-      if (reason === 'io server disconnect') {
-        this.connectionState = 'disconnected';
+    this.socket.on("disconnect", (reason) => {
+      if (reason === "io server disconnect") {
+        this.connectionState = "disconnected";
       } else {
-        this.connectionState = 'reconnecting';
+        this.connectionState = "reconnecting";
       }
       this.handlers.onDisconnect?.(reason);
     });
 
-    this.socket.io.on('reconnect', (attempt) => {
-      this.connectionState = 'connected';
+    this.socket.io.on("reconnect", (attempt) => {
+      this.connectionState = "connected";
       this.handlers.onReconnect?.(attempt);
     });
 
-    this.socket.io.on('reconnect_error', () => {
-      this.connectionState = 'reconnecting';
+    this.socket.io.on("reconnect_error", () => {
+      this.connectionState = "reconnecting";
     });
 
-    this.socket.io.on('reconnect_failed', () => {
-      this.connectionState = 'error';
-      this.handlers.onError?.(new Error('Reconnection failed'));
+    this.socket.io.on("reconnect_failed", () => {
+      this.connectionState = "error";
+      this.handlers.onError?.(new Error("Reconnection failed"));
     });
 
     // Room events
-    this.socket.on('room:left', (payload: RoomLeftPayload) => {
+    this.socket.on("room:left", (payload: RoomLeftPayload) => {
       this.handlers.onRoomLeft?.(payload);
     });
 
-    this.socket.on('room:closed', (roomId: RoomId) => {
+    this.socket.on("room:closed", (roomId: RoomId) => {
       this.handlers.onRoomClosed?.(roomId);
     });
 
-    this.socket.on('room:error', (payload: RoomErrorPayload) => {
+    this.socket.on("room:error", (payload: RoomErrorPayload) => {
       this.handlers.onRoomError?.(payload);
     });
 
     // Peer events
-    this.socket.on('peer:joined', (peer: PeerSummary) => {
+    this.socket.on("peer:joined", (peer: PeerSummary) => {
       this.handlers.onPeerJoined?.(peer);
     });
 
-    this.socket.on('peer:left', (peerId: PeerId) => {
+    this.socket.on("peer:left", (peerId: PeerId) => {
       this.handlers.onPeerLeft?.(peerId);
     });
 
-    this.socket.on('peer:updated', (peer: PeerSummary) => {
+    this.socket.on("peer:updated", (peer: PeerSummary) => {
       this.handlers.onPeerUpdated?.(peer);
     });
 
     // Signaling events
-    this.socket.on('signal:offer', (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => {
-      this.handlers.onSignalOffer?.(fromPeerId, sdp);
-    });
+    this.socket.on(
+      "signal:offer",
+      (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => {
+        this.handlers.onSignalOffer?.(fromPeerId, sdp);
+      },
+    );
 
-    this.socket.on('signal:answer', (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => {
-      this.handlers.onSignalAnswer?.(fromPeerId, sdp);
-    });
+    this.socket.on(
+      "signal:answer",
+      (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => {
+        this.handlers.onSignalAnswer?.(fromPeerId, sdp);
+      },
+    );
 
-    this.socket.on('signal:ice', (fromPeerId: PeerId, candidate: RTCIceCandidateInit) => {
-      this.handlers.onSignalIce?.(fromPeerId, candidate);
-    });
+    this.socket.on(
+      "signal:ice",
+      (fromPeerId: PeerId, candidate: RTCIceCandidateInit) => {
+        this.handlers.onSignalIce?.(fromPeerId, candidate);
+      },
+    );
 
     // Presence events
-    this.socket.on('presence:update', (peer: PeerSummary) => {
+    this.socket.on("presence:update", (peer: PeerSummary) => {
       this.handlers.onPresenceUpdate?.(peer);
     });
   }
@@ -203,18 +212,22 @@ export class SignalingClient {
   public joinRoom(payload: JoinRoomPayload): Promise<RoomJoinedPayload> {
     return new Promise((resolve, reject) => {
       if (!this.socket?.connected) {
-        reject(new Error('Not connected to signaling server'));
+        reject(new Error("Not connected to signaling server"));
         return;
       }
 
-      this.socket.emit('room:join', payload, (response: RoomJoinedPayload | RoomErrorPayload) => {
-        if ('code' in response) {
-          reject(new Error(response.message));
-        } else {
-          this.handlers.onRoomJoined?.(response);
-          resolve(response);
-        }
-      });
+      this.socket.emit(
+        "room:join",
+        payload,
+        (response: RoomJoinedPayload | RoomErrorPayload) => {
+          if ("code" in response) {
+            reject(new Error(response.message));
+          } else {
+            this.handlers.onRoomJoined?.(response);
+            resolve(response);
+          }
+        },
+      );
     });
   }
 
@@ -228,7 +241,7 @@ export class SignalingClient {
         return;
       }
 
-      this.socket.emit('room:leave', payload);
+      this.socket.emit("room:leave", payload);
       resolve();
     });
   }
@@ -236,9 +249,23 @@ export class SignalingClient {
   /**
    * Update peer info
    */
-  public updatePeer(payload: { displayName?: string; avatarUrl?: string }): void {
-    // Note: This would need server-side handler - placeholder for now
-    console.log('updatePeer:', payload);
+  public updatePeer(payload: {
+    displayName?: string;
+    avatarUrl?: string;
+  }): void {
+    if (!this.socket?.connected) return;
+    if (payload.displayName) {
+      this.updateDisplayName(payload.displayName);
+    }
+  }
+
+  /**
+   * Update display name (vanity username)
+   * Broadcasts the new name to all peers in the room
+   */
+  public updateDisplayName(newDisplayName: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit("peer:update_name", { displayName: newDisplayName });
   }
 
   /**
@@ -260,7 +287,7 @@ export class SignalingClient {
    */
   public sendOffer(payload: SignalOfferPayload): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('signal:offer', payload);
+    this.socket.emit("signal:offer", payload);
   }
 
   /**
@@ -268,7 +295,7 @@ export class SignalingClient {
    */
   public sendAnswer(payload: SignalAnswerPayload): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('signal:answer', payload);
+    this.socket.emit("signal:answer", payload);
   }
 
   /**
@@ -276,7 +303,7 @@ export class SignalingClient {
    */
   public sendIce(payload: SignalIcePayload): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('signal:ice', payload);
+    this.socket.emit("signal:ice", payload);
   }
 
   /**
@@ -284,7 +311,7 @@ export class SignalingClient {
    */
   public updatePresence(payload: PresenceUpdatePayload): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('presence:update', payload);
+    this.socket.emit("presence:update", payload);
   }
 
   /**
@@ -292,7 +319,7 @@ export class SignalingClient {
    */
   public sendHeartbeat(): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('presence:heartbeat');
+    this.socket.emit("presence:heartbeat");
   }
 
   /**
@@ -302,8 +329,8 @@ export class SignalingClient {
     roomId: string,
     peerId: string,
     peerDisplayName: string,
-    priority: number = 0
-  ): Promise<import('@/types/voice-mode').TurnRequest | null> {
+    priority: number = 0,
+  ): Promise<import("@/types/voice-mode").TurnRequest | null> {
     return new Promise((resolve) => {
       if (!this.socket?.connected) {
         resolve(null);
@@ -311,11 +338,11 @@ export class SignalingClient {
       }
 
       this.socket.emit(
-        'ai:request_turn',
+        "ai:request_turn",
         { roomId, peerId, peerDisplayName, priority },
-        (response: import('@/types/voice-mode').TurnRequest | null) => {
+        (response: import("@/types/voice-mode").TurnRequest | null) => {
           resolve(response);
-        }
+        },
       );
     });
   }
@@ -325,7 +352,7 @@ export class SignalingClient {
    */
   public cancelTurn(roomId: string, requestId: string): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('ai:cancel_turn', { roomId, requestId });
+    this.socket.emit("ai:cancel_turn", { roomId, requestId });
   }
 
   /**
@@ -333,7 +360,7 @@ export class SignalingClient {
    */
   public interruptAI(roomId: string, peerId: string, reason?: string): boolean {
     if (!this.socket?.connected) return false;
-    this.socket.emit('ai:interrupt', { roomId, interruptedBy: peerId, reason });
+    this.socket.emit("ai:interrupt", { roomId, interruptedBy: peerId, reason });
     return true;
   }
 
@@ -342,7 +369,7 @@ export class SignalingClient {
    */
   public startPTT(roomId: string): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('ai:ptt_start', { roomId });
+    this.socket.emit("ai:ptt_start", { roomId });
   }
 
   /**
@@ -350,7 +377,7 @@ export class SignalingClient {
    */
   public endPTT(roomId: string): void {
     if (!this.socket?.connected) return;
-    this.socket.emit('ai:ptt_end', { roomId });
+    this.socket.emit("ai:ptt_end", { roomId });
   }
 
   /**
@@ -358,7 +385,7 @@ export class SignalingClient {
    */
   public on<K extends keyof SignalingEventHandlers>(
     event: K,
-    handler: SignalingEventHandlers[K]
+    handler: SignalingEventHandlers[K],
   ): void {
     this.handlers[event] = handler;
   }
@@ -368,7 +395,7 @@ export class SignalingClient {
    */
   public off<K extends keyof SignalingEventHandlers>(
     event: K,
-    handler?: SignalingEventHandlers[K]
+    handler?: SignalingEventHandlers[K],
   ): void {
     if (!handler || this.handlers[event] === handler) {
       delete this.handlers[event];
@@ -386,6 +413,8 @@ export class SignalingClient {
 /**
  * Create signaling client instance
  */
-export function createSignalingClient(options?: SignalingClientOptions): SignalingClient {
+export function createSignalingClient(
+  options?: SignalingClientOptions,
+): SignalingClient {
   return new SignalingClient(options);
 }
