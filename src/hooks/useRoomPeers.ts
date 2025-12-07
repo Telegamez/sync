@@ -7,12 +7,12 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-109
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import type { SignalingClient } from '@/lib/signaling/client';
-import type { PeerId, PeerSummary, PeerConnectionState } from '@/types/peer';
-import type { RoomId } from '@/types/room';
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import type { SignalingClient } from "@/lib/signaling/client";
+import type { PeerId, PeerSummary, PeerConnectionState } from "@/types/peer";
+import type { RoomId } from "@/types/room";
 
 /**
  * WebRTC connection info for a peer
@@ -89,7 +89,10 @@ export interface UseRoomPeersOptions {
   /** Called when peer audio stream available */
   onPeerAudioStream?: (peerId: PeerId, stream: MediaStream) => void;
   /** Called when peer connection state changes */
-  onPeerConnectionStateChange?: (peerId: PeerId, state: PeerConnectionState) => void;
+  onPeerConnectionStateChange?: (
+    peerId: PeerId,
+    state: PeerConnectionState,
+  ) => void;
 }
 
 /**
@@ -97,8 +100,8 @@ export interface UseRoomPeersOptions {
  */
 const DEFAULT_RTC_CONFIG: RTCConfiguration = {
   iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
   ],
 };
 
@@ -134,7 +137,9 @@ const INITIAL_STATE: RoomPeersState = {
  * setLocalStream(localAudioStream);
  * ```
  */
-export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & RoomPeersActions {
+export function useRoomPeers(
+  options: UseRoomPeersOptions,
+): RoomPeersState & RoomPeersActions {
   const {
     client,
     roomId,
@@ -148,20 +153,24 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
   // Refs for connections and streams
   const connectionsRef = useRef<Map<PeerId, PeerConnection>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
-  const pendingCandidatesRef = useRef<Map<PeerId, RTCIceCandidateInit[]>>(new Map());
+  const pendingCandidatesRef = useRef<Map<PeerId, RTCIceCandidateInit[]>>(
+    new Map(),
+  );
 
   // Peer summaries state
   const [peerSummaries, setPeerSummaries] = useState<Map<PeerId, PeerSummary>>(
-    new Map(initialPeers.map((p) => [p.id, p]))
+    new Map(initialPeers.map((p) => [p.id, p])),
   );
 
   // Connection states
-  const [connectionStates, setConnectionStates] = useState<Map<PeerId, PeerConnectionState>>(
-    new Map()
-  );
+  const [connectionStates, setConnectionStates] = useState<
+    Map<PeerId, PeerConnectionState>
+  >(new Map());
 
   // Audio streams
-  const [audioStreams, setAudioStreams] = useState<Map<PeerId, MediaStream>>(new Map());
+  const [audioStreams, setAudioStreams] = useState<Map<PeerId, MediaStream>>(
+    new Map(),
+  );
 
   /**
    * Create RTCPeerConnection for a peer
@@ -178,7 +187,7 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
         onPeerConnectionStateChange?.(peerId, state);
 
         // Clean up on failed/closed (remove from tracking only, connection already closed)
-        if (rawState === 'failed' || rawState === 'closed') {
+        if (rawState === "failed" || rawState === "closed") {
           connectionsRef.current.delete(peerId);
         }
       };
@@ -219,14 +228,14 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
       connectionsRef.current.set(peerId, {
         peerId,
         connection: pc,
-        connectionState: 'new',
+        connectionState: "new",
         remoteStream: null,
         isInitiator,
       });
 
       return pc;
     },
-    [client, rtcConfig, onPeerAudioStream, onPeerConnectionStateChange]
+    [client, rtcConfig, onPeerAudioStream, onPeerConnectionStateChange],
   );
 
   /**
@@ -250,10 +259,13 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
           sdp: offer,
         });
       } catch (error) {
-        console.error(`[useRoomPeers] Failed to create offer for ${peerId}:`, error);
+        console.error(
+          `[useRoomPeers] Failed to create offer for ${peerId}:`,
+          error,
+        );
       }
     },
-    [client, createPeerConnection]
+    [client, createPeerConnection],
   );
 
   /**
@@ -290,35 +302,50 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
           sdp: answer,
         });
       } catch (error) {
-        console.error(`[useRoomPeers] Failed to handle offer from ${fromPeerId}:`, error);
+        console.error(
+          `[useRoomPeers] Failed to handle offer from ${fromPeerId}:`,
+          error,
+        );
       }
     },
-    [client, createPeerConnection]
+    [client, createPeerConnection],
   );
 
   /**
    * Handle incoming answer
    */
-  const handleAnswer = useCallback(async (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => {
-    const peerConn = connectionsRef.current.get(fromPeerId);
-    if (!peerConn) {
-      console.warn(`[useRoomPeers] No connection for answer from ${fromPeerId}`);
-      return;
-    }
-
-    try {
-      await peerConn.connection.setRemoteDescription(new RTCSessionDescription(sdp));
-
-      // Apply pending ICE candidates
-      const pending = pendingCandidatesRef.current.get(fromPeerId) || [];
-      for (const candidate of pending) {
-        await peerConn.connection.addIceCandidate(new RTCIceCandidate(candidate));
+  const handleAnswer = useCallback(
+    async (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => {
+      const peerConn = connectionsRef.current.get(fromPeerId);
+      if (!peerConn) {
+        console.warn(
+          `[useRoomPeers] No connection for answer from ${fromPeerId}`,
+        );
+        return;
       }
-      pendingCandidatesRef.current.delete(fromPeerId);
-    } catch (error) {
-      console.error(`[useRoomPeers] Failed to handle answer from ${fromPeerId}:`, error);
-    }
-  }, []);
+
+      try {
+        await peerConn.connection.setRemoteDescription(
+          new RTCSessionDescription(sdp),
+        );
+
+        // Apply pending ICE candidates
+        const pending = pendingCandidatesRef.current.get(fromPeerId) || [];
+        for (const candidate of pending) {
+          await peerConn.connection.addIceCandidate(
+            new RTCIceCandidate(candidate),
+          );
+        }
+        pendingCandidatesRef.current.delete(fromPeerId);
+      } catch (error) {
+        console.error(
+          `[useRoomPeers] Failed to handle answer from ${fromPeerId}:`,
+          error,
+        );
+      }
+    },
+    [],
+  );
 
   /**
    * Handle incoming ICE candidate
@@ -336,12 +363,17 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
       }
 
       try {
-        await peerConn.connection.addIceCandidate(new RTCIceCandidate(candidate));
+        await peerConn.connection.addIceCandidate(
+          new RTCIceCandidate(candidate),
+        );
       } catch (error) {
-        console.error(`[useRoomPeers] Failed to add ICE candidate from ${fromPeerId}:`, error);
+        console.error(
+          `[useRoomPeers] Failed to add ICE candidate from ${fromPeerId}:`,
+          error,
+        );
       }
     },
-    []
+    [],
   );
 
   /**
@@ -356,7 +388,7 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
         initiateConnection(peer.id);
       }
     },
-    [localPeerId, initiateConnection]
+    [localPeerId, initiateConnection],
   );
 
   /**
@@ -414,7 +446,7 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
 
       // Remove existing tracks
       pc.getSenders().forEach((sender) => {
-        if (sender.track?.kind === 'audio') {
+        if (sender.track?.kind === "audio") {
           pc.removeTrack(sender);
         }
       });
@@ -436,7 +468,7 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
       const summary = peerSummaries.get(peerId);
       if (!summary) return undefined;
 
-      const webrtcState = connectionStates.get(peerId) || 'new';
+      const webrtcState = connectionStates.get(peerId) || "new";
       const audioStream = audioStreams.get(peerId) || null;
 
       return {
@@ -446,7 +478,7 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
         audioStream,
       };
     },
-    [peerSummaries, connectionStates, audioStreams]
+    [peerSummaries, connectionStates, audioStreams],
   );
 
   /**
@@ -486,7 +518,7 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
         initiateConnection(peerId);
       }
     },
-    [localPeerId, initiateConnection]
+    [localPeerId, initiateConnection],
   );
 
   // Setup signaling event handlers
@@ -494,22 +526,22 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
     if (!client) return;
 
     // Register handlers
-    client.on('onSignalOffer', handleOffer);
-    client.on('onSignalAnswer', handleAnswer);
-    client.on('onSignalIce', handleIceCandidate);
-    client.on('onPeerJoined', handlePeerJoined);
-    client.on('onPeerLeft', handlePeerLeft);
-    client.on('onPeerUpdated', handlePeerUpdated);
-    client.on('onPresenceUpdate', handlePeerUpdated);
+    client.on("onSignalOffer", handleOffer);
+    client.on("onSignalAnswer", handleAnswer);
+    client.on("onSignalIce", handleIceCandidate);
+    client.on("onPeerJoined", handlePeerJoined);
+    client.on("onPeerLeft", handlePeerLeft);
+    client.on("onPeerUpdated", handlePeerUpdated);
+    client.on("onPresenceUpdate", handlePeerUpdated);
 
     return () => {
-      client.off('onSignalOffer', handleOffer);
-      client.off('onSignalAnswer', handleAnswer);
-      client.off('onSignalIce', handleIceCandidate);
-      client.off('onPeerJoined', handlePeerJoined);
-      client.off('onPeerLeft', handlePeerLeft);
-      client.off('onPeerUpdated', handlePeerUpdated);
-      client.off('onPresenceUpdate', handlePeerUpdated);
+      client.off("onSignalOffer", handleOffer);
+      client.off("onSignalAnswer", handleAnswer);
+      client.off("onSignalIce", handleIceCandidate);
+      client.off("onPeerJoined", handlePeerJoined);
+      client.off("onPeerLeft", handlePeerLeft);
+      client.off("onPeerUpdated", handlePeerUpdated);
+      client.off("onPresenceUpdate", handlePeerUpdated);
     };
   }, [
     client,
@@ -521,22 +553,23 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
     handlePeerUpdated,
   ]);
 
-  // Initialize connections to existing peers (only runs once on setup)
-  const hasInitializedRef = useRef(false);
+  // Initialize connections to existing peers when we have all required data
   useEffect(() => {
     if (!client || !localPeerId || !roomId) return;
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
 
-    // Connect to all existing peers (higher ID initiates)
+    // Connect to all existing peers that we haven't connected to yet
+    // Higher ID initiates the connection to avoid duplicate connections
     peerSummaries.forEach((peer) => {
       if (peer.id !== localPeerId && peer.id > localPeerId) {
         if (!connectionsRef.current.has(peer.id)) {
+          console.log(
+            `[useRoomPeers] Initiating connection to ${peer.id} (I am ${localPeerId})`,
+          );
           initiateConnection(peer.id);
         }
       }
     });
-  }, [client, localPeerId, roomId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [client, localPeerId, roomId, peerSummaries, initiateConnection]);
 
   // Cleanup on unmount or room change
   useEffect(() => {
@@ -550,27 +583,33 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
     };
   }, [roomId]);
 
-  // Update initial peers when they change (only on mount)
-  const initialPeersRef = useRef(initialPeers);
+  // Update initial peers when they change
   useEffect(() => {
-    // Only run on mount with initial peers
-    if (initialPeersRef.current.length > 0) {
-      setPeerSummaries(new Map(initialPeersRef.current.map((p) => [p.id, p])));
+    if (initialPeers.length > 0) {
+      setPeerSummaries((prev) => {
+        const updated = new Map(prev);
+        initialPeers.forEach((peer) => {
+          if (!updated.has(peer.id)) {
+            updated.set(peer.id, peer);
+          }
+        });
+        return updated;
+      });
     }
-  }, []); // Empty deps - run only on mount
+  }, [initialPeers]);
 
   // Compute derived state
   const peers: ConnectedPeer[] = useMemo(() => {
     return Array.from(peerSummaries.values()).map((summary) => ({
       ...summary,
-      webrtcState: connectionStates.get(summary.id) || 'new',
+      webrtcState: connectionStates.get(summary.id) || "new",
       hasAudio: audioStreams.has(summary.id),
       audioStream: audioStreams.get(summary.id) || null,
     }));
   }, [peerSummaries, connectionStates, audioStreams]);
 
   const connectedCount = useMemo(() => {
-    return peers.filter((p) => p.webrtcState === 'connected').length;
+    return peers.filter((p) => p.webrtcState === "connected").length;
   }, [peers]);
 
   return {
