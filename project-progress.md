@@ -2421,6 +2421,23 @@ Connected room page PTT (Push-to-Talk) to OpenAI Realtime API for end-to-end AI 
 
 **Result:** Audio is now captured during PTT and streamed to OpenAI. AI responds based on actual speech content.
 
+#### Update: Audio Playback Scheduling Fix (2024-12-07)
+
+**Issue:** AI response audio was garbled/unintelligible. All audio chunks were playing simultaneously instead of sequentially.
+
+**Root Cause:** `playAudioChunk` called `source.start()` immediately without scheduling, causing overlapping audio playback.
+
+**Fix Applied to `src/hooks/useSharedAI.ts`:**
+
+1. Added `nextPlaybackTimeRef` to track when next audio chunk should start
+2. Updated `playAudioChunk` to schedule chunks sequentially:
+   - Uses `audioContext.currentTime` and tracks `nextPlaybackTimeRef`
+   - Each chunk starts at `Math.max(currentTime, nextPlaybackTimeRef)`
+   - Updates `nextPlaybackTimeRef` to `startTime + duration` after each chunk
+3. Reset `nextPlaybackTimeRef` in `stopPlayback` and `clearBuffer`
+
+**Result:** Audio chunks now play sequentially without overlap, making AI responses clear and understandable.
+
 ---
 
 ## Protocol Compliance

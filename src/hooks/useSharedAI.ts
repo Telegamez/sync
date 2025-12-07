@@ -290,6 +290,7 @@ export function useSharedAI(
   const gainNodeRef = useRef<GainNode | null>(null);
   const isPlayingRef = useRef(false);
   const playbackPositionRef = useRef(0);
+  const nextPlaybackTimeRef = useRef(0); // Track when next chunk should start
 
   // Callback refs
   const onAIStateChangeRef = useRef(onAIStateChange);
@@ -382,7 +383,7 @@ export function useSharedAI(
   );
 
   /**
-   * Play audio chunk immediately (streaming playback)
+   * Play audio chunk with proper scheduling (streaming playback)
    */
   const playAudioChunk = useCallback(
     async (chunk: AIAudioChunk) => {
@@ -397,9 +398,11 @@ export function useSharedAI(
             : volumeRef.current;
         }
 
+        const audioContext = audioContextRef.current;
+
         // Resume if suspended (requires user interaction)
-        if (audioContextRef.current.state === "suspended") {
-          await audioContextRef.current.resume();
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
         }
 
         // Decode PCM16 to Float32
@@ -410,28 +413,38 @@ export function useSharedAI(
         }
 
         // Create audio buffer
-        const audioBuffer = audioContextRef.current.createBuffer(
+        const audioBuffer = audioContext.createBuffer(
           1,
           float32.length,
           sampleRate,
         );
         audioBuffer.getChannelData(0).set(float32);
 
-        // Play buffer
-        const source = audioContextRef.current.createBufferSource();
+        // Play buffer with proper scheduling
+        const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
 
         if (gainNodeRef.current) {
           source.connect(gainNodeRef.current);
         } else {
-          source.connect(audioContextRef.current.destination);
+          source.connect(audioContext.destination);
         }
 
-        source.start();
+        // Schedule this chunk to play after previous chunks
+        const currentTime = audioContext.currentTime;
+        const startTime = Math.max(currentTime, nextPlaybackTimeRef.current);
+        const duration = audioBuffer.duration;
 
-        // Mark as playing
+        source.start(startTime);
+
+        // Update next playback time for the following chunk
+        nextPlaybackTimeRef.current = startTime + duration;
+
+        // Mark as playing on first chunk
         if (!isPlayingRef.current && chunk.isFirst) {
           isPlayingRef.current = true;
+          // Reset playback time tracking for new response
+          nextPlaybackTimeRef.current = currentTime + duration;
           onPlaybackStartRef.current?.();
           updatePlaybackState();
         }
@@ -644,6 +657,7 @@ export function useSharedAI(
   const stopPlayback = useCallback(() => {
     isPlayingRef.current = false;
     playbackPositionRef.current = 0;
+    nextPlaybackTimeRef.current = 0; // Reset scheduling
     audioBufferRef.current = [];
     updatePlaybackState();
     onPlaybackEndRef.current?.();
@@ -671,6 +685,7 @@ export function useSharedAI(
   const clearBuffer = useCallback(() => {
     audioBufferRef.current = [];
     playbackPositionRef.current = 0;
+    nextPlaybackTimeRef.current = 0; // Reset scheduling
     updatePlaybackState();
   }, [updatePlaybackState]);
 
