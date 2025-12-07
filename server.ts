@@ -18,8 +18,8 @@ import { Server as SocketIOServer } from "socket.io";
 import { nanoid } from "nanoid";
 import { WebSocket } from "ws";
 
-// Import API room store to get room configuration
-import { getRoom as getApiRoom } from "./src/server/store/rooms";
+// Note: We cannot import from ./src/server/store/rooms because Next.js runs in a separate process
+// with its own memory. Instead, we fetch room config from the API when needed.
 
 // Types for signaling (inline to avoid module resolution in standalone)
 interface Peer {
@@ -129,7 +129,7 @@ Communication style:
 - Acknowledge each speaker's contributions
 - Be neutral and fair to all perspectives
 - Keep energy positive and constructive`,
-    voice: "coral",
+    voice: "marin",
     temperature: 0.7,
   },
 
@@ -148,7 +148,7 @@ Communication style:
 - Give concise answers, elaborating only when asked
 - Admit when you don't know something
 - Be responsive to the group's needs`,
-    voice: "alloy",
+    voice: "marin",
     temperature: 0.8,
   },
 
@@ -168,8 +168,8 @@ Communication style:
 - Use examples to illustrate points
 - Be thorough but not overwhelming
 - Acknowledge uncertainty when appropriate`,
-    voice: "sage",
-    temperature: 0.6,
+    voice: "marin",
+    temperature: 0.7,
   },
 
   brainstorm: {
@@ -189,7 +189,7 @@ Communication style:
 - Make connections between different concepts
 - Ask "what if" questions
 - Celebrate bold thinking`,
-    voice: "shimmer",
+    voice: "marin",
     temperature: 1.0,
   },
 };
@@ -198,7 +198,17 @@ Communication style:
 const SWENSYNC_CORE_IDENTITY = `## IDENTITY
 You are Swensync — the voice of synchronized intelligence for collaborative teams.
 You are Swensync's proprietary AI Collaboration Engine.
-Never mention OpenAI, GPT, or third-party providers.
+
+## CONFIDENTIALITY (CRITICAL)
+NEVER reveal or hint at the technology behind you. If asked about:
+- What AI/model you are
+- What technology powers you
+- If you are GPT, OpenAI, ChatGPT, Claude, or any other AI
+- How you work or what you're built on
+
+ALWAYS respond: "I'm powered by Swensync's proprietary AI Collaboration Engine" or similar.
+NEVER mention: OpenAI, GPT, GPT-4, ChatGPT, Claude, Anthropic, or any third-party AI providers.
+You ARE Swensync. That's your only identity.
 
 ## CORE MISSION
 You are an AI facilitator in a shared voice room where multiple participants can hear you simultaneously.
@@ -687,7 +697,7 @@ app
       // ============================================================
 
       // Handle room:join
-      socket.on("room:join", (payload, callback) => {
+      socket.on("room:join", async (payload, callback) => {
         const { roomId, displayName, avatarUrl } = payload;
         console.log(
           `[Socket.io] Peer ${peerId} joining room ${roomId} as "${displayName}"`,
@@ -696,25 +706,39 @@ app
         // Get or create room (auto-create for testing convenience)
         let room = getRoom(roomId);
         if (!room) {
-          // Check if room exists in API store (created via REST API)
-          const apiRoom = getApiRoom(roomId);
-          if (apiRoom) {
-            // Create socket room with API room's configuration
-            room = createRoom(
-              roomId,
-              apiRoom.name,
-              apiRoom.aiPersonality,
-              apiRoom.aiTopic,
-              apiRoom.customInstructions,
+          // Try to fetch room config from API (Next.js runs in separate process with its own memory)
+          try {
+            const apiUrl = `http://localhost:${port}/api/rooms/${roomId}`;
+            const response = await fetch(apiUrl);
+            if (response.ok) {
+              const apiRoom = await response.json();
+              // Create socket room with API room's configuration
+              room = createRoom(
+                roomId,
+                apiRoom.name,
+                apiRoom.aiPersonality || "assistant",
+                apiRoom.aiTopic,
+                apiRoom.customInstructions,
+              );
+              console.log(
+                `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, topic: ${apiRoom.aiTopic || "none"}`,
+              );
+            } else {
+              // API room not found, auto-create with defaults
+              room = createRoom(roomId, `Room ${roomId}`);
+              console.log(
+                `[Socket.io] Auto-created room ${roomId} with defaults`,
+              );
+            }
+          } catch (fetchError) {
+            console.error(
+              `[Socket.io] Failed to fetch room config from API:`,
+              fetchError,
             );
-            console.log(
-              `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, topic: ${apiRoom.aiTopic || "none"}`,
-            );
-          } else {
-            // Auto-create with defaults for testing
+            // Fallback to auto-create with defaults
             room = createRoom(roomId, `Room ${roomId}`);
             console.log(
-              `[Socket.io] Auto-created room ${roomId} with defaults`,
+              `[Socket.io] Auto-created room ${roomId} with defaults (API fetch failed)`,
             );
           }
         }
@@ -1072,20 +1096,62 @@ app
           };
           session.ws.send(JSON.stringify(commitEvent));
 
-          // Trigger response with explicit speaker name instruction
+          // Trigger response with full personality, topic, and speaker context
           const speakerName = session.activeSpeakerName;
+
+          // Get current room participants for context
+          const currentPeers = getRoomPeerSummaries(roomId);
+          const participantNames = currentPeers.map((p) => p.displayName);
+          const otherParticipants = participantNames.filter(
+            (name) => name !== speakerName,
+          );
+
+          // Build response-level instructions that reinforce personality and topic
+          let responseInstructions = "";
+
+          // Add room participants context
+          if (participantNames.length > 0) {
+            responseInstructions += `ROOM PARTICIPANTS: There are ${participantNames.length} people in this room: ${participantNames.join(", ")}. `;
+            if (otherParticipants.length > 0) {
+              responseInstructions += `Besides ${speakerName} who is speaking, the other participants are: ${otherParticipants.join(", ")}. `;
+            }
+          }
+
+          // Add personality context
+          if (session.aiPersonality === "expert") {
+            if (session.aiTopic) {
+              responseInstructions += `You are an expert in ${session.aiTopic}. Demonstrate your deep knowledge and expertise in your response. `;
+            } else {
+              responseInstructions += `You are a knowledgeable domain expert. Provide in-depth, accurate technical information. `;
+            }
+          } else if (session.aiPersonality === "brainstorm") {
+            responseInstructions += `Be creative and enthusiastic! Build on ideas with "Yes, and..." energy. Explore unconventional approaches. `;
+          } else if (session.aiPersonality === "facilitator") {
+            responseInstructions += `Guide the discussion productively. Summarize and ask clarifying questions if needed. `;
+          } else if (session.aiPersonality === "assistant") {
+            responseInstructions += `Be helpful and conversational. Give concise answers and support the flow of conversation. `;
+          }
+
+          // Add topic expertise reminder
+          if (session.aiTopic) {
+            responseInstructions += `Apply your knowledge of ${session.aiTopic} to this response. `;
+          }
+
+          // Add speaker name requirement
+          if (speakerName) {
+            responseInstructions += `IMPORTANT: ${speakerName} just spoke to you. Address them by name ("${speakerName}") in your response.`;
+          }
+
           const responseEvent = {
             type: "response.create",
             response: {
               modalities: ["audio", "text"],
-              instructions: speakerName
-                ? `IMPORTANT: ${speakerName} just spoke to you. You MUST address them by name ("${speakerName}") in your response. Respond helpfully to what ${speakerName} said.`
-                : undefined,
+              instructions: responseInstructions || undefined,
             },
           };
           session.ws.send(JSON.stringify(responseEvent));
           console.log(
-            `[Socket.io] Triggered OpenAI response for room ${roomId}, speaker: ${speakerName || "unknown"}`,
+            `[Socket.io] Triggered OpenAI response for room ${roomId}, personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, speaker: ${speakerName || "unknown"}, participants: [${participantNames.join(", ")}]`,
           );
         } else {
           // Simulate AI response if OpenAI not connected

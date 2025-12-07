@@ -20,8 +20,21 @@ import { DEFAULT_VOICE_SETTINGS } from "@/types/voice-mode";
 
 /**
  * In-memory room storage
+ * Uses globalThis to persist across HMR in development mode
  */
-const rooms = new Map<RoomId, Room>();
+declare global {
+  // eslint-disable-next-line no-var
+  var __swensync_rooms: Map<RoomId, Room> | undefined;
+}
+
+// Use global store to survive HMR in development
+const rooms: Map<RoomId, Room> =
+  globalThis.__swensync_rooms ?? new Map<RoomId, Room>();
+
+// Persist to global in development
+if (process.env.NODE_ENV !== "production") {
+  globalThis.__swensync_rooms = rooms;
+}
 
 /**
  * Generate a unique room ID
