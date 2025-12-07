@@ -727,7 +727,7 @@
       ],
       "testFile": "tests/unit/reliability/reconnection.test.ts",
       "dependencies": ["FEAT-108", "FEAT-303"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-405",
@@ -1010,7 +1010,7 @@
     "phase3": 13,
     "phase4": 9,
     "phase5": 11,
-    "passed": 44,
-    "pending": 7
+    "passed": 45,
+    "pending": 6
   }
 }

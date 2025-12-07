@@ -13,9 +13,9 @@
 | Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
 | Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
 | Phase 4: Shared AI Session | **Complete** | 9/9 | 100% |
-| Phase 5: Production Polish | In Progress | 4/11 | 36% |
+| Phase 5: Production Polish | In Progress | 5/11 | 45% |
 
-**Phase 5 In Progress!** Next Feature: `FEAT-404` - Error recovery - Reconnection handling
+**Phase 5 In Progress!** Next Feature: `FEAT-405` - Error recovery - Graceful degradation
 
 ---
 
@@ -1916,6 +1916,53 @@ Implemented comprehensive role-based permission system for room management:
 
 **Test Results:**
 ✅ 72 tests passing (role hierarchy, permissions, canKick, canBan, canChangeRole, PermissionManager, integration)
+
+---
+
+### FEAT-404: Error Recovery - Reconnection Handling
+**Date:** 2024-12-07
+**Test:** `tests/unit/reliability/reconnection.test.ts`
+
+Implemented comprehensive reconnection handling for Socket.io, WebRTC, and AI sessions:
+
+**Files Created:**
+- `src/lib/reconnection/index.ts` - Complete reconnection management system
+
+**Utility Functions:**
+- `calculateReconnectionDelay()` - Exponential backoff with jitter
+- `shouldReconnect()` - Check if reconnection should be attempted (filters non-recoverable errors)
+- `formatReconnectionStatus()` - Human-readable status messages
+
+**ReconnectionManager Class:**
+- Manages reconnection for signaling, WebRTC, and AI session connections
+- Configurable max attempts, base delay, max delay, exponential backoff
+- Room state preservation across reconnects
+- Event callbacks: onStateChange, onAttempt, onSuccess, onFailure, onRoomStateRestored
+- Cancellation and reset support
+
+**WebRTCReconnectionManager Class:**
+- Manages per-peer WebRTC reconnection
+- Individual peer state tracking
+- Automatic retry with backoff
+
+**Non-Recoverable Errors:**
+- unauthorized, banned, room_not_found, room_closed, kicked, invalid_token
+- These errors skip reconnection attempts
+
+**React Integration:**
+- `getReconnectionDisplayStatus()` - Combined status for UI display
+- `UseReconnectionStatus` type for React components
+- Overall state calculation across all connection types
+
+**Key Features:**
+- Exponential backoff with configurable jitter
+- Room state snapshot for restoration after reconnect
+- Per-connection-type status tracking with history
+- Automatic detection of non-recoverable errors
+- Connection timeout support
+
+**Test Results:**
+✅ 47 tests passing (delay calculation, shouldReconnect, formatStatus, ReconnectionManager, WebRTCReconnectionManager, integration)
 
 ---
 
