@@ -795,7 +795,7 @@
       ],
       "testFile": ".github/workflows/ci.yml",
       "dependencies": [],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-409",
