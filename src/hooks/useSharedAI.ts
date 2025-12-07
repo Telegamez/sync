@@ -382,6 +382,67 @@ export function useSharedAI(
   );
 
   /**
+   * Play audio chunk immediately (streaming playback)
+   */
+  const playAudioChunk = useCallback(
+    async (chunk: AIAudioChunk) => {
+      try {
+        // Initialize audio context if needed
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext({ sampleRate });
+          gainNodeRef.current = audioContextRef.current.createGain();
+          gainNodeRef.current.connect(audioContextRef.current.destination);
+          gainNodeRef.current.gain.value = isMutedRef.current
+            ? 0
+            : volumeRef.current;
+        }
+
+        // Resume if suspended (requires user interaction)
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+
+        // Decode PCM16 to Float32
+        const pcm16 = new Int16Array(chunk.data);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
+
+        // Create audio buffer
+        const audioBuffer = audioContextRef.current.createBuffer(
+          1,
+          float32.length,
+          sampleRate,
+        );
+        audioBuffer.getChannelData(0).set(float32);
+
+        // Play buffer
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = audioBuffer;
+
+        if (gainNodeRef.current) {
+          source.connect(gainNodeRef.current);
+        } else {
+          source.connect(audioContextRef.current.destination);
+        }
+
+        source.start();
+
+        // Mark as playing
+        if (!isPlayingRef.current && chunk.isFirst) {
+          isPlayingRef.current = true;
+          onPlaybackStartRef.current?.();
+          updatePlaybackState();
+        }
+      } catch (error) {
+        console.error("[useSharedAI] Failed to play audio chunk:", error);
+      }
+    },
+    [sampleRate, updatePlaybackState],
+  );
+
+  /**
    * Handle AI state event
    */
   const handleAIStateEvent = useCallback(
@@ -472,6 +533,34 @@ export function useSharedAI(
       }
     };
 
+    // Handle direct base64 audio from server (FEAT-413)
+    const onAudioBase64 = (audioBase64: string) => {
+      try {
+        // Decode base64 to ArrayBuffer
+        const binaryString = atob(audioBase64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const chunk: AIAudioChunk = {
+          chunkId: `chunk-${Date.now()}`,
+          sequenceNumber: audioBufferRef.current.length,
+          data: bytes.buffer,
+          receivedAt: Date.now(),
+          durationMs: bytes.length / 2 / (sampleRate / 1000), // PCM16 bytes to duration
+          isFirst: audioBufferRef.current.length === 0,
+          isLast: false,
+        };
+
+        handleAudioChunk(chunk);
+        playAudioChunk(chunk);
+      } catch (error) {
+        console.error("[useSharedAI] Failed to decode audio:", error);
+      }
+    };
+
+    // Legacy structured audio data format
     const onAudioData = (data: {
       roomId: RoomId;
       chunk: AIAudioChunk;
@@ -497,29 +586,39 @@ export function useSharedAI(
     };
 
     // Subscribe to AI events (these are extended events not in base SignalingEventHandlers)
-
     const client = signalingClient as any;
-    client.on("ai:state", onAIState);
-    client.on("ai:audio", onAudioData);
-    client.on("connect", onConnect);
-    client.on("disconnect", onDisconnect);
+    const socket = client.getSocket?.();
+
+    if (socket) {
+      socket.on("ai:state", onAIState);
+      socket.on("ai:audio", onAudioBase64); // Direct base64 audio from server
+      socket.on("ai:audio_data", onAudioData); // Legacy structured format
+    }
+
+    client.on("onConnect", onConnect);
+    client.on("onDisconnect", onDisconnect);
 
     // Check initial connection
-    if (client.isConnected?.()) {
+    if (client.getConnectionState?.() === "connected") {
       handleSessionConnect();
     }
 
     return () => {
-      client.off("ai:state", onAIState);
-      client.off("ai:audio", onAudioData);
-      client.off("connect", onConnect);
-      client.off("disconnect", onDisconnect);
+      if (socket) {
+        socket.off("ai:state", onAIState);
+        socket.off("ai:audio", onAudioBase64);
+        socket.off("ai:audio_data", onAudioData);
+      }
+      client.off("onConnect", onConnect);
+      client.off("onDisconnect", onDisconnect);
     };
   }, [
     signalingClient,
     roomId,
+    sampleRate,
     handleAIStateEvent,
     handleAudioChunk,
+    playAudioChunk,
     handleResponseStart,
     handleResponseEnd,
     handleSessionConnect,

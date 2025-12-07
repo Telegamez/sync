@@ -3,15 +3,20 @@
  *
  * This server starts Next.js and attaches Socket.io for real-time signaling.
  * Required for WebRTC peer connections and room coordination.
+ * Includes OpenAI Realtime API integration for shared AI in rooms.
  *
- * Part of the Long-Horizon Engineering Protocol - FEAT-411
+ * Part of the Long-Horizon Engineering Protocol - FEAT-411, FEAT-413
  */
+
+// Load environment variables from .env file
+import "dotenv/config";
 
 import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server as SocketIOServer } from "socket.io";
 import { nanoid } from "nanoid";
+import { WebSocket } from "ws";
 
 // Types for signaling (inline to avoid module resolution in standalone)
 interface Peer {
@@ -53,10 +58,57 @@ interface Room {
   createdAt: Date;
 }
 
+// ============================================================
+// OPENAI REALTIME API TYPES AND CONFIG
+// ============================================================
+
+/** AI response state for room */
+type AISessionState = "idle" | "listening" | "processing" | "speaking";
+
+/** OpenAI session for a room */
+interface RoomAISession {
+  roomId: string;
+  ws: WebSocket | null;
+  state: AISessionState;
+  activeSpeakerId: string | null;
+  activeSpeakerName: string | null;
+  isConnecting: boolean;
+  isConnected: boolean;
+}
+
+/** OpenAI Realtime WebSocket endpoint */
+const OPENAI_REALTIME_WS_URL = "wss://api.openai.com/v1/realtime";
+const OPENAI_MODEL = "gpt-4o-realtime-preview-2024-12-17";
+
+/** OpenAI API key from environment */
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+console.log(
+  `[Server] OpenAI API key configured: ${OPENAI_API_KEY ? "Yes" : "No"}`,
+);
+
+/** Default system instructions for Swensync rooms */
+const SWENSYNC_INSTRUCTIONS = `You are Swensync — the voice of synchronized intelligence for collaborative teams.
+
+## CORE MISSION
+You are an AI facilitator in a shared voice room where multiple participants can hear you simultaneously.
+When someone addresses you via Push-to-Talk (PTT), listen carefully and respond concisely.
+Your responses are broadcast to everyone in the room.
+
+## IDENTITY
+You are Swensync's proprietary AI Collaboration Engine.
+Never mention OpenAI, GPT, or third-party providers.
+
+## STYLE
+- Conversational, concise, warm
+- Brief responses optimized for voice (2-3 sentences typically)
+- Address the speaker by name when known
+- Be helpful to the entire group`;
+
 // In-memory stores
 const rooms = new Map<string, Room>();
 const roomPeers = new Map<string, Map<string, Peer>>();
 const socketToPeer = new Map<string, { peerId: string; roomId: string }>();
+const roomAISessions = new Map<string, RoomAISession>();
 
 // Server configuration
 const dev = process.env.NODE_ENV !== "production";
@@ -136,6 +188,231 @@ function getRoomPeerSummaries(roomId: string): PeerSummary[] {
   return peers ? Array.from(peers.values()).map(toPeerSummary) : [];
 }
 
+// ============================================================
+// OPENAI REALTIME API HELPERS
+// ============================================================
+
+/**
+ * Create or get OpenAI session for a room
+ */
+function getOrCreateAISession(
+  io: SocketIOServer,
+  roomId: string,
+): RoomAISession {
+  let session = roomAISessions.get(roomId);
+  if (session) return session;
+
+  session = {
+    roomId,
+    ws: null,
+    state: "idle",
+    activeSpeakerId: null,
+    activeSpeakerName: null,
+    isConnecting: false,
+    isConnected: false,
+  };
+
+  roomAISessions.set(roomId, session);
+  return session;
+}
+
+/**
+ * Connect OpenAI WebSocket for a room session
+ */
+function connectOpenAI(
+  io: SocketIOServer,
+  session: RoomAISession,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!OPENAI_API_KEY) {
+      console.log("[OpenAI] No API key configured - using simulated responses");
+      resolve();
+      return;
+    }
+
+    if (session.isConnected || session.isConnecting) {
+      resolve();
+      return;
+    }
+
+    session.isConnecting = true;
+    const url = `${OPENAI_REALTIME_WS_URL}?model=${OPENAI_MODEL}`;
+
+    console.log(`[OpenAI] Connecting for room ${session.roomId}...`);
+
+    const ws = new WebSocket(url, {
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "OpenAI-Beta": "realtime=v1",
+      },
+    });
+
+    session.ws = ws;
+
+    ws.on("open", () => {
+      console.log(`[OpenAI] Connected for room ${session.roomId}`);
+      session.isConnecting = false;
+      session.isConnected = true;
+
+      // Send session configuration
+      const config = {
+        type: "session.update",
+        session: {
+          modalities: ["text", "audio"],
+          instructions: SWENSYNC_INSTRUCTIONS,
+          voice: "marin",
+          input_audio_format: "pcm16",
+          output_audio_format: "pcm16",
+          temperature: 0.8,
+          turn_detection: null, // Disable server VAD - we use PTT
+        },
+      };
+      ws.send(JSON.stringify(config));
+
+      resolve();
+    });
+
+    ws.on("message", (data) => {
+      handleOpenAIMessage(io, session, data.toString());
+    });
+
+    ws.on("error", (error) => {
+      console.error(
+        `[OpenAI] WebSocket error for room ${session.roomId}:`,
+        error.message,
+      );
+      session.isConnecting = false;
+      reject(error);
+    });
+
+    ws.on("close", (code, reason) => {
+      console.log(`[OpenAI] Closed for room ${session.roomId}: ${code}`);
+      session.isConnected = false;
+      session.ws = null;
+    });
+
+    // Connection timeout
+    setTimeout(() => {
+      if (session.isConnecting) {
+        ws.close();
+        session.isConnecting = false;
+        reject(new Error("Connection timeout"));
+      }
+    }, 10000);
+  });
+}
+
+/**
+ * Handle OpenAI WebSocket message
+ */
+function handleOpenAIMessage(
+  io: SocketIOServer,
+  session: RoomAISession,
+  data: string,
+): void {
+  try {
+    const event = JSON.parse(data);
+
+    // Log important events
+    const importantEvents = [
+      "session.created",
+      "session.updated",
+      "error",
+      "response.created",
+      "response.done",
+      "response.audio.done",
+    ];
+
+    if (importantEvents.includes(event.type)) {
+      console.log(`[OpenAI] Room ${session.roomId}: ${event.type}`);
+    }
+
+    switch (event.type) {
+      case "session.created":
+      case "session.updated":
+        console.log(`[OpenAI] Session ready for room ${session.roomId}`);
+        break;
+
+      case "response.audio.delta":
+        // Audio chunk received - broadcast to room
+        if (event.delta) {
+          // First audio chunk - transition to speaking
+          if (session.state !== "speaking") {
+            session.state = "speaking";
+            broadcastAIState(io, session);
+          }
+          // Broadcast audio to room
+          io.to(session.roomId).emit("ai:audio", event.delta);
+        }
+        break;
+
+      case "response.audio.done":
+        console.log(
+          `[OpenAI] Audio stream complete for room ${session.roomId}`,
+        );
+        break;
+
+      case "response.done":
+        // Response complete - return to idle
+        console.log(`[OpenAI] Response complete for room ${session.roomId}`);
+        session.state = "idle";
+        session.activeSpeakerId = null;
+        session.activeSpeakerName = null;
+        broadcastAIState(io, session);
+        break;
+
+      case "error":
+        console.error(
+          `[OpenAI] Error for room ${session.roomId}:`,
+          event.error,
+        );
+        io.to(session.roomId).emit("ai:error", {
+          roomId: session.roomId,
+          error: event.error?.message || "OpenAI error",
+        });
+        break;
+    }
+  } catch (error) {
+    console.error(`[OpenAI] Failed to parse message:`, error);
+  }
+}
+
+/**
+ * Broadcast AI state to room
+ */
+function broadcastAIState(io: SocketIOServer, session: RoomAISession): void {
+  const stateEvent = {
+    type: `ai:${session.state}`,
+    roomId: session.roomId,
+    state: {
+      state: session.state,
+      stateStartedAt: new Date(),
+      activeSpeakerId: session.activeSpeakerId,
+      activeSpeakerName: session.activeSpeakerName,
+      isSessionHealthy: session.isConnected || !OPENAI_API_KEY,
+      queue: { queue: [], totalProcessed: 0, totalExpired: 0 },
+    },
+  };
+  io.to(session.roomId).emit("ai:state", stateEvent);
+  console.log(`[Socket.io] Broadcast AI state: ${session.state}`);
+}
+
+/**
+ * Clean up AI session for a room
+ */
+function cleanupAISession(roomId: string): void {
+  const session = roomAISessions.get(roomId);
+  if (!session) return;
+
+  if (session.ws) {
+    session.ws.close();
+    session.ws = null;
+  }
+
+  roomAISessions.delete(roomId);
+  console.log(`[OpenAI] Cleaned up session for room ${roomId}`);
+}
+
 // Helper: Remove peer from room
 function removePeerFromRoom(
   io: SocketIOServer,
@@ -152,6 +429,8 @@ function removePeerFromRoom(
     peers.delete(peerId);
     if (peers.size === 0) {
       roomPeers.delete(roomId);
+      // Clean up AI session when room becomes empty
+      cleanupAISession(roomId);
     }
   }
 
@@ -438,7 +717,7 @@ app
       });
 
       // Handle PTT start - user is addressing AI
-      socket.on("ai:ptt_start", (payload) => {
+      socket.on("ai:ptt_start", async (payload) => {
         const roomId = payload.roomId || (socket as any).roomId;
         if (!roomId) return;
 
@@ -447,26 +726,47 @@ app
           `[Socket.io] PTT START from ${peerId} (${displayName}) in room ${roomId}`,
         );
 
-        // Broadcast AI state change to room: listening
-        const aiStateEvent = {
-          type: "ai:listening",
-          roomId,
-          state: {
-            state: "listening" as const,
-            stateStartedAt: new Date(),
-            activeSpeakerId: peerId,
-            activeSpeakerName: displayName,
-            isSessionHealthy: true,
-            queue: { queue: [], totalProcessed: 0, totalExpired: 0 },
-          },
-        };
-        io.to(roomId).emit("ai:state", aiStateEvent);
-        console.log(`[Socket.io] Broadcast AI state: listening`);
+        // Get or create AI session for this room
+        const session = getOrCreateAISession(io, roomId);
 
-        // TODO: When OPENAI_API_KEY is configured:
-        // 1. Create/get AI session for this room via AIOrchestrator
-        // 2. Call orchestrator.startListening(roomId, peerId)
-        // 3. Start routing peer audio to OpenAI
+        // Update session state
+        session.state = "listening";
+        session.activeSpeakerId = peerId;
+        session.activeSpeakerName = displayName;
+
+        // Broadcast AI state: listening
+        broadcastAIState(io, session);
+
+        // Connect to OpenAI if API key is configured
+        if (OPENAI_API_KEY && !session.isConnected && !session.isConnecting) {
+          try {
+            await connectOpenAI(io, session);
+          } catch (error) {
+            console.error(`[Socket.io] Failed to connect OpenAI:`, error);
+          }
+        }
+      });
+
+      // Handle PTT audio data - stream to OpenAI
+      socket.on("ai:audio_data", (payload) => {
+        const roomId = payload.roomId || (socket as any).roomId;
+        if (!roomId) return;
+
+        const session = roomAISessions.get(roomId);
+        if (
+          !session ||
+          !session.ws ||
+          session.ws.readyState !== WebSocket.OPEN
+        ) {
+          return;
+        }
+
+        // Forward audio to OpenAI
+        const audioEvent = {
+          type: "input_audio_buffer.append",
+          audio: payload.audio, // base64 encoded PCM16
+        };
+        session.ws.send(JSON.stringify(audioEvent));
       });
 
       // Handle PTT end - user finished speaking, process with AI
@@ -476,45 +776,65 @@ app
 
         console.log(`[Socket.io] PTT END from ${peerId} in room ${roomId}`);
 
-        // Broadcast AI state change to room: processing
-        const processingEvent = {
-          type: "ai:processing",
-          roomId,
-          state: {
-            state: "processing" as const,
-            stateStartedAt: new Date(),
-            activeSpeakerId: peerId,
-            activeSpeakerName: (socket as any).displayName || "User",
-            isSessionHealthy: true,
-            queue: { queue: [], totalProcessed: 0, totalExpired: 0 },
-          },
-        };
-        io.to(roomId).emit("ai:state", processingEvent);
-        console.log(`[Socket.io] Broadcast AI state: processing`);
+        const session = roomAISessions.get(roomId);
 
-        // TODO: When OPENAI_API_KEY is configured:
-        // 1. Call orchestrator.startProcessing(roomId) to commit audio
-        // 2. Wait for AI response
-        // 3. Broadcast ai:speaking state and audio chunks
-        // 4. When done, broadcast ai:idle state
+        // Update state to processing
+        if (session) {
+          session.state = "processing";
+          broadcastAIState(io, session);
+        }
 
-        // For now, simulate AI response cycle (2 second delay then idle)
-        setTimeout(() => {
-          const idleEvent = {
-            type: "ai:idle",
-            roomId,
-            state: {
-              state: "idle" as const,
-              stateStartedAt: new Date(),
-              activeSpeakerId: null,
-              activeSpeakerName: null,
-              isSessionHealthy: true,
-              queue: { queue: [], totalProcessed: 1, totalExpired: 0 },
+        // If OpenAI is connected, commit audio and trigger response
+        if (session && session.ws && session.ws.readyState === WebSocket.OPEN) {
+          // Commit the audio buffer
+          const commitEvent = {
+            type: "input_audio_buffer.commit",
+          };
+          session.ws.send(JSON.stringify(commitEvent));
+
+          // Trigger response
+          const responseEvent = {
+            type: "response.create",
+            response: {
+              modalities: ["audio", "text"],
+              instructions: session.activeSpeakerName
+                ? `The user ${session.activeSpeakerName} just spoke. Respond helpfully to what they said.`
+                : undefined,
             },
           };
-          io.to(roomId).emit("ai:state", idleEvent);
-          console.log(`[Socket.io] Broadcast AI state: idle (simulated)`);
-        }, 2000);
+          session.ws.send(JSON.stringify(responseEvent));
+          console.log(
+            `[Socket.io] Triggered OpenAI response for room ${roomId}`,
+          );
+        } else {
+          // Simulate AI response if OpenAI not connected
+          console.log(
+            `[Socket.io] Simulating AI response (no OpenAI connection)`,
+          );
+          setTimeout(() => {
+            if (session) {
+              session.state = "idle";
+              session.activeSpeakerId = null;
+              session.activeSpeakerName = null;
+              broadcastAIState(io, session);
+            } else {
+              const idleEvent = {
+                type: "ai:idle",
+                roomId,
+                state: {
+                  state: "idle" as const,
+                  stateStartedAt: new Date(),
+                  activeSpeakerId: null,
+                  activeSpeakerName: null,
+                  isSessionHealthy: true,
+                  queue: { queue: [], totalProcessed: 1, totalExpired: 0 },
+                },
+              };
+              io.to(roomId).emit("ai:state", idleEvent);
+            }
+            console.log(`[Socket.io] Broadcast AI state: idle (simulated)`);
+          }, 2000);
+        }
       });
 
       // ============================================================
