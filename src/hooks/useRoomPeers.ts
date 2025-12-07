@@ -430,9 +430,14 @@ export function useRoomPeers(
   /**
    * Handle peer updated
    */
-  const handlePeerUpdated = useCallback((peer: PeerSummary) => {
-    setPeerSummaries((prev) => new Map(prev).set(peer.id, peer));
-  }, []);
+  const handlePeerUpdated = useCallback(
+    (peer: PeerSummary) => {
+      // Skip local peer - they shouldn't be in the remote peers list
+      if (peer.id === localPeerId) return;
+      setPeerSummaries((prev) => new Map(prev).set(peer.id, peer));
+    },
+    [localPeerId],
+  );
 
   /**
    * Set local audio stream
@@ -598,15 +603,17 @@ export function useRoomPeers(
     }
   }, [initialPeers]);
 
-  // Compute derived state
+  // Compute derived state - filter out local peer to prevent duplicates
   const peers: ConnectedPeer[] = useMemo(() => {
-    return Array.from(peerSummaries.values()).map((summary) => ({
-      ...summary,
-      webrtcState: connectionStates.get(summary.id) || "new",
-      hasAudio: audioStreams.has(summary.id),
-      audioStream: audioStreams.get(summary.id) || null,
-    }));
-  }, [peerSummaries, connectionStates, audioStreams]);
+    return Array.from(peerSummaries.values())
+      .filter((summary) => summary.id !== localPeerId)
+      .map((summary) => ({
+        ...summary,
+        webrtcState: connectionStates.get(summary.id) || "new",
+        hasAudio: audioStreams.has(summary.id),
+        audioStream: audioStreams.get(summary.id) || null,
+      }));
+  }, [peerSummaries, connectionStates, audioStreams, localPeerId]);
 
   const connectedCount = useMemo(() => {
     return peers.filter((p) => p.webrtcState === "connected").length;
