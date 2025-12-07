@@ -183,6 +183,7 @@ export async function createRoom(
       max_participants: insertData.max_participants!,
       status: insertData.status!,
       ai_personality: insertData.ai_personality!,
+      custom_instructions: insertData.custom_instructions ?? null,
       created_at: insertData.created_at!,
       last_activity_at: insertData.last_activity_at!,
       closed_at: null,
@@ -566,12 +567,12 @@ export async function hardDeleteRoom(
   if (!client) {
     const existed = mockRooms.delete(roomId);
     // Also delete related data
-    for (const [id, p] of mockParticipants) {
+    Array.from(mockParticipants.entries()).forEach(([id, p]) => {
       if (p.room_id === roomId) mockParticipants.delete(id);
-    }
-    for (const [id, h] of mockHistory) {
+    });
+    Array.from(mockHistory.entries()).forEach(([id, h]) => {
       if (h.room_id === roomId) mockHistory.delete(id);
-    }
+    });
     return { success: existed, rowsAffected: existed ? 1 : 0 };
   }
 
@@ -776,13 +777,9 @@ export async function removeParticipant(
 
   if (!client) {
     // Find participant by peer_id
-    let participant: ParticipantsTable | undefined;
-    for (const p of mockParticipants.values()) {
-      if (p.room_id === roomId && p.peer_id === peerId && p.is_active) {
-        participant = p;
-        break;
-      }
-    }
+    const participant = Array.from(mockParticipants.values()).find(
+      p => p.room_id === roomId && p.peer_id === peerId && p.is_active
+    );
 
     if (!participant) {
       return { success: false, error: 'Participant not found', rowsAffected: 0 };
@@ -861,13 +858,14 @@ export async function updateParticipantRole(
   client?: DatabaseClient
 ): Promise<UpdateResult<ParticipantsTable>> {
   if (!client) {
-    for (const p of mockParticipants.values()) {
-      if (p.room_id === roomId && p.peer_id === peerId && p.is_active) {
-        const oldRole = p.role;
-        p.role = newRole;
-        await recordRoomEvent(roomId, 'role_changed', changedBy, peerId, { oldRole, newRole });
-        return { success: true, data: p, rowsAffected: 1 };
-      }
+    const participant = Array.from(mockParticipants.values()).find(
+      p => p.room_id === roomId && p.peer_id === peerId && p.is_active
+    );
+    if (participant) {
+      const oldRole = participant.role;
+      participant.role = newRole;
+      await recordRoomEvent(roomId, 'role_changed', changedBy, peerId, { oldRole, newRole });
+      return { success: true, data: participant, rowsAffected: 1 };
     }
     return { success: false, error: 'Participant not found', rowsAffected: 0 };
   }
@@ -928,12 +926,9 @@ export async function getParticipantByPeerId(
   client?: DatabaseClient
 ): Promise<ParticipantsTable | null> {
   if (!client) {
-    for (const p of mockParticipants.values()) {
-      if (p.room_id === roomId && p.peer_id === peerId && p.is_active) {
-        return p;
-      }
-    }
-    return null;
+    return Array.from(mockParticipants.values()).find(
+      p => p.room_id === roomId && p.peer_id === peerId && p.is_active
+    ) ?? null;
   }
 
   return client.queryOne<ParticipantsTable>(
@@ -1019,6 +1014,9 @@ export async function recordRoomEvent(
   if (!client) {
     const history: RoomHistoryTable = {
       ...insertData,
+      user_id: insertData.user_id ?? null,
+      peer_id: insertData.peer_id ?? null,
+      event_data: insertData.event_data ?? null,
       created_at: insertData.created_at!,
     };
     mockHistory.set(id, history);

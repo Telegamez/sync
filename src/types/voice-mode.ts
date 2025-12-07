@@ -116,6 +116,8 @@ export interface RoomAIState {
   state: AIResponseState;
   /** Peer currently addressing AI */
   activeSpeakerId?: PeerId;
+  /** Display name of the peer currently addressing AI */
+  activeSpeakerName?: string;
   /** When the current state started */
   stateStartedAt: Date;
   /** Turn queue */

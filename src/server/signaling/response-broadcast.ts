@@ -349,11 +349,11 @@ export class ResponseBroadcastManager {
     state.bufferedDurationMs = 0;
 
     // Reset peer states
-    for (const peer of state.peers.values()) {
+    Array.from(state.peers.values()).forEach(peer => {
       peer.lastChunkSent = -1;
       peer.isReady = false;
       peer.bufferStatus = 'filling';
-    }
+    });
 
     this.callbacks.onStateChange?.(roomId, 'buffering', response);
 
@@ -540,10 +540,10 @@ export class ResponseBroadcastManager {
    * Dispose all rooms
    */
   dispose(): void {
-    for (const [roomId, state] of this.rooms) {
+    Array.from(this.rooms.values()).forEach(state => {
       if (state.waitTimer) clearTimeout(state.waitTimer);
       if (state.broadcastTimer) clearTimeout(state.broadcastTimer);
-    }
+    });
     this.rooms.clear();
   }
 
@@ -557,10 +557,7 @@ export class ResponseBroadcastManager {
     if (!state || !state.currentResponse) return;
 
     // Count ready peers
-    let readyCount = 0;
-    for (const peer of state.peers.values()) {
-      if (peer.isReady) readyCount++;
-    }
+    const readyCount = Array.from(state.peers.values()).filter(peer => peer.isReady).length;
 
     // Check if enough peers are ready
     const hasEnoughPeers =
@@ -615,14 +612,14 @@ export class ResponseBroadcastManager {
     const response = state.currentResponse;
 
     // Send to all peers
-    for (const [peerId, peer] of state.peers) {
+    Array.from(state.peers.entries()).forEach(([peerId, peer]) => {
       // Skip if we've already sent this chunk
-      if (chunk.sequenceNumber <= peer.lastChunkSent) continue;
+      if (chunk.sequenceNumber <= peer.lastChunkSent) return;
 
       this.callbacks.onSendToPeer?.(peerId, chunk, response);
       peer.lastChunkSent = chunk.sequenceNumber;
       peer.bufferStatus = 'playing';
-    }
+    });
 
     response.broadcastedChunks++;
   }

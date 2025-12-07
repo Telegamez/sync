@@ -574,6 +574,6 @@ export class AudioMixer {
 /**
  * Create a new audio mixer instance
  */
-export function createAudioMixer(options?: AudioMixerOptions): AudioMixer {
+export function createAudioMixer(options?: AudioMixerOptionsV2): AudioMixer {
   return new AudioMixer(options);
 }

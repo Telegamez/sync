@@ -172,12 +172,13 @@ export function useRoomPeers(options: UseRoomPeersOptions): RoomPeersState & Roo
 
       // Track connection state
       pc.onconnectionstatechange = () => {
-        const state = pc.connectionState as PeerConnectionState;
+        const rawState = pc.connectionState;
+        const state = rawState as PeerConnectionState;
         setConnectionStates((prev) => new Map(prev).set(peerId, state));
         onPeerConnectionStateChange?.(peerId, state);
 
         // Clean up on failed/closed (remove from tracking only, connection already closed)
-        if (state === 'failed' || state === 'closed') {
+        if (rawState === 'failed' || rawState === 'closed') {
           connectionsRef.current.delete(peerId);
         }
       };

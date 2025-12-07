@@ -401,7 +401,6 @@ export const PTTButton = forwardRef<HTMLButtonElement, PTTButtonProps>(
           className={buttonClasses}
           style={style}
           aria-label={ariaLabel}
-          aria-pressed={isActive}
           aria-disabled={!canActivate || !enabled}
           data-state={visualState}
           data-ptt-active={isActive}

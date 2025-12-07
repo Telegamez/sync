@@ -329,11 +329,13 @@ export function useTurnManager(
       }
     };
 
-    // Subscribe to AI state events
-    signalingClient.on('ai:state', handleAIState);
+    // Subscribe to AI state events (extended event not in base SignalingEventHandlers)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = signalingClient as any;
+    client.on('ai:state', handleAIState);
 
     return () => {
-      signalingClient.off('ai:state', handleAIState);
+      client.off('ai:state', handleAIState);
     };
   }, [signalingClient, roomId, handleAIStateEvent]);
 

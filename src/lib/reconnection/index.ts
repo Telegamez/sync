@@ -254,12 +254,9 @@ export class ReconnectionManager {
    * Check if any reconnection is in progress
    */
   isReconnecting(): boolean {
-    for (const status of this.statuses.values()) {
-      if (status.state === 'reconnecting' || status.state === 'waiting') {
-        return true;
-      }
-    }
-    return false;
+    return Array.from(this.statuses.values()).some(
+      status => status.state === 'reconnecting' || status.state === 'waiting'
+    );
   }
 
   /**
@@ -620,9 +617,9 @@ export class WebRTCReconnectionManager {
    * Reset all peers
    */
   reset(): void {
-    for (const timer of this.peerTimers.values()) {
+    Array.from(this.peerTimers.values()).forEach(timer => {
       clearTimeout(timer);
-    }
+    });
     this.peerTimers.clear();
     this.peerStates.clear();
   }

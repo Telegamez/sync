@@ -18,9 +18,9 @@ export interface PeerVisualizationData {
   /** Current audio level (0-1) */
   audioLevel: number;
   /** Frequency data for waveform visualization (0-255 values) */
-  frequencyData: Uint8Array;
+  frequencyData: Uint8Array<ArrayBuffer>;
   /** Time domain data for oscilloscope visualization (0-255 values) */
-  timeDomainData: Uint8Array;
+  timeDomainData: Uint8Array<ArrayBuffer>;
   /** Whether the peer is local (for different styling) */
   isLocal: boolean;
 }
@@ -51,8 +51,8 @@ interface SourceInfo {
   stream: MediaStream;
   sourceNode: MediaStreamAudioSourceNode;
   analyserNode: AnalyserNode;
-  frequencyData: Uint8Array;
-  timeDomainData: Uint8Array;
+  frequencyData: Uint8Array<ArrayBuffer>;
+  timeDomainData: Uint8Array<ArrayBuffer>;
   isLocal: boolean;
 }
 
@@ -387,7 +387,7 @@ export class PeerVisualizer {
   /**
    * Calculate audio level from frequency data (0-1)
    */
-  private calculateAudioLevel(frequencyData: Uint8Array): number {
+  private calculateAudioLevel(frequencyData: Uint8Array<ArrayBuffer>): number {
     // Calculate RMS from frequency data
     let sum = 0;
     for (let i = 0; i < frequencyData.length; i++) {

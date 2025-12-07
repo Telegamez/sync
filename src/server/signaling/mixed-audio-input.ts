@@ -391,7 +391,7 @@ export class MixedAudioInputManager {
   ): { data: ArrayBuffer; durationMs: number } | null {
     try {
       // Convert to Int16 array (PCM16)
-      let samples = new Int16Array(audioData);
+      let samples: Int16Array<ArrayBuffer> = new Int16Array(audioData);
 
       // Downmix to mono if stereo
       if (sourceChannels === 2) {
@@ -423,7 +423,7 @@ export class MixedAudioInputManager {
   /**
    * Downmix stereo to mono
    */
-  private downmixToMono(stereoSamples: Int16Array): Int16Array {
+  private downmixToMono(stereoSamples: Int16Array<ArrayBuffer>): Int16Array<ArrayBuffer> {
     const monoSamples = new Int16Array(stereoSamples.length / 2);
     for (let i = 0; i < monoSamples.length; i++) {
       const left = stereoSamples[i * 2];
@@ -437,10 +437,10 @@ export class MixedAudioInputManager {
    * Resample audio to target sample rate
    */
   private resample(
-    samples: Int16Array,
+    samples: Int16Array<ArrayBuffer>,
     sourceSampleRate: number,
     targetSampleRate: number
-  ): Int16Array {
+  ): Int16Array<ArrayBuffer> {
     const ratio = sourceSampleRate / targetSampleRate;
     const targetLength = Math.ceil(samples.length / ratio);
     const resampled = new Int16Array(targetLength);
@@ -464,7 +464,7 @@ export class MixedAudioInputManager {
   /**
    * Apply audio quality optimizations
    */
-  private optimizeAudio(samples: Int16Array): Int16Array {
+  private optimizeAudio(samples: Int16Array<ArrayBuffer>): Int16Array<ArrayBuffer> {
     const optimized = new Int16Array(samples.length);
 
     // Find peak amplitude for normalization

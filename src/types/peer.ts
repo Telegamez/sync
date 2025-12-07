@@ -16,11 +16,13 @@ export type PeerId = string;
  * Peer connection state
  */
 export type PeerConnectionState =
+  | 'new' // Initial state before connection attempt
   | 'connecting' // Initial connection in progress
   | 'connected' // Fully connected and ready
   | 'reconnecting' // Temporarily disconnected, attempting reconnect
   | 'disconnected' // Cleanly disconnected
-  | 'failed'; // Connection failed
+  | 'failed' // Connection failed
+  | 'closed'; // Connection closed
 
 /**
  * Peer role within a room

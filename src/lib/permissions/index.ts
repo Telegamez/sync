@@ -391,11 +391,11 @@ export class PermissionManager {
     this.rooms.delete(roomId);
     this.roomOwners.delete(roomId);
     // Clear bans for this room
-    for (const key of this.bans.keys()) {
+    Array.from(this.bans.keys()).forEach(key => {
       if (key.startsWith(`${roomId}:`)) {
         this.bans.delete(key);
       }
-    }
+    });
   }
 
   /**
@@ -496,11 +496,9 @@ export class PermissionManager {
     const room = this.rooms.get(roomId);
     let targetRole: PeerRole = 'participant';
     if (room) {
-      for (const p of room.values()) {
-        if (p.userId === targetUserId) {
-          targetRole = p.role;
-          break;
-        }
+      const participant = Array.from(room.values()).find(p => p.userId === targetUserId);
+      if (participant) {
+        targetRole = participant.role;
       }
     }
 
@@ -582,12 +580,11 @@ export class PermissionManager {
     // If target is in room, remove them
     const room = this.rooms.get(roomId);
     if (room) {
-      for (const [peerId, p] of room) {
-        if (p.userId === targetUserId) {
-          this.removeParticipant(roomId, peerId);
-          this.options.onKick?.(roomId, peerId, reason);
-          break;
-        }
+      const entry = Array.from(room.entries()).find(([, p]) => p.userId === targetUserId);
+      if (entry) {
+        const [peerId] = entry;
+        this.removeParticipant(roomId, peerId);
+        this.options.onKick?.(roomId, peerId, reason);
       }
     }
 
@@ -680,16 +677,16 @@ export class PermissionManager {
     const bans: BanEntry[] = [];
     const now = new Date();
 
-    for (const [key, ban] of this.bans) {
+    Array.from(this.bans.entries()).forEach(([key, ban]) => {
       if (key.startsWith(`${roomId}:`)) {
         // Check expiration
         if (ban.expiresAt && ban.expiresAt < now) {
           this.bans.delete(key);
-          continue;
+          return;
         }
         bans.push(ban);
       }
-    }
+    });
 
     return bans;
   }
@@ -701,12 +698,12 @@ export class PermissionManager {
     const now = new Date();
     let removed = 0;
 
-    for (const [key, ban] of this.bans) {
+    Array.from(this.bans.entries()).forEach(([key, ban]) => {
       if (ban.expiresAt && ban.expiresAt < now) {
         this.bans.delete(key);
         removed++;
       }
-    }
+    });
 
     return removed;
   }

@@ -408,7 +408,7 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
 
         {/* Audio Visualizer */}
         <AudioWaveVisualizer
-          analyserNode={analyserNode}
+          analyserNode={analyserNode ?? null}
           isActive={isVisualizerActive}
           animState={animState}
           variant={visualizerMode}

@@ -471,22 +471,24 @@ export function useSharedAI(
       handleSessionDisconnect();
     };
 
-    // Subscribe
-    signalingClient.on('ai:state', onAIState);
-    signalingClient.on('ai:audio', onAudioData);
-    signalingClient.on('connect', onConnect);
-    signalingClient.on('disconnect', onDisconnect);
+    // Subscribe to AI events (these are extended events not in base SignalingEventHandlers)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = signalingClient as any;
+    client.on('ai:state', onAIState);
+    client.on('ai:audio', onAudioData);
+    client.on('connect', onConnect);
+    client.on('disconnect', onDisconnect);
 
     // Check initial connection
-    if (signalingClient.isConnected?.()) {
+    if (client.isConnected?.()) {
       handleSessionConnect();
     }
 
     return () => {
-      signalingClient.off('ai:state', onAIState);
-      signalingClient.off('ai:audio', onAudioData);
-      signalingClient.off('connect', onConnect);
-      signalingClient.off('disconnect', onDisconnect);
+      client.off('ai:state', onAIState);
+      client.off('ai:audio', onAudioData);
+      client.off('connect', onConnect);
+      client.off('disconnect', onDisconnect);
     };
   }, [
     signalingClient,

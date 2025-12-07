@@ -557,9 +557,9 @@ export class DegradationManager {
    * Clean up resources
    */
   public destroy(): void {
-    for (const breaker of this.circuitBreakers.values()) {
+    Array.from(this.circuitBreakers.values()).forEach(breaker => {
       breaker.destroy();
-    }
+    });
     this.circuitBreakers.clear();
     this.peerHealth.clear();
     this.eventHistory = [];
