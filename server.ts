@@ -49,6 +49,14 @@ interface PeerSummary {
   connectionState: string;
 }
 
+/** AI personality types */
+type AIPersonality =
+  | "facilitator"
+  | "assistant"
+  | "expert"
+  | "brainstorm"
+  | "custom";
+
 interface Room {
   id: string;
   name: string;
@@ -56,6 +64,9 @@ interface Room {
   participantCount: number;
   maxParticipants: number;
   createdAt: Date;
+  aiPersonality: AIPersonality;
+  aiTopic?: string;
+  customInstructions?: string;
 }
 
 // ============================================================
@@ -74,6 +85,10 @@ interface RoomAISession {
   activeSpeakerName: string | null;
   isConnecting: boolean;
   isConnected: boolean;
+  // Room AI configuration
+  aiPersonality: AIPersonality;
+  aiTopic?: string;
+  customInstructions?: string;
 }
 
 /** OpenAI Realtime WebSocket endpoint */
@@ -86,17 +101,106 @@ console.log(
   `[Server] OpenAI API key configured: ${OPENAI_API_KEY ? "Yes" : "No"}`,
 );
 
-/** Default system instructions for Swensync rooms */
-const SWENSYNC_BASE_INSTRUCTIONS = `You are Swensync — the voice of synchronized intelligence for collaborative teams.
+/**
+ * Personality preset instructions
+ */
+const PERSONALITY_INSTRUCTIONS: Record<
+  Exclude<AIPersonality, "custom">,
+  { instructions: string; voice: string; temperature: number }
+> = {
+  facilitator: {
+    instructions: `You are a skilled discussion facilitator in a multi-person voice conversation.
+
+Your role:
+- Guide the conversation to stay productive and on-topic
+- Summarize key points when discussions get lengthy
+- Ensure all participants have a chance to contribute
+- Ask clarifying questions to deepen understanding
+- Gently redirect off-topic tangents
+- Identify areas of agreement and disagreement
+- Synthesize different viewpoints into actionable insights
+
+Communication style:
+- Speak clearly and concisely
+- Use inclusive language ("we", "let's", "together")
+- Acknowledge each speaker's contributions
+- Be neutral and fair to all perspectives
+- Keep energy positive and constructive`,
+    voice: "coral",
+    temperature: 0.7,
+  },
+
+  assistant: {
+    instructions: `You are a helpful voice assistant participating in a group conversation.
+
+Your role:
+- Answer questions accurately and helpfully
+- Provide information when asked
+- Help with tasks, planning, and problem-solving
+- Be friendly and approachable
+- Support the flow of conversation
+
+Communication style:
+- Be conversational but professional
+- Give concise answers, elaborating only when asked
+- Admit when you don't know something
+- Be responsive to the group's needs`,
+    voice: "alloy",
+    temperature: 0.8,
+  },
+
+  expert: {
+    instructions: `You are a knowledgeable domain expert in a technical discussion.
+
+Your role:
+- Provide in-depth, accurate technical information
+- Explain complex concepts clearly
+- Share best practices and industry standards
+- Point out potential issues or considerations
+- Suggest resources for further learning
+
+Communication style:
+- Be precise with technical terminology
+- Provide context for your recommendations
+- Use examples to illustrate points
+- Be thorough but not overwhelming
+- Acknowledge uncertainty when appropriate`,
+    voice: "sage",
+    temperature: 0.6,
+  },
+
+  brainstorm: {
+    instructions: `You are an enthusiastic creative partner in a brainstorming session.
+
+Your role:
+- Generate diverse and creative ideas
+- Build on others' suggestions ("Yes, and...")
+- Challenge assumptions constructively
+- Explore unconventional approaches
+- Keep energy high and momentum going
+- Capture and organize ideas as they emerge
+
+Communication style:
+- Be enthusiastic and encouraging
+- No idea is too wild - embrace creativity
+- Make connections between different concepts
+- Ask "what if" questions
+- Celebrate bold thinking`,
+    voice: "shimmer",
+    temperature: 1.0,
+  },
+};
+
+/** Default system instructions wrapper for Swensync rooms */
+const SWENSYNC_CORE_IDENTITY = `## IDENTITY
+You are Swensync — the voice of synchronized intelligence for collaborative teams.
+You are Swensync's proprietary AI Collaboration Engine.
+Never mention OpenAI, GPT, or third-party providers.
 
 ## CORE MISSION
 You are an AI facilitator in a shared voice room where multiple participants can hear you simultaneously.
 When someone addresses you via Push-to-Talk (PTT), listen carefully and respond concisely.
 Your responses are broadcast to everyone in the room.
-
-## IDENTITY
-You are Swensync's proprietary AI Collaboration Engine.
-Never mention OpenAI, GPT, or third-party providers.
 
 ## STYLE
 - Conversational, concise, warm
@@ -105,18 +209,61 @@ Never mention OpenAI, GPT, or third-party providers.
 - Be helpful to the entire group`;
 
 /**
- * Generate instructions that include the current speaker's name
+ * Generate full instructions based on personality, topic, and current speaker
  */
-function getInstructionsForSpeaker(speakerName: string | null): string {
-  if (!speakerName) {
-    return SWENSYNC_BASE_INSTRUCTIONS;
-  }
-  return `${SWENSYNC_BASE_INSTRUCTIONS}
+function generateInstructions(
+  personality: AIPersonality,
+  topic: string | undefined,
+  speakerName: string | null,
+  customInstructions?: string,
+): string {
+  const parts: string[] = [];
 
-## CURRENT SPEAKER
+  // Add core Swensync identity
+  parts.push(SWENSYNC_CORE_IDENTITY);
+
+  // Add personality-specific instructions
+  if (personality === "custom" && customInstructions) {
+    parts.push(`\n## PERSONALITY\n${customInstructions}`);
+  } else if (personality !== "custom") {
+    const preset = PERSONALITY_INSTRUCTIONS[personality];
+    parts.push(`\n## PERSONALITY\n${preset.instructions}`);
+  }
+
+  // Add topic expertise if provided
+  if (topic && topic.trim()) {
+    parts.push(`\n## DOMAIN EXPERTISE
+You have deep expertise and knowledge in: ${topic.trim()}
+Apply your knowledge of this domain to all your responses.
+When relevant, draw upon industry best practices, common challenges, and insider knowledge about ${topic.trim()}.
+Tailor your language and examples to this specific field.`);
+  }
+
+  // Add current speaker context
+  if (speakerName) {
+    parts.push(`\n## CURRENT SPEAKER
 The person currently speaking to you is named "${speakerName}".
 You MUST address them by name ("${speakerName}") in your response.
-For example, start with "Hey ${speakerName}," or "${speakerName}, ..." or include their name naturally in your response.`;
+For example, start with "Hey ${speakerName}," or "${speakerName}, ..." or include their name naturally in your response.`);
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Get personality configuration for OpenAI session
+ */
+function getPersonalityConfig(personality: AIPersonality): {
+  voice: string;
+  temperature: number;
+} {
+  if (personality === "custom" || !PERSONALITY_INSTRUCTIONS[personality]) {
+    return { voice: "alloy", temperature: 0.8 };
+  }
+  return {
+    voice: PERSONALITY_INSTRUCTIONS[personality].voice,
+    temperature: PERSONALITY_INSTRUCTIONS[personality].temperature,
+  };
 }
 
 // In-memory stores
@@ -184,7 +331,13 @@ function getRoom(roomId: string): Room | undefined {
 }
 
 // Helper: Create room
-function createRoom(roomId: string, name: string): Room {
+function createRoom(
+  roomId: string,
+  name: string,
+  aiPersonality: AIPersonality = "assistant",
+  aiTopic?: string,
+  customInstructions?: string,
+): Room {
   const room: Room = {
     id: roomId,
     name: name || `Room ${roomId}`,
@@ -192,6 +345,9 @@ function createRoom(roomId: string, name: string): Room {
     participantCount: 0,
     maxParticipants: 10,
     createdAt: new Date(),
+    aiPersonality,
+    aiTopic,
+    customInstructions,
   };
   rooms.set(roomId, room);
   return room;
@@ -211,11 +367,17 @@ function getRoomPeerSummaries(roomId: string): PeerSummary[] {
  * Create or get OpenAI session for a room
  */
 function getOrCreateAISession(
-  io: SocketIOServer,
+  _io: SocketIOServer,
   roomId: string,
 ): RoomAISession {
   let session = roomAISessions.get(roomId);
   if (session) return session;
+
+  // Get room configuration for AI settings
+  const room = rooms.get(roomId);
+  const aiPersonality = room?.aiPersonality ?? "assistant";
+  const aiTopic = room?.aiTopic;
+  const customInstructions = room?.customInstructions;
 
   session = {
     roomId,
@@ -225,6 +387,9 @@ function getOrCreateAISession(
     activeSpeakerName: null,
     isConnecting: false,
     isConnected: false,
+    aiPersonality,
+    aiTopic,
+    customInstructions,
   };
 
   roomAISessions.set(roomId, session);
@@ -269,20 +434,31 @@ function connectOpenAI(
       session.isConnecting = false;
       session.isConnected = true;
 
-      // Send session configuration
+      // Get personality configuration for voice and temperature
+      const personalityConfig = getPersonalityConfig(session.aiPersonality);
+
+      // Send session configuration with personality-specific settings
       const config = {
         type: "session.update",
         session: {
           modalities: ["text", "audio"],
-          instructions: getInstructionsForSpeaker(session.activeSpeakerName),
-          voice: "marin",
+          instructions: generateInstructions(
+            session.aiPersonality,
+            session.aiTopic,
+            session.activeSpeakerName,
+            session.customInstructions,
+          ),
+          voice: personalityConfig.voice,
           input_audio_format: "pcm16",
           output_audio_format: "pcm16",
-          temperature: 0.8,
+          temperature: personalityConfig.temperature,
           turn_detection: null, // Disable server VAD - we use PTT
         },
       };
       ws.send(JSON.stringify(config));
+      console.log(
+        `[OpenAI] Session configured with personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}`,
+      );
 
       resolve();
     });
@@ -814,7 +990,12 @@ app
           const updateConfig = {
             type: "session.update",
             session: {
-              instructions: getInstructionsForSpeaker(displayName),
+              instructions: generateInstructions(
+                session.aiPersonality,
+                session.aiTopic,
+                displayName,
+                session.customInstructions,
+              ),
             },
           };
           session.ws.send(JSON.stringify(updateConfig));

@@ -6,11 +6,11 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-113
  */
 
-'use client';
+"use client";
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { Loader2, Users, Bot, MessageSquare } from 'lucide-react';
-import type { CreateRoomRequest, AIPersonality } from '@/types/room';
+import React, { useState, useCallback, useMemo } from "react";
+import { Loader2, Users, Bot, MessageSquare, Lightbulb } from "lucide-react";
+import type { CreateRoomRequest, AIPersonality } from "@/types/room";
 
 /**
  * Props for the CreateRoomForm component
@@ -35,16 +35,37 @@ interface FormErrors {
   name?: string;
   description?: string;
   maxParticipants?: string;
+  aiTopic?: string;
 }
 
 /**
  * AI Personality options
  */
-const AI_PERSONALITIES: { value: AIPersonality; label: string; description: string }[] = [
-  { value: 'facilitator', label: 'Facilitator', description: 'Guides discussions, summarizes, keeps on track' },
-  { value: 'assistant', label: 'Assistant', description: 'General helpful assistant' },
-  { value: 'expert', label: 'Expert', description: 'Domain expert with technical depth' },
-  { value: 'brainstorm', label: 'Brainstorm', description: 'Creative ideation partner' },
+const AI_PERSONALITIES: {
+  value: AIPersonality;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "facilitator",
+    label: "Facilitator",
+    description: "Guides discussions, summarizes, keeps on track",
+  },
+  {
+    value: "assistant",
+    label: "Assistant",
+    description: "General helpful assistant",
+  },
+  {
+    value: "expert",
+    label: "Expert",
+    description: "Domain expert with technical depth",
+  },
+  {
+    value: "brainstorm",
+    label: "Brainstorm",
+    description: "Creative ideation partner",
+  },
 ];
 
 /**
@@ -58,6 +79,7 @@ const PARTICIPANT_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 const ROOM_NAME_MIN = 2;
 const ROOM_NAME_MAX = 100;
 const DESCRIPTION_MAX = 500;
+const AI_TOPIC_MAX = 200;
 
 /**
  * Validate room name
@@ -65,7 +87,7 @@ const DESCRIPTION_MAX = 500;
 function validateName(name: string): string | undefined {
   const trimmed = name.trim();
   if (!trimmed) {
-    return 'Room name is required';
+    return "Room name is required";
   }
   if (trimmed.length < ROOM_NAME_MIN) {
     return `Room name must be at least ${ROOM_NAME_MIN} characters`;
@@ -82,6 +104,16 @@ function validateName(name: string): string | undefined {
 function validateDescription(description: string): string | undefined {
   if (description.length > DESCRIPTION_MAX) {
     return `Description must be at most ${DESCRIPTION_MAX} characters`;
+  }
+  return undefined;
+}
+
+/**
+ * Validate AI topic
+ */
+function validateAITopic(topic: string): string | undefined {
+  if (topic.length > AI_TOPIC_MAX) {
+    return `Topic must be at most ${AI_TOPIC_MAX} characters`;
   }
   return undefined;
 }
@@ -108,15 +140,20 @@ export function CreateRoomForm({
   onCancel,
   initialValues = {},
   showCancel = false,
-  className = '',
+  className = "",
 }: CreateRoomFormProps) {
   // Form state
-  const [name, setName] = useState(initialValues.name ?? '');
-  const [description, setDescription] = useState(initialValues.description ?? '');
-  const [maxParticipants, setMaxParticipants] = useState(initialValues.maxParticipants ?? 4);
-  const [aiPersonality, setAIPersonality] = useState<AIPersonality>(
-    initialValues.aiPersonality ?? 'assistant'
+  const [name, setName] = useState(initialValues.name ?? "");
+  const [description, setDescription] = useState(
+    initialValues.description ?? "",
   );
+  const [maxParticipants, setMaxParticipants] = useState(
+    initialValues.maxParticipants ?? 4,
+  );
+  const [aiPersonality, setAIPersonality] = useState<AIPersonality>(
+    initialValues.aiPersonality ?? "assistant",
+  );
+  const [aiTopic, setAITopic] = useState(initialValues.aiTopic ?? "");
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,56 +172,89 @@ export function CreateRoomForm({
     const descError = validateDescription(description);
     if (descError) newErrors.description = descError;
 
+    const topicError = validateAITopic(aiTopic);
+    if (topicError) newErrors.aiTopic = topicError;
+
     return newErrors;
-  }, [name, description]);
+  }, [name, description, aiTopic]);
 
   /**
    * Check if form is valid
    */
   const isValid = useMemo(() => {
     const formErrors = validateForm();
-    return Object.keys(formErrors).length === 0 && name.trim().length >= ROOM_NAME_MIN;
+    return (
+      Object.keys(formErrors).length === 0 &&
+      name.trim().length >= ROOM_NAME_MIN
+    );
   }, [validateForm, name]);
 
   /**
    * Handle field blur - validates immediately on blur
    */
-  const handleBlur = useCallback((field: 'name' | 'description') => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
+  const handleBlur = useCallback(
+    (field: "name" | "description" | "aiTopic") => {
+      setTouched((prev) => ({ ...prev, [field]: true }));
 
-    // Validate immediately on blur
-    if (field === 'name') {
-      const error = validateName(name);
-      setErrors((prev) => ({ ...prev, name: error }));
-    } else if (field === 'description') {
-      const error = validateDescription(description);
-      setErrors((prev) => ({ ...prev, description: error }));
-    }
-  }, [name, description]);
+      // Validate immediately on blur
+      if (field === "name") {
+        const error = validateName(name);
+        setErrors((prev) => ({ ...prev, name: error }));
+      } else if (field === "description") {
+        const error = validateDescription(description);
+        setErrors((prev) => ({ ...prev, description: error }));
+      } else if (field === "aiTopic") {
+        const error = validateAITopic(aiTopic);
+        setErrors((prev) => ({ ...prev, aiTopic: error }));
+      }
+    },
+    [name, description, aiTopic],
+  );
 
   /**
    * Handle name change
    */
-  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setName(value);
-    if (touched.name) {
-      const error = validateName(value);
-      setErrors((prev) => ({ ...prev, name: error }));
-    }
-  }, [touched.name]);
+  const handleNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setName(value);
+      if (touched.name) {
+        const error = validateName(value);
+        setErrors((prev) => ({ ...prev, name: error }));
+      }
+    },
+    [touched.name],
+  );
 
   /**
    * Handle description change
    */
-  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setDescription(value);
-    if (touched.description) {
-      const error = validateDescription(value);
-      setErrors((prev) => ({ ...prev, description: error }));
-    }
-  }, [touched.description]);
+  const handleDescriptionChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      setDescription(value);
+      if (touched.description) {
+        const error = validateDescription(value);
+        setErrors((prev) => ({ ...prev, description: error }));
+      }
+    },
+    [touched.description],
+  );
+
+  /**
+   * Handle AI topic change
+   */
+  const handleAITopicChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setAITopic(value);
+      if (touched.aiTopic) {
+        const error = validateAITopic(value);
+        setErrors((prev) => ({ ...prev, aiTopic: error }));
+      }
+    },
+    [touched.aiTopic],
+  );
 
   /**
    * Handle form submission
@@ -196,7 +266,7 @@ export function CreateRoomForm({
       // Validate all fields
       const formErrors = validateForm();
       setErrors(formErrors);
-      setTouched({ name: true, description: true });
+      setTouched({ name: true, description: true, aiTopic: true });
 
       if (Object.keys(formErrors).length > 0) {
         return;
@@ -210,6 +280,7 @@ export function CreateRoomForm({
           description: description.trim() || undefined,
           maxParticipants,
           aiPersonality,
+          aiTopic: aiTopic.trim() || undefined,
         };
 
         await onSubmit(data);
@@ -217,7 +288,15 @@ export function CreateRoomForm({
         setIsSubmitting(false);
       }
     },
-    [name, description, maxParticipants, aiPersonality, validateForm, onSubmit]
+    [
+      name,
+      description,
+      maxParticipants,
+      aiPersonality,
+      aiTopic,
+      validateForm,
+      onSubmit,
+    ],
   );
 
   return (
@@ -228,7 +307,10 @@ export function CreateRoomForm({
     >
       {/* Room Name */}
       <div className="flex flex-col gap-2">
-        <label htmlFor="room-name" className="text-sm font-medium text-foreground">
+        <label
+          htmlFor="room-name"
+          className="text-sm font-medium text-foreground"
+        >
           Room Name <span className="text-red-400">*</span>
         </label>
         <input
@@ -236,14 +318,16 @@ export function CreateRoomForm({
           type="text"
           value={name}
           onChange={handleNameChange}
-          onBlur={() => handleBlur('name')}
+          onBlur={() => handleBlur("name")}
           placeholder="Enter room name"
           className={`px-4 py-2 bg-card border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-            errors.name && touched.name ? 'border-red-400' : 'border-border'
+            errors.name && touched.name ? "border-red-400" : "border-border"
           }`}
           disabled={isSubmitting}
-          aria-invalid={errors.name && touched.name ? 'true' : 'false'}
-          aria-describedby={errors.name && touched.name ? 'name-error' : undefined}
+          aria-invalid={errors.name && touched.name ? "true" : "false"}
+          aria-describedby={
+            errors.name && touched.name ? "name-error" : undefined
+          }
         />
         {errors.name && touched.name && (
           <p id="name-error" className="text-sm text-red-400" role="alert">
@@ -257,25 +341,40 @@ export function CreateRoomForm({
 
       {/* Description */}
       <div className="flex flex-col gap-2">
-        <label htmlFor="room-description" className="text-sm font-medium text-foreground">
+        <label
+          htmlFor="room-description"
+          className="text-sm font-medium text-foreground"
+        >
           Description <span className="text-muted-foreground">(optional)</span>
         </label>
         <textarea
           id="room-description"
           value={description}
           onChange={handleDescriptionChange}
-          onBlur={() => handleBlur('description')}
+          onBlur={() => handleBlur("description")}
           placeholder="What's this room about?"
           rows={3}
           className={`px-4 py-2 bg-card border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none ${
-            errors.description && touched.description ? 'border-red-400' : 'border-border'
+            errors.description && touched.description
+              ? "border-red-400"
+              : "border-border"
           }`}
           disabled={isSubmitting}
-          aria-invalid={errors.description && touched.description ? 'true' : 'false'}
-          aria-describedby={errors.description && touched.description ? 'description-error' : undefined}
+          aria-invalid={
+            errors.description && touched.description ? "true" : "false"
+          }
+          aria-describedby={
+            errors.description && touched.description
+              ? "description-error"
+              : undefined
+          }
         />
         {errors.description && touched.description && (
-          <p id="description-error" className="text-sm text-red-400" role="alert">
+          <p
+            id="description-error"
+            className="text-sm text-red-400"
+            role="alert"
+          >
             {errors.description}
           </p>
         )}
@@ -286,7 +385,10 @@ export function CreateRoomForm({
 
       {/* Max Participants */}
       <div className="flex flex-col gap-2">
-        <label htmlFor="max-participants" className="text-sm font-medium text-foreground flex items-center gap-2">
+        <label
+          htmlFor="max-participants"
+          className="text-sm font-medium text-foreground flex items-center gap-2"
+        >
           <Users className="w-4 h-4" />
           Max Participants
         </label>
@@ -320,16 +422,60 @@ export function CreateRoomForm({
               disabled={isSubmitting}
               className={`flex flex-col items-start p-3 border rounded-lg text-left transition-colors ${
                 aiPersonality === personality.value
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-border hover:border-primary/50 text-muted-foreground hover:text-foreground'
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border hover:border-primary/50 text-muted-foreground hover:text-foreground"
               }`}
               aria-pressed={aiPersonality === personality.value}
             >
               <span className="font-medium text-sm">{personality.label}</span>
-              <span className="text-xs opacity-75">{personality.description}</span>
+              <span className="text-xs opacity-75">
+                {personality.description}
+              </span>
             </button>
           ))}
         </div>
+      </div>
+
+      {/* AI Topic */}
+      <div className="flex flex-col gap-2">
+        <label
+          htmlFor="ai-topic"
+          className="text-sm font-medium text-foreground flex items-center gap-2"
+        >
+          <Lightbulb className="w-4 h-4" />
+          Topic / Domain{" "}
+          <span className="text-muted-foreground">(optional)</span>
+        </label>
+        <input
+          id="ai-topic"
+          type="text"
+          value={aiTopic}
+          onChange={handleAITopicChange}
+          onBlur={() => handleBlur("aiTopic")}
+          placeholder="e.g., real estate, software engineering, marketing strategy"
+          className={`px-4 py-2 bg-card border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+            errors.aiTopic && touched.aiTopic
+              ? "border-red-400"
+              : "border-border"
+          }`}
+          disabled={isSubmitting}
+          aria-invalid={errors.aiTopic && touched.aiTopic ? "true" : "false"}
+          aria-describedby={
+            errors.aiTopic && touched.aiTopic
+              ? "ai-topic-error"
+              : "ai-topic-hint"
+          }
+        />
+        {errors.aiTopic && touched.aiTopic ? (
+          <p id="ai-topic-error" className="text-sm text-red-400" role="alert">
+            {errors.aiTopic}
+          </p>
+        ) : (
+          <p id="ai-topic-hint" className="text-xs text-muted-foreground">
+            The AI will have deep expertise in this subject and tailor responses
+            accordingly.
+          </p>
+        )}
       </div>
 
       {/* Actions */}

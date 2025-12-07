@@ -1055,6 +1055,24 @@
       "testFile": "tests/unit/components/UsernameModal.test.tsx",
       "dependencies": ["FEAT-413"],
       "passes": true
+    },
+    {
+      "id": "FEAT-415",
+      "phase": 5,
+      "category": "ai",
+      "description": "AI personality presets and topic expertise integration",
+      "priority": "high",
+      "steps": [
+        "Add aiTopic field to CreateRoomRequest and Room types",
+        "Add Topic/Domain input field to CreateRoomForm UI",
+        "Update server.ts to use personality presets for AI instructions",
+        "Integrate topic expertise into AI system prompt",
+        "Use personality-specific voice and temperature settings",
+        "Maintain speaker name recognition in AI responses"
+      ],
+      "testFile": "tests/unit/ai/personality-topic.test.ts",
+      "dependencies": ["FEAT-305", "FEAT-414"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1078,12 +1096,12 @@
     "user-experience": "User experience and personalization"
   },
   "statistics": {
-    "total": 55,
+    "total": 56,
     "phase2": 23,
     "phase3": 14,
     "phase4": 10,
-    "phase5": 13,
-    "passed": 55,
+    "phase5": 14,
+    "passed": 56,
     "pending": 0
   }
 }

@@ -5,8 +5,8 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-100
  */
 
-import type { Peer, PeerId } from './peer';
-import type { RoomVoiceSettings } from './voice-mode';
+import type { Peer, PeerId } from "./peer";
+import type { RoomVoiceSettings } from "./voice-mode";
 
 /**
  * Unique identifier for a room
@@ -16,17 +16,17 @@ export type RoomId = string;
 /**
  * Room status states
  */
-export type RoomStatus = 'waiting' | 'active' | 'full' | 'closed';
+export type RoomStatus = "waiting" | "active" | "full" | "closed";
 
 /**
  * AI personality presets for room configuration
  */
 export type AIPersonality =
-  | 'facilitator' // Guides discussions, summarizes, keeps on track
-  | 'assistant' // General helpful assistant
-  | 'expert' // Domain expert, technical depth
-  | 'brainstorm' // Creative ideation partner
-  | 'custom'; // Custom instructions provided
+  | "facilitator" // Guides discussions, summarizes, keeps on track
+  | "assistant" // General helpful assistant
+  | "expert" // Domain expert, technical depth
+  | "brainstorm" // Creative ideation partner
+  | "custom"; // Custom instructions provided
 
 /**
  * Room creation request payload
@@ -42,6 +42,8 @@ export interface CreateRoomRequest {
   aiPersonality?: AIPersonality;
   /** Custom AI instructions (when aiPersonality is 'custom') */
   customInstructions?: string;
+  /** Topic/domain for AI expertise (e.g., "real estate broker", "software engineering") */
+  aiTopic?: string;
   /** Voice mode settings */
   voiceSettings?: Partial<RoomVoiceSettings>;
 }
@@ -64,6 +66,8 @@ export interface Room {
   aiPersonality: AIPersonality;
   /** Custom AI instructions */
   customInstructions?: string;
+  /** Topic/domain for AI expertise */
+  aiTopic?: string;
   /** Voice mode and turn management settings */
   voiceSettings: RoomVoiceSettings;
   /** Room creator/owner peer ID */
@@ -117,7 +121,11 @@ export interface JoinRoomResponse {
   /** Error message if join failed */
   error?: string;
   /** Error code for programmatic handling */
-  errorCode?: 'ROOM_NOT_FOUND' | 'ROOM_FULL' | 'ROOM_CLOSED' | 'ALREADY_IN_ROOM';
+  errorCode?:
+    | "ROOM_NOT_FOUND"
+    | "ROOM_FULL"
+    | "ROOM_CLOSED"
+    | "ALREADY_IN_ROOM";
 }
 
 /**
@@ -145,9 +153,9 @@ export interface ListRoomsQuery {
   /** Pagination limit */
   limit?: number;
   /** Sort field */
-  sortBy?: 'createdAt' | 'name' | 'participantCount';
+  sortBy?: "createdAt" | "name" | "participantCount";
   /** Sort direction */
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 /**
@@ -164,10 +172,10 @@ export interface ListRoomsResponse {
  * Room event types for real-time updates
  */
 export type RoomEventType =
-  | 'room:created'
-  | 'room:updated'
-  | 'room:closed'
-  | 'room:deleted';
+  | "room:created"
+  | "room:updated"
+  | "room:closed"
+  | "room:deleted";
 
 /**
  * Room event payload

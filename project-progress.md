@@ -13,9 +13,9 @@
 | Phase 2: Room Infrastructure | **Complete** | 23/23    | 100%   |
 | Phase 3: Multi-Peer Audio    | **Complete** | 13/13    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 10/10    | 100%   |
-| Phase 5: Production Polish   | In Progress  | 8/13     | 62%    |
+| Phase 5: Production Polish   | In Progress  | 9/14     | 64%    |
 
-**Latest:** FEAT-414 (Vanity Username) - Users can now set a custom username that persists and is used by the AI.
+**Latest:** FEAT-415 (AI Personality + Topic) - AI personality presets now fully work with optional topic expertise.
 
 ---
 
@@ -2524,3 +2524,69 @@ This project follows the **Long-Horizon Engineering Protocol**:
 4. Update `features_list.json` to `passes: true`
 5. Add entry to this file
 6. Commit with `feat(FEAT-XXX): description`
+
+---
+
+### FEAT-415: AI Personality Presets and Topic Expertise Integration
+
+**Date:** 2024-12-07
+**Test:** `tests/unit/ai/personality-topic.test.ts`
+
+Implemented fully functional AI personality presets with topic/domain expertise. The host can now select an AI personality (Facilitator, Assistant, Expert, Brainstorm) and optionally specify a topic for deep expertise.
+
+**Files Modified:**
+
+- `src/types/room.ts` - Added `aiTopic` field to `CreateRoomRequest` and `Room` interfaces
+- `src/components/room/CreateRoomForm.tsx` - Added Topic/Domain input field with validation
+- `server.ts` - Complete personality integration:
+  - Added `PERSONALITY_INSTRUCTIONS` with preset configs (instructions, voice, temperature)
+  - Added `generateInstructions()` function combining personality + topic + speaker name
+  - Added `getPersonalityConfig()` for voice and temperature settings
+  - Updated `Room` and `RoomAISession` interfaces to include AI config
+  - Modified `createRoom()` to accept personality parameters
+  - Modified `getOrCreateAISession()` to read room AI configuration
+  - Modified OpenAI session configuration to use dynamic instructions
+- `features_list.json` - Added FEAT-415 entry
+
+**Key Features:**
+
+- **Personality Presets:** Each personality has distinct instructions, suggested voice, and temperature:
+  - Facilitator: Discussion guide with coral voice (temp 0.7)
+  - Assistant: General helpful assistant with alloy voice (temp 0.8)
+  - Expert: Domain expert with sage voice (temp 0.6)
+  - Brainstorm: Creative partner with shimmer voice (temp 1.0)
+
+- **Topic Expertise:** Optional text field where host specifies a domain (e.g., "real estate broker", "software engineering"). The AI receives instructions to:
+  - Have deep expertise in that domain
+  - Apply industry best practices
+  - Tailor language and examples to the field
+
+- **Speaker Name Recognition:** Preserved from FEAT-414 - AI still addresses users by their vanity username
+
+**Instruction Generation Flow:**
+
+```
+Room Created with personality=brainstorm, topic="real estate"
+    ↓
+Room stored with aiPersonality and aiTopic
+    ↓
+PTT Start → getOrCreateAISession() reads room config
+    ↓
+connectOpenAI() → session.update with:
+  - voice: shimmer (from personality)
+  - temperature: 1.0 (from personality)
+  - instructions: generateInstructions() combining:
+      1. SWENSYNC_CORE_IDENTITY (base identity)
+      2. PERSONALITY section (brainstorm instructions)
+      3. DOMAIN EXPERTISE section (real estate knowledge)
+      4. CURRENT SPEAKER section (user's name)
+    ↓
+AI responds with brainstorm energy + real estate expertise + addressing user by name
+```
+
+**UI Changes:**
+
+- New "Topic / Domain" input field below AI Personality selector
+- Placeholder text: "e.g., real estate, software engineering, marketing strategy"
+- Helper text: "The AI will have deep expertise in this subject and tailor responses accordingly."
+- Max 200 characters with validation
