@@ -138,6 +138,11 @@ export default function RoomPage() {
   // Local media stream ref
   const localStreamRef = useRef<MediaStream | null>(null);
 
+  // Audio capture refs for PTT streaming
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+
   // Socket.io room connection hook - provides real signaling
   const {
     connectionState,
@@ -420,7 +425,7 @@ export default function RoomPage() {
 
     connectAndJoin();
 
-    // Cleanup: Leave room and stop microphone when component unmounts
+    // Cleanup: Leave room, stop microphone, and close audio context when component unmounts
     return () => {
       mounted = false;
       if (hasJoined) {
@@ -430,6 +435,20 @@ export default function RoomPage() {
         });
       }
       stopMicrophoneRef.current();
+
+      // Clean up audio capture
+      if (scriptProcessorRef.current) {
+        scriptProcessorRef.current.disconnect();
+        scriptProcessorRef.current = null;
+      }
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
     };
   }, [roomId, displayName]); // Only depend on roomId and displayName
 
@@ -471,7 +490,7 @@ export default function RoomPage() {
   }, [router, leaveRoom, stopMicrophone]);
 
   /**
-   * Handle PTT start - unmute and address AI
+   * Handle PTT start - unmute, address AI, and start audio capture
    */
   const handlePTTStart = useCallback(() => {
     // Check if AI is already speaking/processing - don't allow PTT
@@ -480,15 +499,18 @@ export default function RoomPage() {
       return;
     }
 
+    if (!localStreamRef.current) {
+      console.error("[Room] No local stream available for PTT");
+      return;
+    }
+
     setIsAddressingAI(true);
     console.log("[Room] PTT started - addressing AI");
 
     // Unmute microphone when PTT is active
-    if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach((track) => {
-        track.enabled = true;
-      });
-    }
+    localStreamRef.current.getAudioTracks().forEach((track) => {
+      track.enabled = true;
+    });
 
     // Update presence for signaling
     setPresenceAddressingAI(true);
@@ -500,6 +522,67 @@ export default function RoomPage() {
       client.startPTT(roomId);
       console.log("[Room] Sent ai:ptt_start to server");
     }
+
+    // Set up audio capture for streaming to server
+    try {
+      // Create AudioContext at 24kHz (OpenAI Realtime API requirement)
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      }
+
+      const audioContext = audioContextRef.current;
+
+      // Resume if suspended (browser autoplay policy)
+      if (audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+
+      // Create source from microphone stream
+      const source = audioContext.createMediaStreamSource(
+        localStreamRef.current,
+      );
+      sourceNodeRef.current = source;
+
+      // Create ScriptProcessor for audio capture
+      // Buffer size 4096 gives ~170ms chunks at 24kHz - good balance
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      scriptProcessorRef.current = processor;
+
+      // Process audio chunks and send to server
+      processor.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+
+        // Convert Float32 to PCM16
+        const pcm16 = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          // Clamp and convert to 16-bit integer
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        }
+
+        // Convert to base64
+        const uint8Array = new Uint8Array(pcm16.buffer);
+        let binary = "";
+        for (let i = 0; i < uint8Array.length; i++) {
+          binary += String.fromCharCode(uint8Array[i]);
+        }
+        const audioBase64 = btoa(binary);
+
+        // Send to server
+        const socket = client?.getSocket();
+        if (socket) {
+          socket.emit("ai:audio_data", { roomId, audio: audioBase64 });
+        }
+      };
+
+      // Connect: source -> processor -> destination (required for processor to work)
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      console.log("[Room] Audio capture started for PTT");
+    } catch (err) {
+      console.error("[Room] Failed to start audio capture:", err);
+    }
   }, [
     aiState.aiState,
     setPresenceAddressingAI,
@@ -509,13 +592,25 @@ export default function RoomPage() {
   ]);
 
   /**
-   * Handle PTT end - restore mute state
+   * Handle PTT end - stop audio capture and restore mute state
    */
   const handlePTTEnd = useCallback(() => {
     if (!isAddressingAI) return; // Not in PTT mode
 
     setIsAddressingAI(false);
     console.log("[Room] PTT ended");
+
+    // Stop audio capture
+    if (scriptProcessorRef.current) {
+      scriptProcessorRef.current.disconnect();
+      scriptProcessorRef.current.onaudioprocess = null;
+      scriptProcessorRef.current = null;
+    }
+    if (sourceNodeRef.current) {
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
+    }
+    console.log("[Room] Audio capture stopped");
 
     // Restore previous mute state
     if (localStreamRef.current) {

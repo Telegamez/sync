@@ -2392,6 +2392,35 @@ Connected room page PTT (Push-to-Talk) to OpenAI Realtime API for end-to-end AI 
 ✅ Server running with OpenAI API key configured
 ✅ AI state flow verified: idle → listening → processing → idle
 
+#### Update: Audio Capture Fix (2024-12-07)
+
+**Issue:** AI was responding with the same generic response regardless of what the user said. Server logs showed: `Error committing input audio buffer: buffer too small. Expected at least 100ms of audio, but buffer only has 0.00ms of audio.`
+
+**Root Cause:** The PTT handlers were only toggling `track.enabled` but not actually capturing and streaming microphone audio to the server.
+
+**Fix Applied to `src/app/rooms/[roomId]/page.tsx`:**
+
+1. Added audio capture refs:
+   - `audioContextRef` - AudioContext at 24kHz (OpenAI requirement)
+   - `scriptProcessorRef` - ScriptProcessorNode for capturing audio
+   - `sourceNodeRef` - MediaStreamAudioSourceNode from microphone
+
+2. Updated `handlePTTStart`:
+   - Creates AudioContext at 24kHz sample rate
+   - Creates MediaStreamAudioSourceNode from microphone stream
+   - Creates ScriptProcessorNode with 4096 buffer size (~170ms chunks)
+   - Converts Float32 audio to PCM16 format
+   - Base64 encodes the PCM16 data
+   - Sends via `socket.emit("ai:audio_data", { roomId, audio: audioBase64 })`
+
+3. Updated `handlePTTEnd`:
+   - Disconnects and cleans up ScriptProcessor
+   - Disconnects source node
+
+4. Added cleanup on unmount for audio resources
+
+**Result:** Audio is now captured during PTT and streamed to OpenAI. AI responds based on actual speech content.
+
 ---
 
 ## Protocol Compliance
