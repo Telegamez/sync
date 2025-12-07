@@ -9,7 +9,7 @@
     "postbuild": "cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/ && cp server.ts .next/standalone/ && cp tsconfig.server.json .next/standalone/ && cp package.json .next/standalone/",
     "start": "tsx server.ts",
     "start:next": "next start -p 24680",
-    "start:detached": "nohup tsx server.ts > /tmp/swensync.log 2>&1 & echo $! > /tmp/swensync.pid && echo \"Started with PID $(cat /tmp/swensync.pid)\"",
+    "start:detached": "nohup npx tsx server.ts > /tmp/swensync.log 2>&1 & echo $! > /tmp/swensync.pid && echo \"Started with PID $(cat /tmp/swensync.pid)\"",
     "stop": "if [ -f /tmp/swensync.pid ]; then kill $(cat /tmp/swensync.pid) 2>/dev/null && rm /tmp/swensync.pid && echo 'Stopped'; else fuser -k 24680/tcp 2>/dev/null || true; fi; sleep 0.5; echo 'Stopped processes'",
     "restart": "pnpm stop && pnpm dev",
     "prod": "pnpm build && PORT=24680 NODE_ENV=production pnpm start:detached",

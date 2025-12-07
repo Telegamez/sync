@@ -7,17 +7,17 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-303
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SignalingClient } from '@/lib/signaling/client';
-import type { PeerId } from '@/types/peer';
-import type { RoomId } from '@/types/room';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { SignalingClient } from "@/lib/signaling/client";
+import type { PeerId } from "@/types/peer";
+import type { RoomId } from "@/types/room";
 import type {
   AIResponseState,
   RoomAIState,
   AIStateEvent,
-} from '@/types/voice-mode';
+} from "@/types/voice-mode";
 
 /**
  * AI audio chunk received from broadcast
@@ -120,7 +120,10 @@ export interface UseSharedAIOptions {
  */
 export interface UseSharedAICallbacks {
   /** Called when AI state changes */
-  onAIStateChange?: (state: AIResponseState, previousState?: AIResponseState) => void;
+  onAIStateChange?: (
+    state: AIResponseState,
+    previousState?: AIResponseState,
+  ) => void;
   /** Called when AI starts responding */
   onResponseStart?: (response: AIResponseInfo) => void;
   /** Called when AI response ends */
@@ -172,7 +175,9 @@ export interface UseSharedAIActions {
 /**
  * Default options
  */
-const DEFAULT_OPTIONS: Required<Omit<UseSharedAIOptions, 'signalingClient' | 'roomId' | 'localPeerId'>> = {
+const DEFAULT_OPTIONS: Required<
+  Omit<UseSharedAIOptions, "signalingClient" | "roomId" | "localPeerId">
+> = {
   autoReconnect: true,
   maxReconnectAttempts: 5,
   playbackBufferMs: 200,
@@ -184,7 +189,7 @@ const DEFAULT_OPTIONS: Required<Omit<UseSharedAIOptions, 'signalingClient' | 'ro
  */
 const DEFAULT_STATE: SharedAIState = {
   isConnected: false,
-  aiState: 'idle',
+  aiState: "idle",
   isSessionHealthy: true,
   currentSpeakerId: null,
   currentSpeakerName: null,
@@ -242,7 +247,7 @@ const DEFAULT_PLAYBACK_STATE: AudioPlaybackState = {
  */
 export function useSharedAI(
   options: UseSharedAIOptions = {},
-  callbacks: UseSharedAICallbacks = {}
+  callbacks: UseSharedAICallbacks = {},
 ): {
   state: SharedAIState;
   playback: AudioPlaybackState;
@@ -273,7 +278,9 @@ export function useSharedAI(
 
   // State
   const [state, setState] = useState<SharedAIState>(DEFAULT_STATE);
-  const [playback, setPlayback] = useState<AudioPlaybackState>(DEFAULT_PLAYBACK_STATE);
+  const [playback, setPlayback] = useState<AudioPlaybackState>(
+    DEFAULT_PLAYBACK_STATE,
+  );
 
   // Audio buffer and context
   const audioBufferRef = useRef<AIAudioChunk[]>([]);
@@ -331,9 +338,14 @@ export function useSharedAI(
       audioContextRef.current = new AudioContext({ sampleRate });
       gainNodeRef.current = audioContextRef.current.createGain();
       gainNodeRef.current.connect(audioContextRef.current.destination);
-      gainNodeRef.current.gain.value = isMutedRef.current ? 0 : volumeRef.current;
+      gainNodeRef.current.gain.value = isMutedRef.current
+        ? 0
+        : volumeRef.current;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create audio context';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to create audio context";
       onErrorRef.current?.(message);
     }
   }, [sampleRate]);
@@ -343,7 +355,10 @@ export function useSharedAI(
    */
   const updatePlaybackState = useCallback(() => {
     const buffer = audioBufferRef.current;
-    const totalDuration = buffer.reduce((acc, chunk) => acc + chunk.durationMs, 0);
+    const totalDuration = buffer.reduce(
+      (acc, chunk) => acc + chunk.durationMs,
+      0,
+    );
 
     setPlayback({
       isPlaying: isPlayingRef.current,
@@ -357,39 +372,45 @@ export function useSharedAI(
   /**
    * Handle incoming audio chunk
    */
-  const handleAudioChunk = useCallback((chunk: AIAudioChunk) => {
-    audioBufferRef.current.push(chunk);
-    onAudioChunkRef.current?.(chunk);
-    updatePlaybackState();
-  }, [updatePlaybackState]);
+  const handleAudioChunk = useCallback(
+    (chunk: AIAudioChunk) => {
+      audioBufferRef.current.push(chunk);
+      onAudioChunkRef.current?.(chunk);
+      updatePlaybackState();
+    },
+    [updatePlaybackState],
+  );
 
   /**
    * Handle AI state event
    */
-  const handleAIStateEvent = useCallback((event: AIStateEvent) => {
-    const previousState = state.aiState;
-    const newAIState = event.state.state;
+  const handleAIStateEvent = useCallback(
+    (event: AIStateEvent) => {
+      const previousState = state.aiState;
+      const newAIState = event.state.state;
 
-    setState((prev) => ({
-      ...prev,
-      aiState: newAIState,
-      isSessionHealthy: event.state.isSessionHealthy,
-      currentSpeakerId: event.state.activeSpeakerId ?? null,
-      currentSpeakerName: event.state.activeSpeakerName ?? null,
-      isResponding: newAIState === 'speaking',
-      lastError: event.state.lastError ?? null,
-    }));
+      setState((prev) => ({
+        ...prev,
+        aiState: newAIState,
+        isSessionHealthy: event.state.isSessionHealthy,
+        currentSpeakerId: event.state.activeSpeakerId ?? null,
+        currentSpeakerName: event.state.activeSpeakerName ?? null,
+        isResponding: newAIState === "speaking",
+        lastError: event.state.lastError ?? null,
+      }));
 
-    // Notify state change
-    if (newAIState !== previousState) {
-      onAIStateChangeRef.current?.(newAIState, previousState);
-    }
+      // Notify state change
+      if (newAIState !== previousState) {
+        onAIStateChangeRef.current?.(newAIState, previousState);
+      }
 
-    // Handle errors
-    if (event.type === 'ai:error') {
-      onErrorRef.current?.(event.state.lastError ?? 'Unknown error');
-    }
-  }, [state.aiState]);
+      // Handle errors
+      if (event.type === "ai:error") {
+        onErrorRef.current?.(event.state.lastError ?? "Unknown error");
+      }
+    },
+    [state.aiState],
+  );
 
   /**
    * Handle response start
@@ -451,7 +472,11 @@ export function useSharedAI(
       }
     };
 
-    const onAudioData = (data: { roomId: RoomId; chunk: AIAudioChunk; response: AIResponseInfo }) => {
+    const onAudioData = (data: {
+      roomId: RoomId;
+      chunk: AIAudioChunk;
+      response: AIResponseInfo;
+    }) => {
       if (data.roomId === roomId) {
         if (data.chunk.isFirst) {
           handleResponseStart(data.response);
@@ -472,12 +497,12 @@ export function useSharedAI(
     };
 
     // Subscribe to AI events (these are extended events not in base SignalingEventHandlers)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const client = signalingClient as any;
-    client.on('ai:state', onAIState);
-    client.on('ai:audio', onAudioData);
-    client.on('connect', onConnect);
-    client.on('disconnect', onDisconnect);
+    client.on("ai:state", onAIState);
+    client.on("ai:audio", onAudioData);
+    client.on("connect", onConnect);
+    client.on("disconnect", onDisconnect);
 
     // Check initial connection
     if (client.isConnected?.()) {
@@ -485,10 +510,10 @@ export function useSharedAI(
     }
 
     return () => {
-      client.off('ai:state', onAIState);
-      client.off('ai:audio', onAudioData);
-      client.off('connect', onConnect);
-      client.off('disconnect', onDisconnect);
+      client.off("ai:state", onAIState);
+      client.off("ai:audio", onAudioData);
+      client.off("connect", onConnect);
+      client.off("disconnect", onDisconnect);
     };
   }, [
     signalingClient,
@@ -596,9 +621,11 @@ export function useSharedAI(
     if (!signalingClient || !roomId || !localPeerId) return;
 
     // Tell server we're ready for playback
-    (signalingClient as unknown as {
-      emit: (event: string, data: unknown) => void;
-    }).emit('ai:ready', { roomId, peerId: localPeerId });
+    (
+      signalingClient as unknown as {
+        emit: (event: string, data: unknown) => void;
+      }
+    ).emit("ai:ready", { roomId, peerId: localPeerId });
   }, [signalingClient, roomId, localPeerId]);
 
   /**
@@ -615,9 +642,11 @@ export function useSharedAI(
     onReconnectingRef.current?.(state.reconnectAttempts + 1);
 
     // Request reconnection via signaling
-    (signalingClient as unknown as {
-      emit: (event: string, data: unknown) => void;
-    }).emit('ai:reconnect', { roomId });
+    (
+      signalingClient as unknown as {
+        emit: (event: string, data: unknown) => void;
+      }
+    ).emit("ai:reconnect", { roomId });
   }, [signalingClient, roomId, state.reconnectAttempts]);
 
   /**
@@ -656,7 +685,7 @@ export function useSharedAI(
  */
 export function createSharedAI(
   options?: UseSharedAIOptions,
-  callbacks?: UseSharedAICallbacks
+  callbacks?: UseSharedAICallbacks,
 ) {
   return () => useSharedAI(options, callbacks);
 }

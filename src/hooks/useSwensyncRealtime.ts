@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from "react";
 import type {
   SwensyncConnectionState,
   SwensyncAnimState,
   SwensyncRealtimeOptions,
   SwensyncRealtimeHook,
   TurnLatency,
-} from '@/types/swensync';
+} from "@/types/swensync";
 
 // Dynamic import for MicVAD to avoid SSR issues
-let MicVADClass: typeof import('@ricky0123/vad-web').MicVAD | null = null;
+let MicVADClass: typeof import("@ricky0123/vad-web").MicVAD | null = null;
 
 /**
  * Session limits (in seconds)
@@ -22,8 +22,8 @@ const SESSION_MAX_TIME = 10 * 60; // 10 minutes
  * OpenAI Realtime API WebRTC endpoint
  * Note: Model is passed in query parameter for /v1/realtime endpoint
  */
-const OPENAI_REALTIME_ENDPOINT = 'https://api.openai.com/v1/realtime';
-const OPENAI_MODEL = 'gpt-4o-realtime-preview';
+const OPENAI_REALTIME_ENDPOINT = "https://api.openai.com/v1/realtime";
+const OPENAI_MODEL = "gpt-4o-realtime-preview";
 
 /**
  * Maximum number of turn latencies to keep
@@ -45,17 +45,17 @@ const MAX_LATENCY_HISTORY = 5;
  * @returns {SwensyncRealtimeHook} Hook state and controls
  */
 export function useSwensyncRealtime(
-  options: SwensyncRealtimeOptions = {}
+  options: SwensyncRealtimeOptions = {},
 ): SwensyncRealtimeHook {
   const { userName, useClientVAD = true } = options;
 
   // Connection state
   const [connectionState, setConnectionState] =
-    useState<SwensyncConnectionState>('idle');
+    useState<SwensyncConnectionState>("idle");
   const [error, setError] = useState<Error | null>(null);
 
   // Animation state
-  const [animState, setAnimState] = useState<SwensyncAnimState>('Listening');
+  const [animState, setAnimState] = useState<SwensyncAnimState>("Listening");
   const [isVisualizerActive, setIsVisualizerActive] = useState(false);
 
   // Session management
@@ -101,7 +101,7 @@ export function useSwensyncRealtime(
   const audioStreamEndTimeRef = useRef<number>(0);
 
   // Client-side VAD refs
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const clientVADRef = useRef<any>(null);
   const isClientVADActiveRef = useRef<boolean>(false);
   const clientVADSpeechStartTimeRef = useRef<number | null>(null);
@@ -115,14 +115,14 @@ export function useSwensyncRealtime(
    * Fetch ephemeral token from our backend
    */
   const fetchToken = useCallback(async (): Promise<string> => {
-    const res = await fetch('/api/swensync-realtime-token');
+    const res = await fetch("/api/swensync-realtime-token");
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to get realtime token');
+      throw new Error(errorData.error || "Failed to get realtime token");
     }
     const data = await res.json();
     if (!data.client_secret?.value) {
-      throw new Error('Invalid token response: missing client_secret');
+      throw new Error("Invalid token response: missing client_secret");
     }
     return data.client_secret.value;
   }, []);
@@ -136,9 +136,7 @@ export function useSwensyncRealtime(
     sessionTimerRef.current = setInterval(() => {
       if (!sessionStartRef.current) return;
 
-      const elapsed = Math.floor(
-        (Date.now() - sessionStartRef.current) / 1000
-      );
+      const elapsed = Math.floor((Date.now() - sessionStartRef.current) / 1000);
       setSessionDuration(elapsed);
 
       // Warning at 8 minutes
@@ -148,7 +146,7 @@ export function useSwensyncRealtime(
 
       // Auto-disconnect at 10 minutes
       if (elapsed >= SESSION_MAX_TIME) {
-        console.log('[Swensync] Session timeout: auto-disconnecting');
+        console.log("[Swensync] Session timeout: auto-disconnecting");
       }
     }, 1000);
   }, []);
@@ -182,7 +180,7 @@ export function useSwensyncRealtime(
       }
     }, 16);
 
-    console.log('[Swensync] Stopwatch started');
+    console.log("[Swensync] Stopwatch started");
   }, []);
 
   /**
@@ -220,7 +218,9 @@ export function useSwensyncRealtime(
     stopwatchStartRef.current = null;
     isWaitingForResponseRef.current = false;
 
-    console.log(`[Swensync] Stopwatch stopped: Turn ${newTurn} = ${latencyMs}ms`);
+    console.log(
+      `[Swensync] Stopwatch stopped: Turn ${newTurn} = ${latencyMs}ms`,
+    );
   }, []); // No dependencies - uses refs
 
   /**
@@ -236,7 +236,7 @@ export function useSwensyncRealtime(
       const audioContext = audioContextRef.current;
 
       // Resume audio context if suspended (browser autoplay policy)
-      if (audioContext.state === 'suspended') {
+      if (audioContext.state === "suspended") {
         audioContext.resume();
       }
 
@@ -252,9 +252,9 @@ export function useSwensyncRealtime(
       analyserRef.current = analyser;
       setModelAnalyserNode(analyser);
 
-      console.log('[Swensync] Audio analyser setup complete');
+      console.log("[Swensync] Audio analyser setup complete");
     } catch (err) {
-      console.warn('[Swensync] Failed to setup audio analyser:', err);
+      console.warn("[Swensync] Failed to setup audio analyser:", err);
     }
   }, []);
 
@@ -292,15 +292,15 @@ export function useSwensyncRealtime(
         silentFrameCountRef.current++;
 
         if (silentFrameCountRef.current >= SILENT_FRAMES_REQUIRED) {
-          console.log('[Swensync] Silence detected - switching to Listening');
-          setAnimState('Listening');
+          console.log("[Swensync] Silence detected - switching to Listening");
+          setAnimState("Listening");
           setIsVisualizerActive(false);
           isResponseCompleteRef.current = false;
           silentFrameCountRef.current = 0;
         }
       } else {
         silentFrameCountRef.current = 0;
-        setAnimState('Speaking');
+        setAnimState("Speaking");
         setIsVisualizerActive(true);
       }
     }, 33); // ~30fps monitoring
@@ -324,13 +324,15 @@ export function useSwensyncRealtime(
    */
   const sendCommitSignal = useCallback(() => {
     const dc = dataChannelRef.current;
-    if (dc && dc.readyState === 'open') {
+    if (dc && dc.readyState === "open") {
       // Commit the audio buffer to trigger immediate processing
       const commitMsg = {
-        type: 'input_audio_buffer.commit',
+        type: "input_audio_buffer.commit",
       };
       dc.send(JSON.stringify(commitMsg));
-      console.log('[Swensync] Client VAD: Sent commit signal (local speech end detected)');
+      console.log(
+        "[Swensync] Client VAD: Sent commit signal (local speech end detected)",
+      );
     }
   }, []);
 
@@ -338,91 +340,96 @@ export function useSwensyncRealtime(
    * Initialize client-side Silero VAD for faster turn detection
    * This runs in parallel with server VAD but can trigger response faster
    */
-  const initializeClientVAD = useCallback(async (stream: MediaStream) => {
-    if (!useClientVAD) {
-      console.log('[Swensync] Client VAD disabled');
-      return;
-    }
-
-    try {
-      // Dynamic import to avoid SSR issues
-      if (!MicVADClass) {
-        const vadModule = await import('@ricky0123/vad-web');
-        MicVADClass = vadModule.MicVAD;
+  const initializeClientVAD = useCallback(
+    async (stream: MediaStream) => {
+      if (!useClientVAD) {
+        console.log("[Swensync] Client VAD disabled");
+        return;
       }
 
-      console.log('[Swensync] Initializing client-side Silero VAD...');
+      try {
+        // Dynamic import to avoid SSR issues
+        if (!MicVADClass) {
+          const vadModule = await import("@ricky0123/vad-web");
+          MicVADClass = vadModule.MicVAD;
+        }
 
-      // Local paths for ONNX model and WASM files (served from /public/vad/)
-      // Files are copied from node_modules during build
-      const VAD_BASE_PATH = '/vad/';
+        console.log("[Swensync] Initializing client-side Silero VAD...");
 
-      const vad = await MicVADClass.new({
-        // Asset paths - load from local public directory
-        baseAssetPath: VAD_BASE_PATH,
-        onnxWASMBasePath: VAD_BASE_PATH,
+        // Local paths for ONNX model and WASM files (served from /public/vad/)
+        // Files are copied from node_modules during build
+        const VAD_BASE_PATH = "/vad/";
 
-        // Use the existing stream instead of requesting a new one
-        getStream: async () => stream,
-        // Don't stop the stream when pausing VAD
-        pauseStream: async () => {},
-        resumeStream: async () => stream,
+        const vad = await MicVADClass.new({
+          // Asset paths - load from local public directory
+          baseAssetPath: VAD_BASE_PATH,
+          onnxWASMBasePath: VAD_BASE_PATH,
 
-        // Aggressive settings for fast turn detection
-        // Lower threshold = more sensitive to speech
-        positiveSpeechThreshold: 0.6,
-        negativeSpeechThreshold: 0.35,
+          // Use the existing stream instead of requesting a new one
+          getStream: async () => stream,
+          // Don't stop the stream when pausing VAD
+          pauseStream: async () => {},
+          resumeStream: async () => stream,
 
-        // Fast redemption - only wait 200ms of silence before triggering end
-        // This is the KEY latency improvement: server VAD waits 350ms, we wait 200ms
-        redemptionMs: 200,
+          // Aggressive settings for fast turn detection
+          // Lower threshold = more sensitive to speech
+          positiveSpeechThreshold: 0.6,
+          negativeSpeechThreshold: 0.35,
 
-        // Minimal pre-speech padding (we don't need the audio, just the signal)
-        preSpeechPadMs: 0,
+          // Fast redemption - only wait 200ms of silence before triggering end
+          // This is the KEY latency improvement: server VAD waits 350ms, we wait 200ms
+          redemptionMs: 200,
 
-        // Minimum speech duration to avoid false positives
-        minSpeechMs: 150,
+          // Minimal pre-speech padding (we don't need the audio, just the signal)
+          preSpeechPadMs: 0,
 
-        // Use v5 model for better accuracy
-        model: 'v5',
+          // Minimum speech duration to avoid false positives
+          minSpeechMs: 150,
 
-        // Callbacks
-        onSpeechStart: () => {
-          console.log('[Swensync] Client VAD: Speech started');
-          clientVADSpeechStartTimeRef.current = Date.now();
-          isClientVADActiveRef.current = true;
-        },
+          // Use v5 model for better accuracy
+          model: "v5",
 
-        onSpeechEnd: () => {
-          if (!isClientVADActiveRef.current) return;
+          // Callbacks
+          onSpeechStart: () => {
+            console.log("[Swensync] Client VAD: Speech started");
+            clientVADSpeechStartTimeRef.current = Date.now();
+            isClientVADActiveRef.current = true;
+          },
 
-          const duration = clientVADSpeechStartTimeRef.current
-            ? Date.now() - clientVADSpeechStartTimeRef.current
-            : 0;
-          console.log(`[Swensync] Client VAD: Speech ended (${duration}ms) - sending commit`);
+          onSpeechEnd: () => {
+            if (!isClientVADActiveRef.current) return;
 
-          // Send commit signal to OpenAI immediately
-          sendCommitSignal();
+            const duration = clientVADSpeechStartTimeRef.current
+              ? Date.now() - clientVADSpeechStartTimeRef.current
+              : 0;
+            console.log(
+              `[Swensync] Client VAD: Speech ended (${duration}ms) - sending commit`,
+            );
 
-          isClientVADActiveRef.current = false;
-          clientVADSpeechStartTimeRef.current = null;
-        },
+            // Send commit signal to OpenAI immediately
+            sendCommitSignal();
 
-        onVADMisfire: () => {
-          console.log('[Swensync] Client VAD: Misfire (too short)');
-          isClientVADActiveRef.current = false;
-          clientVADSpeechStartTimeRef.current = null;
-        },
-      });
+            isClientVADActiveRef.current = false;
+            clientVADSpeechStartTimeRef.current = null;
+          },
 
-      clientVADRef.current = vad;
-      await vad.start();
-      console.log('[Swensync] Client VAD initialized and running');
-    } catch (err) {
-      console.warn('[Swensync] Failed to initialize client VAD:', err);
-      // Non-fatal - server VAD will still work
-    }
-  }, [useClientVAD, sendCommitSignal]);
+          onVADMisfire: () => {
+            console.log("[Swensync] Client VAD: Misfire (too short)");
+            isClientVADActiveRef.current = false;
+            clientVADSpeechStartTimeRef.current = null;
+          },
+        });
+
+        clientVADRef.current = vad;
+        await vad.start();
+        console.log("[Swensync] Client VAD initialized and running");
+      } catch (err) {
+        console.warn("[Swensync] Failed to initialize client VAD:", err);
+        // Non-fatal - server VAD will still work
+      }
+    },
+    [useClientVAD, sendCommitSignal],
+  );
 
   /**
    * Cleanup client VAD
@@ -431,9 +438,9 @@ export function useSwensyncRealtime(
     if (clientVADRef.current) {
       try {
         await clientVADRef.current.destroy();
-        console.log('[Swensync] Client VAD destroyed');
+        console.log("[Swensync] Client VAD destroyed");
       } catch (err) {
-        console.warn('[Swensync] Error destroying client VAD:', err);
+        console.warn("[Swensync] Error destroying client VAD:", err);
       }
       clientVADRef.current = null;
     }
@@ -451,22 +458,22 @@ export function useSwensyncRealtime(
 
         // Log important events
         const importantEvents = [
-          'session.created',
-          'session.updated',
-          'error',
-          'response.created',
-          'response.done',
-          'response.audio.done',
-          'input_audio_buffer.speech_started',
-          'input_audio_buffer.speech_stopped',
+          "session.created",
+          "session.updated",
+          "error",
+          "response.created",
+          "response.done",
+          "response.audio.done",
+          "input_audio_buffer.speech_started",
+          "input_audio_buffer.speech_stopped",
         ];
         if (importantEvents.includes(data.type)) {
-          console.log('[Swensync] Event:', data.type);
+          console.log("[Swensync] Event:", data.type);
         }
 
         switch (data.type) {
-          case 'response.audio.delta':
-          case 'response.audio_transcript.delta':
+          case "response.audio.delta":
+          case "response.audio_transcript.delta":
             // First audio delta - stop stopwatch if waiting
             if (isWaitingForResponseRef.current) {
               stopStopwatch();
@@ -475,51 +482,53 @@ export function useSwensyncRealtime(
             isResponseCompleteRef.current = false;
             silentFrameCountRef.current = 0;
             audioStreamEndTimeRef.current = 0;
-            setAnimState('Speaking');
+            setAnimState("Speaking");
             setIsVisualizerActive(true);
             break;
 
-          case 'response.audio.done':
-            console.log('[Swensync] Audio stream complete');
+          case "response.audio.done":
+            console.log("[Swensync] Audio stream complete");
             audioStreamEndTimeRef.current = Date.now();
             isResponseCompleteRef.current = true;
             break;
 
-          case 'response.done':
-            console.log('[Swensync] Response complete');
+          case "response.done":
+            console.log("[Swensync] Response complete");
             isResponseCompleteRef.current = true;
             break;
 
-          case 'input_audio_buffer.speech_started':
+          case "input_audio_buffer.speech_started":
             // User started speaking
-            console.log('[Swensync] User speaking');
-            setAnimState('Focused');
+            console.log("[Swensync] User speaking");
+            setAnimState("Focused");
             setIsVisualizerActive(false);
             break;
 
-          case 'input_audio_buffer.speech_stopped':
+          case "input_audio_buffer.speech_stopped":
             // User stopped speaking - start stopwatch NOW (true latency measurement)
             // This measures: end of speech → first audio byte (excludes user speech duration)
-            console.log('[Swensync] User stopped - Thinking (stopwatch started)');
+            console.log(
+              "[Swensync] User stopped - Thinking (stopwatch started)",
+            );
             startStopwatch();
-            setAnimState('Thinking');
+            setAnimState("Thinking");
             setIsVisualizerActive(false);
             break;
 
-          case 'session.created':
-            console.log('[Swensync] Session created:', data.session?.id);
+          case "session.created":
+            console.log("[Swensync] Session created:", data.session?.id);
             break;
 
-          case 'error':
-            console.error('[Swensync] Server error:', data.error);
-            setError(new Error(data.error?.message || 'Server error'));
+          case "error":
+            console.error("[Swensync] Server error:", data.error);
+            setError(new Error(data.error?.message || "Server error"));
             break;
         }
       } catch {
         // Not JSON or parse error - ignore
       }
     },
-    [startStopwatch, stopStopwatch]
+    [startStopwatch, stopStopwatch],
   );
 
   /**
@@ -528,29 +537,29 @@ export function useSwensyncRealtime(
   const connect = useCallback(async () => {
     // Prevent multiple concurrent connection attempts
     if (isConnectingRef.current) {
-      console.warn('[Swensync] Connection already in progress');
+      console.warn("[Swensync] Connection already in progress");
       return;
     }
 
-    if (connectionState !== 'idle') {
-      console.warn('[Swensync] Already connecting or connected');
+    if (connectionState !== "idle") {
+      console.warn("[Swensync] Already connecting or connected");
       return;
     }
 
     isConnectingRef.current = true;
 
     try {
-      setConnectionState('connecting');
+      setConnectionState("connecting");
       setError(null);
-      console.log('[Swensync] Initiating WebRTC connection');
+      console.log("[Swensync] Initiating WebRTC connection");
 
       // 1. Get ephemeral token
       const token = await fetchToken();
-      console.log('[Swensync] Token acquired');
+      console.log("[Swensync] Token acquired");
 
       // Check if we should abort
       if (!isMountedRef.current) {
-        console.log('[Swensync] Aborting - component unmounted');
+        console.log("[Swensync] Aborting - component unmounted");
         isConnectingRef.current = false;
         return;
       }
@@ -560,13 +569,13 @@ export function useSwensyncRealtime(
       peerConnectionRef.current = pc;
 
       // 3. Setup audio element for playback
-      const audioEl = document.createElement('audio');
+      const audioEl = document.createElement("audio");
       audioEl.autoplay = true;
       audioElementRef.current = audioEl;
 
       // Handle incoming audio track from OpenAI
       pc.ontrack = (event) => {
-        console.log('[Swensync] Received remote audio track');
+        console.log("[Swensync] Received remote audio track");
         const remoteStream = event.streams[0];
         audioEl.srcObject = remoteStream;
 
@@ -578,23 +587,23 @@ export function useSwensyncRealtime(
 
       // Connection state changes
       pc.onconnectionstatechange = () => {
-        console.log('[Swensync] Connection state:', pc.connectionState);
+        console.log("[Swensync] Connection state:", pc.connectionState);
         if (
-          pc.connectionState === 'failed' ||
-          pc.connectionState === 'closed'
+          pc.connectionState === "failed" ||
+          pc.connectionState === "closed"
         ) {
-          setConnectionState('error');
-          setError(new Error('WebRTC connection failed'));
+          setConnectionState("error");
+          setError(new Error("WebRTC connection failed"));
         }
       };
 
       // 4. Add local audio track (microphone)
-      console.log('[Swensync] Requesting microphone access...');
+      console.log("[Swensync] Requesting microphone access...");
 
       // Check if getUserMedia is available (requires HTTPS or localhost)
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error(
-          'Microphone access requires HTTPS. Please access this site via HTTPS or localhost.'
+          "Microphone access requires HTTPS. Please access this site via HTTPS or localhost.",
         );
       }
 
@@ -603,18 +612,18 @@ export function useSwensyncRealtime(
 
       stream.getAudioTracks().forEach((track) => {
         pc.addTrack(track, stream);
-        console.log('[Swensync] Added local audio track');
+        console.log("[Swensync] Added local audio track");
       });
 
       // Initialize client-side VAD for faster turn detection
       initializeClientVAD(stream);
 
       // 5. Create data channel for events
-      const dc = pc.createDataChannel('oai-events');
+      const dc = pc.createDataChannel("oai-events");
       dataChannelRef.current = dc;
 
       dc.onopen = () => {
-        console.log('[Swensync] Data channel opened');
+        console.log("[Swensync] Data channel opened");
 
         // Build personalized greeting instruction
         const userGreeting = userName
@@ -623,9 +632,9 @@ export function useSwensyncRealtime(
 
         // Send session configuration
         const sessionConfig = {
-          type: 'session.update',
+          type: "session.update",
           session: {
-            modalities: ['text', 'audio'],
+            modalities: ["text", "audio"],
             instructions: `You are Swensync — the voice of synchronized intelligence.
 
 ## CORE MISSION
@@ -657,34 +666,34 @@ You are Swensync's proprietary AI Collaboration Engine — the platform for sync
 ## GREETING
 ${userGreeting}
 Greet warmly. Introduce yourself as Swensync — synchronized intelligence for teams.`,
-            voice: 'marin',
-            input_audio_format: 'pcm16',
-            output_audio_format: 'pcm16',
+            voice: "marin",
+            input_audio_format: "pcm16",
+            output_audio_format: "pcm16",
             turn_detection: {
-              type: 'server_vad',
+              type: "server_vad",
               threshold: 0.5,
-              prefix_padding_ms: 200,    // Reduced from 300ms for faster turn start
-              silence_duration_ms: 350,  // Reduced from 500ms for snappier responses
+              prefix_padding_ms: 200, // Reduced from 300ms for faster turn start
+              silence_duration_ms: 350, // Reduced from 500ms for snappier responses
             },
           },
         };
         dc.send(JSON.stringify(sessionConfig));
-        console.log('[Swensync] Sent session config');
+        console.log("[Swensync] Sent session config");
 
         // Trigger proactive greeting
         setTimeout(() => {
-          if (dc.readyState === 'open') {
+          if (dc.readyState === "open") {
             const greetingTrigger = {
-              type: 'response.create',
+              type: "response.create",
               response: {
-                modalities: ['text', 'audio'],
+                modalities: ["text", "audio"],
                 instructions: userName
                   ? `Greet ${userName} warmly and introduce yourself as Swensync — synchronized intelligence for teams.`
                   : `Greet the user warmly and introduce yourself as Swensync — synchronized intelligence for teams.`,
               },
             };
             dc.send(JSON.stringify(greetingTrigger));
-            console.log('[Swensync] Triggered greeting');
+            console.log("[Swensync] Triggered greeting");
           }
         }, 100);
       };
@@ -692,7 +701,7 @@ Greet warmly. Introduce yourself as Swensync — synchronized intelligence for t
       dc.onmessage = handleDataChannelMessage;
 
       dc.onerror = (event) => {
-        console.error('[Swensync] Data channel error:', event);
+        console.error("[Swensync] Data channel error:", event);
       };
 
       // 6. Create SDP offer
@@ -700,56 +709,60 @@ Greet warmly. Introduce yourself as Swensync — synchronized intelligence for t
       await pc.setLocalDescription(offer);
 
       if (!offer.sdp) {
-        throw new Error('Failed to create SDP offer');
+        throw new Error("Failed to create SDP offer");
       }
 
-      console.log('[Swensync] Created SDP offer, connecting...');
+      console.log("[Swensync] Created SDP offer, connecting...");
 
       // 7. Send offer to OpenAI Realtime endpoint
       const response = await fetch(
         `${OPENAI_REALTIME_ENDPOINT}?model=${OPENAI_MODEL}`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/sdp',
+            "Content-Type": "application/sdp",
             Authorization: `Bearer ${token}`,
           },
           body: offer.sdp,
-        }
+        },
       );
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[Swensync] OpenAI response error:', response.status, errorText);
+        console.error(
+          "[Swensync] OpenAI response error:",
+          response.status,
+          errorText,
+        );
         throw new Error(
-          `OpenAI connection failed: ${response.status} ${response.statusText}`
+          `OpenAI connection failed: ${response.status} ${response.statusText}`,
         );
       }
 
       // 8. Set remote description from OpenAI's answer
       const answerSdp = await response.text();
-      console.log('[Swensync] Received SDP answer');
+      console.log("[Swensync] Received SDP answer");
 
       const answer: RTCSessionDescriptionInit = {
-        type: 'answer',
+        type: "answer",
         sdp: answerSdp,
       };
 
       await pc.setRemoteDescription(answer);
-      console.log('[Swensync] WebRTC connection established');
+      console.log("[Swensync] WebRTC connection established");
 
       // 9. Start session timer and audio monitor
       startSessionTimer();
       startAudioMonitor();
 
-      setConnectionState('connected');
-      setAnimState('Listening');
+      setConnectionState("connected");
+      setAnimState("Listening");
       isConnectingRef.current = false;
-      console.log('[Swensync] Ready for conversation');
+      console.log("[Swensync] Ready for conversation");
     } catch (err) {
-      console.error('[Swensync] Connection failed:', err);
+      console.error("[Swensync] Connection failed:", err);
       setError(err instanceof Error ? err : new Error(String(err)));
-      setConnectionState('error');
+      setConnectionState("error");
       isConnectingRef.current = false;
 
       // Cleanup on failure
@@ -817,7 +830,7 @@ Greet warmly. Introduce yourself as Swensync — synchronized intelligence for t
    * Disconnect and cleanup all resources
    */
   const disconnect = useCallback(() => {
-    console.log('[Swensync] Disconnecting');
+    console.log("[Swensync] Disconnecting");
 
     // Stop session timer
     stopSessionTimer();
@@ -829,8 +842,8 @@ Greet warmly. Introduce yourself as Swensync — synchronized intelligence for t
     cleanupResources();
 
     // Reset state
-    setConnectionState('idle');
-    setAnimState('Listening');
+    setConnectionState("idle");
+    setAnimState("Listening");
     setIsVisualizerActive(false);
     setError(null);
     setIsStopwatchRunning(false);
@@ -846,7 +859,7 @@ Greet warmly. Introduce yourself as Swensync — synchronized intelligence for t
     setCurrentTurnNumber(0);
     setTurnLatencies([]);
 
-    console.log('[Swensync] Disconnected');
+    console.log("[Swensync] Disconnected");
   }, [stopSessionTimer, stopAudioMonitor, cleanupResources]);
 
   // Track mounted state and cleanup on unmount
@@ -855,7 +868,7 @@ Greet warmly. Introduce yourself as Swensync — synchronized intelligence for t
 
     return () => {
       isMountedRef.current = false;
-      console.log('[Swensync] Unmounting - cleaning up');
+      console.log("[Swensync] Unmounting - cleaning up");
 
       // Stop all intervals
       if (sessionTimerRef.current) {
@@ -899,7 +912,7 @@ Greet warmly. Introduce yourself as Swensync — synchronized intelligence for t
   useEffect(() => {
     if (
       sessionDuration >= SESSION_MAX_TIME &&
-      connectionState === 'connected'
+      connectionState === "connected"
     ) {
       disconnect();
     }
