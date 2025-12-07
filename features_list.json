@@ -983,6 +983,24 @@
       "testFile": "tests/unit/ai/interrupt.test.ts",
       "dependencies": ["FEAT-157", "FEAT-302"],
       "passes": true
+    },
+    {
+      "id": "FEAT-411",
+      "phase": 5,
+      "category": "signaling",
+      "description": "Custom server with integrated Socket.io signaling",
+      "priority": "critical",
+      "steps": [
+        "Create server.ts custom Next.js server with Socket.io",
+        "Attach signaling handlers for room:join, room:leave events",
+        "Implement WebRTC signaling relay (offer/answer/ice)",
+        "Add presence update broadcasting",
+        "Update package.json scripts for custom server",
+        "Configure CORS for production domains"
+      ],
+      "testFile": "tests/unit/signaling/custom-server.test.ts",
+      "dependencies": ["FEAT-104", "FEAT-105", "FEAT-106", "FEAT-107"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1005,12 +1023,12 @@
     "e2e": "End-to-end testing"
   },
   "statistics": {
-    "total": 51,
+    "total": 52,
     "phase2": 23,
     "phase3": 13,
     "phase4": 9,
-    "phase5": 11,
-    "passed": 51,
+    "phase5": 12,
+    "passed": 52,
     "pending": 0
   }
 }

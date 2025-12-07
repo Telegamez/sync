@@ -7,13 +7,13 @@
 
 ## Current Status
 
-| Phase | Status | Features | Passed |
-|-------|--------|----------|--------|
-| Phase 1: Foundation | Complete | 5/5 | 100% |
-| Phase 2: Room Infrastructure | **Complete** | 23/23 | 100% |
-| Phase 3: Multi-Peer Audio | **Complete** | 13/13 | 100% |
-| Phase 4: Shared AI Session | **Complete** | 9/9 | 100% |
-| Phase 5: Production Polish | In Progress | 5/11 | 45% |
+| Phase                        | Status       | Features | Passed |
+| ---------------------------- | ------------ | -------- | ------ |
+| Phase 1: Foundation          | Complete     | 5/5      | 100%   |
+| Phase 2: Room Infrastructure | **Complete** | 23/23    | 100%   |
+| Phase 3: Multi-Peer Audio    | **Complete** | 13/13    | 100%   |
+| Phase 4: Shared AI Session   | **Complete** | 9/9      | 100%   |
+| Phase 5: Production Polish   | In Progress  | 6/12     | 50%    |
 
 **Phase 5 In Progress!** Next Feature: `FEAT-405` - Error recovery - Graceful degradation
 
@@ -22,6 +22,7 @@
 ## Phase 1: Foundation (Complete)
 
 ### Initial Project Setup
+
 **Date:** 2024-12-04
 **Commit:** `90f0c4e`
 
@@ -39,6 +40,7 @@ Established the SwenSync project with single-peer voice AI capabilities:
 - Nginx configuration for production
 
 **Key Files Created:**
+
 - `src/hooks/useSwensyncRealtime.ts` (923 lines)
 - `src/components/swensync/*` (6 components)
 - `src/types/swensync.ts`
@@ -46,6 +48,7 @@ Established the SwenSync project with single-peer voice AI capabilities:
 - `src/app/api/health/route.ts`
 
 ### Branding Update
+
 **Date:** 2024-12-05
 **Commit:** `defda4a`
 
@@ -60,12 +63,14 @@ Rebranded to "AI Collaboration Engine" with synchronized intelligence messaging:
 ## Phase 2: Room Infrastructure (In Progress)
 
 ### FEAT-100: Define Room and Peer TypeScript types
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/types/room.test.ts`
 
 Created comprehensive TypeScript type definitions for multi-peer room functionality:
 
 **Files Created:**
+
 - `src/types/room.ts` - Room, RoomSummary, CreateRoomRequest, JoinRoomResponse, etc.
 - `src/types/peer.ts` - Peer, PeerSummary, PeerRole, PeerConnectionState, etc.
 - `src/types/signaling.ts` - All signaling event types and payloads
@@ -77,15 +82,18 @@ Created comprehensive TypeScript type definitions for multi-peer room functional
 ---
 
 ### FEAT-150: Voice mode and turn management types
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/types/voice-mode.test.ts`
 
 Created types for PTT and turn management to prevent AI interruption chaos:
 
 **Files Created:**
+
 - `src/types/voice-mode.ts` - VoiceMode, AIResponseState, TurnRequest, RoomVoiceSettings, etc.
 
 **Key Types:**
+
 - `VoiceMode`: 'open' | 'pushToTalk' | 'wakeWord' | 'designatedSpeaker'
 - `AIResponseState`: 'idle' | 'listening' | 'processing' | 'speaking' | 'locked'
 - `TurnRequest`: Queue management for AI requests
@@ -97,16 +105,19 @@ Created types for PTT and turn management to prevent AI interruption chaos:
 ---
 
 ### FEAT-101: Room CRUD API - Create Room endpoint
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/api/rooms/create.test.ts`
 
 Implemented room creation API with in-memory storage:
 
 **Files Created:**
+
 - `src/server/store/rooms.ts` - In-memory room store with CRUD operations
 - `src/app/api/rooms/route.ts` - POST endpoint for room creation
 
 **Key Features:**
+
 - `createRoom()` - Creates room with unique nanoid, defaults for voice settings
 - `getRoom()` - Retrieves room by ID
 - `generateRoomId()` - Generates unique 10-character room IDs
@@ -119,12 +130,14 @@ Implemented room creation API with in-memory storage:
 ---
 
 ### FEAT-102: Room CRUD API - List Rooms endpoint
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/api/rooms/list.test.ts`
 
 Implemented room listing API with status filtering:
 
 **Key Features:**
+
 - `getAllRooms()` - Returns all rooms
 - `getRoomsByStatus()` - Filter by waiting/active/full/closed
 - `getRoomSummaries()` - Privacy-safe summaries for list views
@@ -137,15 +150,18 @@ Implemented room listing API with status filtering:
 ---
 
 ### FEAT-103: Room CRUD API - Get Room by ID endpoint
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/api/rooms/get.test.ts`
 
 Implemented room retrieval and deletion endpoints:
 
 **Files Created:**
+
 - `src/app/api/rooms/[roomId]/route.ts` - GET and DELETE handlers
 
 **Key Features:**
+
 - `GET /api/rooms/[roomId]` - Returns full room details
 - `DELETE /api/rooms/[roomId]?action=close` - Soft close room
 - `DELETE /api/rooms/[roomId]?action=delete` - Hard delete room
@@ -158,21 +174,25 @@ Implemented room retrieval and deletion endpoints:
 ---
 
 ### FEAT-104, 105, 106: Socket.io Signaling Server
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/signaling/server.test.ts`
 
 Implemented real-time signaling server for WebRTC coordination:
 
 **Files Created:**
+
 - `src/server/signaling/index.ts` - Socket.io server with room management
 - `src/lib/signaling/client.ts` - Client-side signaling wrapper
 
 **FEAT-104: Socket.io Integration**
+
 - Socket.io server with CORS configuration
 - Connection/disconnection handlers
 - Peer ID generation on connect
 
 **FEAT-105: Room Join/Leave Events**
+
 - `room:join` event with validation (room exists, not full, not closed)
 - `room:leave` event with cleanup
 - `peer:joined` / `peer:left` broadcasts
@@ -180,6 +200,7 @@ Implemented real-time signaling server for WebRTC coordination:
 - First joiner becomes room owner
 
 **FEAT-106: WebRTC Signaling Relay**
+
 - `signal:offer` relay to target peer
 - `signal:answer` relay to target peer
 - `signal:ice` candidate relay
@@ -191,12 +212,14 @@ Implemented real-time signaling server for WebRTC coordination:
 ---
 
 ### FEAT-107: Signaling server - Presence and state sync
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/signaling/presence.test.ts`
 
 Implemented comprehensive presence tracking and state synchronization:
 
 **Key Features:**
+
 - Presence state tracking (connected, muted, speaking, isAddressingAI)
 - `presence:update` event broadcasts to room members
 - Full room state on join (existing peers, AI state, room details)
@@ -205,6 +228,7 @@ Implemented comprehensive presence tracking and state synchronization:
 - `getRoomPeerSummaries()` for privacy-safe presence data
 
 **Presence Structure:**
+
 ```typescript
 {
   connectionState: 'connected',
@@ -225,15 +249,18 @@ Implemented comprehensive presence tracking and state synchronization:
 ---
 
 ### FEAT-108: useRoomConnection hook
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/hooks/useRoomConnection.test.ts`
 
 Implemented React hook for Socket.io connection lifecycle management:
 
 **Files Created:**
+
 - `src/hooks/useRoomConnection.ts` - Full connection management hook
 
 **Key Features:**
+
 - `connect()` / `disconnect()` - Connection lifecycle
 - `joinRoom()` / `leaveRoom()` - Room membership management
 - Automatic reconnection with configurable attempts/delay
@@ -243,6 +270,7 @@ Implemented React hook for Socket.io connection lifecycle management:
 - `getClient()` for direct signaling client access
 
 **State Exposed:**
+
 - `connectionState`: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 - `room`, `localPeer`, `peers`, `aiState`: Current room state
 - `isInRoom`, `isLoading`, `error`, `reconnectAttempts`
@@ -253,15 +281,18 @@ Implemented React hook for Socket.io connection lifecycle management:
 ---
 
 ### FEAT-109: useRoomPeers hook - Peer state management
+
 **Date:** 2024-12-05
 **Test:** `tests/unit/hooks/useRoomPeers.test.ts`
 
 Implemented React hook for WebRTC peer connection management in mesh topology:
 
 **Files Created:**
+
 - `src/hooks/useRoomPeers.ts` - Full peer connection management hook
 
 **Key Features:**
+
 - WebRTC mesh topology connections (higher ID initiates)
 - Peer connection lifecycle (create, connect, close)
 - ICE candidate exchange via signaling
@@ -274,6 +305,7 @@ Implemented React hook for WebRTC peer connection management in mesh topology:
 - `reconnectPeer()` - Force reconnection to specific peer
 
 **State Exposed:**
+
 - `peers`: ConnectedPeer[] with webrtcState, hasAudio, audioStream
 - `peerCount`, `connectedCount`, `allConnected`
 - `localPeerId`
@@ -284,15 +316,18 @@ Implemented React hook for WebRTC peer connection management in mesh topology:
 ---
 
 ### FEAT-110: usePresence hook - Real-time presence state
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/hooks/usePresence.test.ts`
 
 Implemented React hook for managing real-time presence state in a room:
 
 **Files Created:**
+
 - `src/hooks/usePresence.ts` - Full presence state management hook
 
 **Key Features:**
+
 - Track speaking/muted state per peer
 - `updatePresence()` - Update local presence and broadcast to server
 - `setMuted()` / `toggleMute()` - Mute control with server sync
@@ -306,6 +341,7 @@ Implemented React hook for managing real-time presence state in a room:
 - Callbacks: `onLocalPresenceChange`, `onPeerPresenceChange`, `onActiveSpeakerChange`
 
 **State Exposed:**
+
 - `localPresence`: { isMuted, isSpeaking, isAddressingAI, audioLevel }
 - `peerPresence`: Map<PeerId, PeerPresenceState>
 - `speakingPeers`, `mutedPeers`, `activeSpeaker`, `anyAddressingAI`
@@ -316,16 +352,19 @@ Implemented React hook for managing real-time presence state in a room:
 ---
 
 ### FEAT-111: RoomLobby component - Room list and join interface
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/RoomLobby.test.tsx`
 
 Implemented React component for browsing and joining available rooms:
 
 **Files Created:**
+
 - `src/components/room/RoomLobby.tsx` - Main lobby component
 - `src/components/room/index.ts` - Component exports
 
 **Key Features:**
+
 - Display list of available rooms in responsive grid
 - Room cards with name, description, participant count, status badge
 - Search by name and description (client-side filtering)
@@ -340,6 +379,7 @@ Implemented React component for browsing and joining available rooms:
 - Footer showing room count
 
 **Props:**
+
 - `onJoinRoom(roomId)` - Callback when joining
 - `onCreateRoom()` - Callback to create room
 - `fetchRooms(status?)` - Custom fetch function
@@ -352,15 +392,18 @@ Implemented React component for browsing and joining available rooms:
 ---
 
 ### FEAT-112: RoomCard component - Room preview card
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/RoomCard.test.tsx`
 
 Implemented React component for displaying a single room preview card:
 
 **Files Created:**
+
 - `src/components/room/RoomCard.tsx` - Room card component
 
 **Key Features:**
+
 - Display room name and description (with line clamp)
 - Status badge with color coding (waiting/active/full/closed)
 - AI personality badge with color coding
@@ -373,6 +416,7 @@ Implemented React component for displaying a single room preview card:
 - Accessible button labels
 
 **Props:**
+
 - `room` - RoomSummary data
 - `onJoin(roomId)` - Callback when joining (supports async)
 - `participantAvatars` - Array of participant avatar data
@@ -385,15 +429,18 @@ Implemented React component for displaying a single room preview card:
 ---
 
 ### FEAT-113: CreateRoomForm component - Room creation form
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/CreateRoomForm.test.tsx`
 
 Implemented React component for creating a new room with validation:
 
 **Files Created:**
+
 - `src/components/room/CreateRoomForm.tsx` - Room creation form component
 
 **Key Features:**
+
 - Room name input with character counter (3-50 chars)
 - Optional description textarea with character counter (max 500 chars)
 - Max participants slider (2-10) with visual indicator
@@ -408,6 +455,7 @@ Implemented React component for creating a new room with validation:
 - Success callback with form data
 
 **Props:**
+
 - `onSubmit(data)` - Callback with CreateRoomRequest data (supports async)
 - `onCancel()` - Callback when cancel button clicked
 - `isLoading` - External loading state control
@@ -420,15 +468,18 @@ Implemented React component for creating a new room with validation:
 ---
 
 ### FEAT-114: ParticipantList component - Active participants display
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/ParticipantList.test.tsx`
 
 Implemented React component for displaying room participants with presence indicators:
 
 **Files Created:**
+
 - `src/components/room/ParticipantList.tsx` - Participant list component
 
 **Key Features:**
+
 - Display all room participants with avatars (initials fallback)
 - Speaking indicator with audio level visualization (pulsing ring)
 - Muted indicator icon overlay
@@ -443,6 +494,7 @@ Implemented React component for displaying room participants with presence indic
 - Accessible aria-labels with state descriptions
 
 **Props:**
+
 - `participants` - Array of ParticipantInfo
 - `activeSpeakerId` - Highlighted active speaker
 - `localPeerId` - For "(You)" label
@@ -457,15 +509,18 @@ Implemented React component for displaying room participants with presence indic
 ---
 
 ### FEAT-115: ParticipantAvatar component - Peer avatar with status
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/ParticipantAvatar.test.tsx`
 
 Implemented standalone avatar component with comprehensive status indicators:
 
 **Files Created:**
+
 - `src/components/room/ParticipantAvatar.tsx` - Avatar component
 
 **Key Features:**
+
 - Initials generation from display name (first + last initial)
 - Image avatar support with fallback to initials
 - Consistent color assignment based on name hash
@@ -480,6 +535,7 @@ Implemented standalone avatar component with comprehensive status indicators:
 - Comprehensive accessible aria-labels
 
 **Props:**
+
 - `displayName` - For initials and color
 - `avatarUrl` - Optional image
 - `size` - 'xs' | 'sm' | 'md' | 'lg' | 'xl'
@@ -495,15 +551,18 @@ Implemented standalone avatar component with comprehensive status indicators:
 ---
 
 ### FEAT-116: RoomControls component - Mute/Leave controls
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/RoomControls.test.tsx`
 
 Implemented control bar component for room actions with keyboard accessibility:
 
 **Files Created:**
+
 - `src/components/room/RoomControls.tsx` - Room controls component
 
 **Key Features:**
+
 - Mute/Unmute toggle with microphone icons
 - Leave room button with loading state
 - Optional PTT (Push-to-Talk) button for AI addressing
@@ -517,6 +576,7 @@ Implemented control bar component for room actions with keyboard accessibility:
 - Loading spinner during leave operation
 
 **Props:**
+
 - `isMuted` / `onMuteToggle` - Mute state and handler
 - `onLeaveRoom` / `isLeaving` - Leave with loading state
 - `showPTT` / `onPTTStart` / `onPTTEnd` - PTT controls
@@ -530,15 +590,18 @@ Implemented control bar component for room actions with keyboard accessibility:
 ---
 
 ### FEAT-117: Room lobby page - /rooms
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/pages/rooms.test.tsx`
 
 Implemented the main room lobby page for browsing and joining rooms:
 
 **Files Created:**
+
 - `src/app/rooms/page.tsx` - Room lobby page
 
 **Key Features:**
+
 - Integrates RoomLobby component for room list display
 - Header with back navigation and title
 - Page description for user guidance
@@ -549,6 +612,7 @@ Implemented the main room lobby page for browsing and joining rooms:
 - Footer with branding
 
 **Navigation Flow:**
+
 - Back to Home: Link to /
 - Create Room: Button navigates to /rooms/create
 - Join Room: Button navigates to /rooms/[roomId]
@@ -560,15 +624,18 @@ Implemented the main room lobby page for browsing and joining rooms:
 ---
 
 ### FEAT-118: Create room page - /rooms/create
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/pages/create-room.test.tsx`
 
 Implemented the create room page for creating new collaboration rooms:
 
 **Files Created:**
+
 - `src/app/rooms/create/page.tsx` - Create room page
 
 **Key Features:**
+
 - Integrates CreateRoomForm component with cancel button
 - Header with back navigation and title
 - Page description for user guidance
@@ -581,6 +648,7 @@ Implemented the create room page for creating new collaboration rooms:
 - Help text explaining post-creation redirect
 
 **Navigation Flow:**
+
 - Back to Rooms: Link to /rooms
 - Cancel: Button navigates to /rooms
 - Create Success: Navigates to /rooms/[newRoomId]
@@ -592,15 +660,18 @@ Implemented the create room page for creating new collaboration rooms:
 ---
 
 ### FEAT-119: Room experience page - /rooms/[roomId]
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/pages/room-experience.test.tsx`
 
 Implemented the main room collaboration experience page:
 
 **Files Created:**
+
 - `src/app/rooms/[roomId]/page.tsx` - Room experience page
 
 **Key Features:**
+
 - Fetches room details from API on mount
 - Displays room name, description, participant count
 - Error states: not found (404), room full, room closed, connection error
@@ -613,6 +684,7 @@ Implemented the main room collaboration experience page:
 - Responsive layout with sticky header and footer controls
 
 **States Handled:**
+
 - Loading: Spinner with "Loading room..."
 - Joining: Spinner with "Joining room..."
 - Connected: Full room experience UI
@@ -627,15 +699,18 @@ Implemented the main room collaboration experience page:
 ---
 
 ### FEAT-120: Multi-peer WebRTC mesh - Peer connection management
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/webrtc/mesh.test.ts`
 
 Verified and tested the WebRTC mesh topology implementation in useRoomPeers hook:
 
 **Implementation Already Complete in:**
+
 - `src/hooks/useRoomPeers.ts` - Full mesh WebRTC connection management
 
 **Key Features:**
+
 - Creates RTCPeerConnection for each peer in room
 - Full mesh topology (each peer connects to every other peer)
 - Higher ID initiates pattern to avoid race conditions
@@ -648,6 +723,7 @@ Verified and tested the WebRTC mesh topology implementation in useRoomPeers hook
 - setLocalStream to add local audio to all connections
 
 **Mesh Topology:**
+
 - Local peer initiates connections to all peers with higher IDs
 - Receives connections from all peers with lower IDs
 - Each peer maintains N-1 connections (where N = room size)
@@ -658,15 +734,18 @@ Verified and tested the WebRTC mesh topology implementation in useRoomPeers hook
 ---
 
 ### FEAT-121: Multi-peer WebRTC mesh - Audio track management
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/webrtc/audio-tracks.test.ts`
 
 Implemented React hook for managing audio playback for all peers in a room:
 
 **Files Created:**
+
 - `src/hooks/useRoomAudio.ts` - Audio track management hook
 
 **Key Features:**
+
 - Creates HTMLAudioElement for each peer's audio stream
 - Auto-play support with fallback handling
 - Per-peer mute/unmute control
@@ -680,6 +759,7 @@ Implemented React hook for managing audio playback for all peers in a room:
 - New peers inherit mute-all state
 
 **API:**
+
 - `addPeerStream(peerId, stream)` - Add audio stream
 - `removePeerStream(peerId)` - Remove audio stream
 - `mutePeer(peerId)` / `unmutePeer(peerId)` - Individual mute
@@ -698,6 +778,7 @@ Implemented React hook for managing audio playback for all peers in a room:
 ## Phase 2: Room Infrastructure (Complete)
 
 All 23 features in Phase 2 have been implemented and tested. The room infrastructure now includes:
+
 - Room and Peer TypeScript types
 - Room CRUD API endpoints
 - Socket.io signaling server with room management
@@ -711,15 +792,18 @@ All 23 features in Phase 2 have been implemented and tested. The room infrastruc
 ---
 
 ### Infrastructure Setup
+
 **Date:** 2024-12-05
 
 Set up testing infrastructure:
+
 - Installed Vitest + happy-dom + @testing-library
 - Created `vitest.config.ts`
 - Added test scripts to package.json
 - Created `.claude/settings.json` for permissions
 
 ### Upcoming Features:
+
 1. `FEAT-100` - TypeScript types for Room and Peer
 2. `FEAT-101` - Room CRUD API - Create endpoint
 3. `FEAT-102` - Room CRUD API - List endpoint
@@ -748,15 +832,18 @@ Set up testing infrastructure:
 ## Phase 3: Multi-Peer Audio (In Progress)
 
 ### FEAT-200: Audio mixer - Multi-stream mixing foundation
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/audio/mixer.test.ts`
 
 Implemented the core audio mixer class for combining multiple peer audio streams:
 
 **Files Created:**
+
 - `src/lib/audio/mixer.ts` - AudioMixer class using Web Audio API
 
 **Key Features:**
+
 - AudioContext initialization with configurable sample rate
 - GainNode per audio source for individual volume control
 - MediaStreamAudioDestinationNode for mixed output stream
@@ -772,6 +859,7 @@ Implemented the core audio mixer class for combining multiple peer audio streams
 - `createAudioMixer()` - Factory function
 
 **Architecture:**
+
 ```
 [Peer Stream 1] → [GainNode 1] ↘
 [Peer Stream 2] → [GainNode 2] → [Master GainNode] → [Destination] → [Mixed Output]
@@ -784,12 +872,14 @@ Implemented the core audio mixer class for combining multiple peer audio streams
 ---
 
 ### FEAT-201: Audio mixer - Per-peer volume control
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/audio/mixer-volume.test.ts`
 
 Extended the audio mixer with advanced per-peer volume control and normalization:
 
 **Key Features:**
+
 - Per-source GainNode control (already in FEAT-200)
 - `setVolume(peerId, level)` with normalization support
 - `mute(id)` / `unmute(id)` with volume restoration
@@ -805,6 +895,7 @@ Extended the audio mixer with advanced per-peer volume control and normalization
 - `SourceVolumeInfo` interface with effectiveVolume for UI
 
 **Normalization Details:**
+
 - Constant mode: `1/√n` - maintains perceived loudness as peers join
 - Auto mode: scales to targetOutputLevel / totalVolume
 - Both modes respect `minSourceGain` floor (default 0.2)
@@ -816,15 +907,18 @@ Extended the audio mixer with advanced per-peer volume control and normalization
 ---
 
 ### FEAT-202: useAudioMixer hook - React integration
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/hooks/useAudioMixer.test.ts`
 
 Implemented React hook for managing audio mixing in a room:
 
 **Files Created:**
+
 - `src/hooks/useAudioMixer.ts` - Audio mixer React hook
 
 **Key Features:**
+
 - Auto-initialize on mount (configurable)
 - `addStream(peerId, stream)` / `removeStream(peerId)` - Manage sources
 - `setVolume()` / `mute()` / `unmute()` - Per-peer control
@@ -837,6 +931,7 @@ Implemented React hook for managing audio mixing in a room:
 - Callbacks: `onInitialized`, `onStateChange`, `onSourceAdded`, `onSourceRemoved`
 
 **State Exposed:**
+
 - `isInitialized`, `isRunning`, `sourceCount`
 - `masterVolume`, `isMasterMuted`
 - `normalizationMode`, `normalizationFactor`
@@ -848,15 +943,18 @@ Implemented React hook for managing audio mixing in a room:
 ---
 
 ### FEAT-203: Per-peer audio analysis - Speaking detection
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/audio/speaking-detection.test.ts`
 
 Implemented speaking detection using AnalyserNode for per-peer audio analysis:
 
 **Files Created:**
+
 - `src/lib/audio/speaking-detector.ts` - SpeakingDetector class
 
 **Key Features:**
+
 - AnalyserNode per peer for audio level analysis
 - RMS-based volume level detection (0-1 normalized)
 - Configurable speaking threshold with hysteresis
@@ -870,6 +968,7 @@ Implemented speaking detection using AnalyserNode for per-peer audio analysis:
 - Callbacks: `onSpeakingStart`, `onSpeakingEnd`, `onAudioLevelChange`, `onSpeakingStateChange`
 
 **Detection Algorithm:**
+
 1. Calculate RMS from FFT frequency data
 2. Speaking starts when level ≥ speakingThreshold
 3. Speaking continues while level ≥ silenceThreshold (hysteresis)
@@ -881,15 +980,18 @@ Implemented speaking detection using AnalyserNode for per-peer audio analysis:
 ---
 
 ### FEAT-204: Per-peer audio visualization
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/audio/peer-visualization.test.ts`
 
 Implemented per-peer audio visualization using AnalyserNode for frequency and time domain data:
 
 **Files Created:**
+
 - `src/lib/audio/peer-visualizer.ts` - PeerVisualizer class
 
 **Key Features:**
+
 - AnalyserNode per peer for visualization data
 - Frequency data (getByteFrequencyData) for spectrum visualization
 - Time domain data (getByteTimeDomainData) for waveform visualization
@@ -906,10 +1008,11 @@ Implemented per-peer audio visualization using AnalyserNode for frequency and ti
 - Callbacks: `onVisualizationUpdate`, `onPeerUpdate`
 
 **Visualization Data Structure:**
+
 ```typescript
 {
   peerId: PeerId;
-  audioLevel: number;       // 0-1 normalized
+  audioLevel: number; // 0-1 normalized
   frequencyData: Uint8Array; // Frequency spectrum
   timeDomainData: Uint8Array; // Time domain waveform
   isLocal: boolean;
@@ -922,15 +1025,18 @@ Implemented per-peer audio visualization using AnalyserNode for frequency and ti
 ---
 
 ### FEAT-205: SpeakingIndicator component - Active speaker display
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/SpeakingIndicator.test.tsx`
 
 Implemented a React component for displaying active speaker(s) with smooth transitions:
 
 **Files Created:**
+
 - `src/components/room/SpeakingIndicator.tsx` - Active speaker display component
 
 **Key Features:**
+
 - Display current active speaker(s) with avatars
 - Three display modes: compact (default), detailed, minimal
 - Smooth animations for speaker enter/leave transitions
@@ -943,11 +1049,13 @@ Implemented a React component for displaying active speaker(s) with smooth trans
 - Accessible with aria-live for screen readers
 
 **Display Modes:**
+
 - `compact`: Avatar(s) + name + waveform
 - `detailed`: Full speaker cards with individual waveforms
 - `minimal`: Text only (e.g., "Alice is speaking")
 
 **Props:**
+
 - `speakers` - Array of SpeakerInfo (id, displayName, audioLevel, isLocal)
 - `mode` - 'compact' | 'detailed' | 'minimal'
 - `maxDisplayed` - Max speakers before overflow (default: 3)
@@ -961,15 +1069,18 @@ Implemented a React component for displaying active speaker(s) with smooth trans
 ---
 
 ### FEAT-206: Audio synchronization - Playback timing
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/audio/sync.test.ts`
 
 Implemented audio synchronization class for managing playback timing across peers:
 
 **Files Created:**
+
 - `src/lib/audio/sync.ts` - AudioSync class for playback timing
 
 **Key Features:**
+
 - Jitter buffer implementation with adaptive sizing
 - Synchronized playback start time calculation
 - Sync status tracking per peer (synced, ahead, behind, unknown)
@@ -981,12 +1092,14 @@ Implemented audio synchronization class for managing playback timing across peer
 - Callbacks: `onSyncStatusChange`, `onResyncNeeded`, `onSyncAccuracy`, `onBufferUnderrun`, `onBufferOverrun`
 
 **Jitter Buffer:**
+
 - Adaptive sizing based on network conditions
 - Min/max buffer limits (50-300ms default)
 - Jitter calculation from packet delay variance
 - Buffer target adjustment on underrun/overrun
 
 **API:**
+
 - `addPeer()` / `removePeer()` - Manage tracked peers
 - `reportPeerTiming(peerId, timing)` - Report timing info
 - `calculateSyncedStartTime()` - Get synchronized start time
@@ -1002,15 +1115,18 @@ Implemented audio synchronization class for managing playback timing across peer
 ---
 
 ### FEAT-151: Push-to-Talk (PTT) implementation
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/audio/push-to-talk.test.ts`
 
 Implemented the usePushToTalk hook for PTT functionality with keyboard, mouse, and touch support:
 
 **Files Created:**
+
 - `src/hooks/usePushToTalk.ts` - Push-to-Talk React hook
 
 **Key Features:**
+
 - Keyboard activation (Space key by default, configurable)
 - Mouse hold-to-talk support
 - Touch hold-to-talk support for mobile
@@ -1024,6 +1140,7 @@ Implemented the usePushToTalk hook for PTT functionality with keyboard, mouse, a
 - Global keyboard event listeners
 
 **API:**
+
 - `startPTT()` / `endPTT()` / `togglePTT()` - Programmatic control
 - `isActive` / `canActivate` / `blockReason` - State
 - `activeDuration` - How long PTT has been held
@@ -1036,15 +1153,18 @@ Implemented the usePushToTalk hook for PTT functionality with keyboard, mouse, a
 ---
 
 ### FEAT-152: AI response locking mechanism
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/signaling/ai-locking.test.ts`
 
 Implemented AI response locking manager for preventing AI interruption chaos:
 
 **Files Created:**
+
 - `src/server/signaling/ai-locking.ts` - AI locking manager class
 
 **Key Features:**
+
 - AI state machine (idle, listening, processing, speaking, locked)
 - Turn request queue with priority sorting
 - Lock timeout as safety mechanism
@@ -1053,11 +1173,13 @@ Implemented AI response locking manager for preventing AI interruption chaos:
 - Session health tracking
 
 **State Transitions:**
+
 - `idle` → `listening` → `processing` → `speaking` → `idle`
 - `speaking`/`locked` → timeout → `idle` (safety release)
 - Any state → `interrupt` → `idle` (force release)
 
 **Queue Management:**
+
 - Priority-based sorting (higher first)
 - FIFO within same priority
 - Request expiration timeout
@@ -1065,6 +1187,7 @@ Implemented AI response locking manager for preventing AI interruption chaos:
 - Auto-process on response complete
 
 **API:**
+
 - `initRoom()` / `removeRoom()` - Room lifecycle
 - `requestTurn()` / `cancelRequest()` - Turn management
 - `startListening()` / `startProcessing()` / `startSpeaking()` / `finishSpeaking()` - State transitions
@@ -1078,16 +1201,19 @@ Implemented AI response locking manager for preventing AI interruption chaos:
 ---
 
 ### FEAT-153: useTurnManager hook - Turn-taking coordination
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/hooks/useTurnManager.test.ts`
 
 Implemented React hook for client-side turn-taking coordination with AI locking:
 
 **Files Modified/Created:**
+
 - `src/hooks/useTurnManager.ts` - Turn manager hook (existing, enhanced)
 - `src/lib/signaling/client.ts` - Added turn management methods
 
 **Key Features:**
+
 - Client-side turn manager state tracking
 - `canRequestTurn` based on AI state and voice mode
 - `requestTurn()` method respecting locks and queue
@@ -1101,12 +1227,14 @@ Implemented React hook for client-side turn-taking coordination with AI locking:
 - Callbacks: `onAIStateChange`, `onTurnGranted`, `onTurnEnded`, `onTurnRejected`, `onQueuePositionChange`, `onAIError`
 
 **SignalingClient Methods Added:**
+
 - `requestTurn(roomId, peerId, displayName, priority)` - Request AI turn
 - `cancelTurn(roomId, requestId)` - Cancel turn request
 - `interruptAI(roomId, peerId, reason)` - Interrupt AI response
 - `startPTT(roomId)` / `endPTT(roomId)` - PTT signaling
 
 **State Exposed:**
+
 - `state` - Full TurnManagerState object
 - `aiState` - Current AI response state
 - `canRequestTurn` - Whether local peer can request turn
@@ -1124,6 +1252,7 @@ Implemented React hook for client-side turn-taking coordination with AI locking:
 ---
 
 ### Planned Features:
+
 1. `FEAT-200` - Audio mixer foundation ✅
 2. `FEAT-201` - Per-peer volume control ✅
 3. `FEAT-202` - useAudioMixer hook ✅
@@ -1141,16 +1270,19 @@ Implemented React hook for client-side turn-taking coordination with AI locking:
 ---
 
 ### FEAT-154: PTTButton component - Push-to-talk interface
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/PTTButton.test.tsx`
 
 Implemented Push-to-Talk button component with hold-to-talk interaction:
 
 **Files Created:**
+
 - `src/components/room/PTTButton.tsx` - Main PTTButton component with variants
 - `src/components/room/index.ts` - Updated exports
 
 **Key Features:**
+
 - Hold-to-talk button with visual feedback
 - Four size variants: sm, md, lg, xl
 - Three style variants: default, primary, minimal
@@ -1165,10 +1297,12 @@ Implemented Push-to-Talk button component with hold-to-talk interaction:
 - Data attributes for styling (data-state, data-ptt-active)
 
 **Convenience Components:**
+
 - `InlinePTTButton` - Small minimal button for inline use
 - `MainPTTButton` - Large primary button for main room interface
 
 **Props:**
+
 - `aiState` - Current AI response state
 - `isDesignatedSpeaker` / `voiceMode` - Voice mode integration
 - `size` / `variant` - Visual configuration
@@ -1183,16 +1317,19 @@ Implemented Push-to-Talk button component with hold-to-talk interaction:
 ---
 
 ### FEAT-155: AIStateIndicator component - Response state display
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/AIStateIndicator.test.tsx`
 
 Implemented AI state indicator component for displaying current AI response state:
 
 **Files Created:**
+
 - `src/components/room/AIStateIndicator.tsx` - Main component with variants
 - `src/components/room/index.ts` - Updated exports
 
 **Key Features:**
+
 - Display all AI states: idle (Ready), listening, processing (Thinking), speaking, locked
 - Color-coded states: gray (idle), blue (listening), amber (processing), green (speaking), red (locked)
 - Three size variants: sm, md, lg
@@ -1205,11 +1342,13 @@ Implemented AI state indicator component for displaying current AI response stat
 - Accessible with role="status" and aria-live="polite"
 
 **Convenience Components:**
+
 - `AIStateBadge` - Small compact badge for headers
 - `AIStateDot` - Minimal dot indicator with short label
 - `AIStateDisplay` - Large expanded display for main room area
 
 **Props:**
+
 - `state` - Current AIResponseState
 - `queuePosition` / `queueLength` - Queue info
 - `isCurrentSpeaker` / `currentSpeakerName` - Speaker info
@@ -1222,16 +1361,19 @@ Implemented AI state indicator component for displaying current AI response stat
 ---
 
 ### FEAT-156: VoiceModeSettings component - Room voice configuration
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/VoiceModeSettings.test.tsx`
 
 Implemented comprehensive settings panel for room voice mode configuration:
 
 **Files Created:**
+
 - `src/components/room/VoiceModeSettings.tsx` - Main settings panel component
 - `src/components/room/index.ts` - Updated exports
 
 **Key Features:**
+
 - Voice mode selection: Open, Push-to-Talk, Designated Speaker
 - Mode cards with icons and descriptions
 - Designated speaker selector (peer selection chips)
@@ -1248,10 +1390,12 @@ Implemented comprehensive settings panel for room voice mode configuration:
 - Read-only mode for non-owners
 
 **Convenience Components:**
+
 - `VoiceModeSettingsCompact` - Compact layout without advanced settings
 - `VoiceModeSettingsFull` - Full layout with advanced settings visible
 
 **Props:**
+
 - `settings` - Current RoomVoiceSettings
 - `onSettingsChange` - Callback when settings change
 - `canEdit` - Whether user can edit (owner/moderator)
@@ -1268,6 +1412,7 @@ Implemented comprehensive settings panel for room voice mode configuration:
 ## Phase 3 Complete!
 
 All 13 Phase 3 features have been implemented and tested:
+
 - Audio infrastructure: FEAT-200 (Audio mixer), FEAT-201 (Volume control), FEAT-202 (useAudioMixer)
 - Speaking detection: FEAT-203 (Per-peer detection), FEAT-204 (Visualization), FEAT-205 (SpeakingIndicator)
 - Synchronization: FEAT-206 (Audio sync)
@@ -1281,6 +1426,7 @@ All 13 Phase 3 features have been implemented and tested:
 ## Phase 4: Shared AI Session (Complete)
 
 ### Planned Features:
+
 1. `FEAT-300` - Single OpenAI connection per room ✅
 2. `FEAT-301` - Mixed audio input to AI ✅
 3. `FEAT-302` - Response broadcasting ✅
@@ -1294,15 +1440,18 @@ All 13 Phase 3 features have been implemented and tested:
 ---
 
 ### FEAT-300: AI Orchestrator - Single OpenAI connection per room
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/ai/orchestrator.test.ts`
 
 Implemented AI Orchestrator for managing single OpenAI Realtime API connections per room:
 
 **Files Created:**
+
 - `src/server/signaling/ai-orchestrator.ts` - Main AIOrchestrator class
 
 **Key Features:**
+
 - Session lifecycle management (create, destroy, reconnect)
 - Turn management integration with AILockingManager
 - OpenAI configuration with voice, temperature, turn detection settings
@@ -1314,6 +1463,7 @@ Implemented AI Orchestrator for managing single OpenAI Realtime API connections 
 - Transcription handling
 
 **AIOrchestrator Methods:**
+
 - `createSession(roomId, config?)` - Create AI session for a room
 - `destroySession(roomId)` - Destroy AI session
 - `requestTurn(roomId, peerId, name, priority?)` - Request turn to address AI
@@ -1324,6 +1474,7 @@ Implemented AI Orchestrator for managing single OpenAI Realtime API connections 
 - `handleAudioResponse/handleTranscription` - Process AI responses
 
 **Session States:**
+
 - `disconnected` - Not connected to OpenAI
 - `connecting` - Connection in progress
 - `connected` - Active connection
@@ -1336,15 +1487,18 @@ Implemented AI Orchestrator for managing single OpenAI Realtime API connections 
 ---
 
 ### FEAT-301: Mixed Audio Input - Routing mixed audio to AI
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/ai/mixed-input.test.ts`
 
 Implemented mixed audio input manager for routing combined peer audio to the AI Orchestrator:
 
 **Files Created:**
+
 - `src/server/signaling/mixed-audio-input.ts` - MixedAudioInputManager class
 
 **Key Features:**
+
 - Room initialization and peer count tracking
 - Audio processing with resampling to target sample rate (24kHz for OpenAI)
 - Stereo to mono downmixing
@@ -1359,6 +1513,7 @@ Implemented mixed audio input manager for routing combined peer audio to the AI 
 - Multiple rooms support (isolated state per room)
 
 **MixedAudioInputManager Methods:**
+
 - `initRoom(roomId)` / `removeRoom(roomId)` - Room lifecycle
 - `setPeerCount(roomId, count)` - Track active peers
 - `processAudio(roomId, audioData, sampleRate, channels?)` - Process mixed audio
@@ -1368,6 +1523,7 @@ Implemented mixed audio input manager for routing combined peer audio to the AI 
 - `clearPrefixBuffer(roomId)` - Clear prefix buffer
 
 **Audio Processing Pipeline:**
+
 1. Skip if room is empty (no peers)
 2. Convert PCM16 to Int16Array
 3. Downmix stereo to mono if needed
@@ -1378,6 +1534,7 @@ Implemented mixed audio input manager for routing combined peer audio to the AI 
 8. Send audio on speech detection
 
 **VAD Algorithm:**
+
 - RMS-based energy calculation
 - Speech probability from energy level
 - Configurable thresholds (energy, speech probability)
@@ -1391,15 +1548,18 @@ Implemented mixed audio input manager for routing combined peer audio to the AI 
 ---
 
 ### FEAT-302: Response Broadcasting - AI audio to all participants
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/ai/broadcast.test.ts`
 
 Implemented response broadcast manager for sending AI audio to all room participants:
 
 **Files Created:**
+
 - `src/server/signaling/response-broadcast.ts` - ResponseBroadcastManager class
 
 **Key Features:**
+
 - Room and peer management for broadcast subscriptions
 - Response lifecycle (start, addChunk, end, cancel)
 - Buffering before broadcast start (configurable buffer size)
@@ -1412,6 +1572,7 @@ Implemented response broadcast manager for sending AI audio to all room particip
 - Multiple rooms support (isolated state per room)
 
 **ResponseBroadcastManager Methods:**
+
 - `initRoom(roomId)` / `removeRoom(roomId)` - Room lifecycle
 - `addPeer(roomId, peerId)` / `removePeer(roomId, peerId)` - Peer management
 - `setPeerReady(roomId, peerId)` - Mark peer ready for playback
@@ -1425,6 +1586,7 @@ Implemented response broadcast manager for sending AI audio to all room particip
 - `getSyncedStartTime(roomId)` - Get synchronized start time
 
 **Broadcast Flow:**
+
 1. `startResponse()` - Initialize response, enter buffering state
 2. `addChunk()` - Add audio chunks, buffer accumulates
 3. Buffer fills → check peer readiness → start broadcasting
@@ -1433,6 +1595,7 @@ Implemented response broadcast manager for sending AI audio to all room particip
 6. `endResponse()` or last chunk → complete
 
 **Late Joiner Support:**
+
 - When peer joins during active broadcast, sends all buffered chunks
 - Callback notifies of catch-up operation
 - Can be disabled via options
@@ -1443,15 +1606,18 @@ Implemented response broadcast manager for sending AI audio to all room particip
 ---
 
 ### FEAT-303: useSharedAI Hook - Client-side AI integration
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/hooks/useSharedAI.test.ts`
 
 Implemented React hook for client-side integration with shared AI sessions:
 
 **Files Created:**
+
 - `src/hooks/useSharedAI.ts` - useSharedAI hook
 
 **Key Features:**
+
 - Subscribe to AI state events from signaling server
 - Receive broadcasted AI audio chunks
 - Track session connection state
@@ -1464,6 +1630,7 @@ Implemented React hook for client-side integration with shared AI sessions:
 - Mark ready notification to server
 
 **State Exposed:**
+
 - `state.isConnected` - Session connection status
 - `state.aiState` - Current AI response state (idle, listening, processing, speaking, locked)
 - `state.isSessionHealthy` - Session health status
@@ -1474,6 +1641,7 @@ Implemented React hook for client-side integration with shared AI sessions:
 - `state.reconnectAttempts` - Reconnection attempt count
 
 **Playback State:**
+
 - `playback.isPlaying` - Whether audio is playing
 - `playback.playbackPosition` - Current position (ms)
 - `playback.bufferedDuration` - Total buffered duration (ms)
@@ -1481,6 +1649,7 @@ Implemented React hook for client-side integration with shared AI sessions:
 - `playback.isReady` - Whether buffer is full enough for playback
 
 **Actions:**
+
 - `startPlayback()` / `stopPlayback()` / `pausePlayback()` / `resumePlayback()`
 - `clearBuffer()` - Clear audio buffer
 - `setVolume(volume)` / `getVolume()` - Volume control
@@ -1494,15 +1663,18 @@ Implemented React hook for client-side integration with shared AI sessions:
 ---
 
 ### FEAT-304: Shared Context Management - Conversation history
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/ai/context.test.ts`
 
 Implemented context manager for tracking conversation history with speaker attribution:
 
 **Files Created:**
+
 - `src/server/signaling/context-manager.ts` - ContextManager class
 
 **Key Features:**
+
 - Room-based conversation context management
 - Speaker attribution (maps peer IDs to display names)
 - Token count estimation for context limits
@@ -1515,6 +1687,7 @@ Implemented context manager for tracking conversation history with speaker attri
 - Timestamps for all messages
 
 **ContextManager Methods:**
+
 - `initRoom(roomId, systemPrompt?)` / `removeRoom(roomId)` - Room lifecycle
 - `addParticipant(roomId, peerId, displayName)` / `removeParticipant(roomId, peerId)` - Participant management
 - `addUserMessage(roomId, content, speakerId?, audioDurationMs?)` - Add user message with attribution
@@ -1527,6 +1700,7 @@ Implemented context manager for tracking conversation history with speaker attri
 - `clearContext(roomId)` - Clear all messages
 
 **Token Estimation:**
+
 - Simple word-based estimation (~4 chars per token average)
 - Tracks system prompt + all messages
 - Respects maxTokens limit
@@ -1538,15 +1712,18 @@ Implemented context manager for tracking conversation history with speaker attri
 ---
 
 ### FEAT-305: AI Personality Configuration - Per-room AI setup
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/ai/personality.test.ts`
 
 Implemented AI personality configuration manager for per-room AI customization:
 
 **Files Created:**
+
 - `src/server/signaling/ai-personality.ts` - AIPersonalityManager class
 
 **Key Features:**
+
 - Personality presets: facilitator, assistant, expert, brainstorm, custom
 - Per-preset system instructions with best practices
 - Suggested voice and temperature per personality
@@ -1559,6 +1736,7 @@ Implemented AI personality configuration manager for per-room AI customization:
 - Export/import for persistence
 
 **Personality Presets:**
+
 - `facilitator`: Discussion guide, summarizes points, keeps on track (voice: coral, temp: 0.7)
 - `assistant`: General helpful assistant (voice: alloy, temp: 0.8)
 - `expert`: Domain expert with technical depth (voice: sage, temp: 0.6)
@@ -1566,6 +1744,7 @@ Implemented AI personality configuration manager for per-room AI customization:
 - `custom`: User-provided instructions
 
 **AIPersonalityManager Methods:**
+
 - `initRoom(roomId, personality?, customInstructions?)` - Initialize room
 - `setPersonality(roomId, personality, customInstructions?, changedBy?)` - Change personality
 - `setCustomInstructions(roomId, instructions)` - Update custom instructions
@@ -1583,15 +1762,18 @@ Implemented AI personality configuration manager for per-room AI customization:
 ---
 
 ### FEAT-306: Enhanced SwensyncOverlay for Multi-Peer Rooms
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/components/SwensyncOverlay-room.test.tsx`
 
 Implemented enhanced full-screen overlay for multi-peer room voice conversations:
 
 **Files Created:**
+
 - `src/components/room/SwensyncOverlayRoom.tsx` - Enhanced room overlay component
 
 **Key Features:**
+
 - Room context with room name, ID, and participant display
 - AI state display with room awareness (idle, listening, processing, speaking)
 - Shows which peer AI is responding to with avatar and name
@@ -1610,6 +1792,7 @@ Implemented enhanced full-screen overlay for multi-peer room voice conversations
 - Auto-connect on open, disconnect on close
 
 **Component Props:**
+
 - `isOpen` / `onClose` - Open state management
 - `roomId` / `roomName` - Room identification
 - `localPeerId` - Local user identification
@@ -1627,15 +1810,18 @@ Implemented enhanced full-screen overlay for multi-peer room voice conversations
 ---
 
 ### FEAT-157: Server-side Turn Queue Processing
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/ai/turn-queue.test.ts`
 
 Implemented server-side FIFO queue processor for turn management:
 
 **Files Created:**
+
 - `src/server/signaling/turn-queue-processor.ts` - TurnQueueProcessor class
 
 **Key Features:**
+
 - FIFO queue with priority-based ordering
 - Role-based priority (owner > moderator > member)
 - Automatic queue advancement after AI response.done
@@ -1648,6 +1834,7 @@ Implemented server-side FIFO queue processor for turn management:
 - Multiple room support
 
 **TurnQueueProcessor Methods:**
+
 - `initRoom(roomId)` / `removeRoom(roomId)` - Room lifecycle
 - `enqueue(roomId, peerId, displayName, role?, priority?)` - Add to queue
 - `dequeue(roomId)` - Remove and return first entry
@@ -1663,6 +1850,7 @@ Implemented server-side FIFO queue processor for turn management:
 - `clearQueue(roomId)` - Clear all entries
 
 **Callbacks:**
+
 - `onPositionChange` - Queue position changes
 - `onTurnGranted` - Turn granted to peer
 - `onTurnCompleted` - Turn completed
@@ -1677,15 +1865,18 @@ Implemented server-side FIFO queue processor for turn management:
 ---
 
 ### FEAT-158: Interrupt Handling for Urgent Overrides
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/ai/interrupt.test.ts`
 
 Implemented interrupt handler for allowing room owners/moderators to interrupt AI responses:
 
 **Files Created:**
+
 - `src/server/signaling/interrupt-handler.ts` - InterruptHandler class
 
 **Key Features:**
+
 - Role-based permissions (owner, moderator, member)
 - Cooldown enforcement between interrupts (configurable, default 2s)
 - Rate limiting (max interrupts per minute)
@@ -1697,6 +1888,7 @@ Implemented interrupt handler for allowing room owners/moderators to interrupt A
 - Pending interrupt queue per room
 
 **InterruptHandler Methods:**
+
 - `initRoom(roomId, enabled?)` / `removeRoom(roomId)` - Room lifecycle
 - `canInterrupt(roomId, peerId, role)` - Check if peer can interrupt
 - `requestInterrupt(roomId, peerId, name, role, aiState, interruptedPeerId?, reason?)` - Request interrupt
@@ -1709,6 +1901,7 @@ Implemented interrupt handler for allowing room owners/moderators to interrupt A
 - `updateOptions(options)` - Update global options
 
 **Interrupt Events:**
+
 - `requested` - Interrupt requested
 - `processed` - Interrupt successfully processed
 - `rejected` - Interrupt rejected (permissions, cooldown, rate limit)
@@ -1722,6 +1915,7 @@ Implemented interrupt handler for allowing room owners/moderators to interrupt A
 ## Phase 4 Complete!
 
 All 9 Phase 4 features have been implemented and tested:
+
 - AI Session: FEAT-300 (Orchestrator), FEAT-301 (Mixed input), FEAT-302 (Broadcasting), FEAT-303 (useSharedAI)
 - Context: FEAT-304 (Context manager), FEAT-305 (AI personality)
 - UI: FEAT-306 (SwensyncOverlayRoom)
@@ -1734,6 +1928,7 @@ All 9 Phase 4 features have been implemented and tested:
 ## Phase 5: Production Polish (In Progress)
 
 ### Planned Features:
+
 1. `FEAT-400` - Supabase authentication ✅
 2. `FEAT-401` - Database schema
 3. `FEAT-402` - Room persistence CRUD
@@ -1749,12 +1944,14 @@ All 9 Phase 4 features have been implemented and tested:
 ---
 
 ### FEAT-400: User Authentication - Supabase Integration
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/auth/supabase.test.tsx`
 
 Implemented Supabase authentication with mock mode for development/testing:
 
 **Files Created:**
+
 - `src/types/auth.ts` - Auth types (UserProfile, Session, AuthState, etc.)
 - `src/lib/supabase/client.ts` - SupabaseAuthClient class with mock mode
 - `src/lib/supabase/index.ts` - Supabase client exports
@@ -1763,6 +1960,7 @@ Implemented Supabase authentication with mock mode for development/testing:
 - `src/middleware.ts` - Route protection middleware
 
 **Key Features:**
+
 - SupabaseAuthClient with mock mode for development without Supabase
 - Sign up/sign in with email/password
 - OAuth support (Google, GitHub) when Supabase configured
@@ -1775,14 +1973,16 @@ Implemented Supabase authentication with mock mode for development/testing:
 - Auth context with hooks: useAuth, useIsAuthenticated, useUser, useAuthState
 
 **Auth Types:**
+
 - `UserProfile`: id, email, displayName, avatarUrl, createdAt, lastSignInAt
 - `Session`: accessToken, refreshToken, expiresAt, user
 - `AuthState`: 'loading' | 'authenticated' | 'unauthenticated' | 'error'
 - `AuthErrorCode`: Mapped Supabase errors to user-friendly messages
 
 **Route Protection:**
-- Protected routes: /rooms, /rooms/*, /profile, /settings
-- Public routes: /, /auth/*, /api/health
+
+- Protected routes: /rooms, /rooms/\*, /profile, /settings
+- Public routes: /, /auth/\*, /api/health
 - Automatic redirect to /auth/signin with returnUrl
 
 **Test Results:**
@@ -1791,21 +1991,25 @@ Implemented Supabase authentication with mock mode for development/testing:
 ---
 
 ### FEAT-401: Room Persistence - Database Schema
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/db/schema.test.ts`
 
 Implemented database schema for room persistence using Drizzle ORM-compatible patterns:
 
 **Files Created:**
+
 - `src/server/db/schema.ts` - Complete database schema
 - `src/server/db/index.ts` - Schema exports
 
 **Table Schemas:**
+
 - `RoomsTable`: rooms with owner, voice settings, AI personality, status
 - `ParticipantsTable`: room participants with roles and presence
 - `RoomHistoryTable`: audit log for room events
 
 **Key Features:**
+
 - PostgreSQL-compatible schema definitions
 - Drizzle ORM-style table schemas with types
 - JSONB columns for voice_settings and event_data
@@ -1818,6 +2022,7 @@ Implemented database schema for room persistence using Drizzle ORM-compatible pa
 - Default value generators
 
 **Validation Functions:**
+
 - `validateRoomName()` - 3-50 chars, alphanumeric with spaces
 - `validateMaxParticipants()` - 2-10 range
 - `validateAIPersonality()` - Valid personality enum
@@ -1832,15 +2037,18 @@ Implemented database schema for room persistence using Drizzle ORM-compatible pa
 ---
 
 ### FEAT-402: Room Persistence - CRUD Operations
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/db/queries.test.ts`
 
 Implemented database CRUD operations with support for both mock and database modes:
 
 **Files Created:**
+
 - `src/server/db/queries.ts` - Complete CRUD operations for rooms, participants, and history
 
 **Room Operations:**
+
 - `createRoom()` - Create room with validation and ownership
 - `getRoom()` / `getRoomWithCount()` / `getRoomWithParticipants()` - Room retrieval
 - `getRooms()` - List rooms with filtering (status, owner, search), pagination, sorting
@@ -1849,6 +2057,7 @@ Implemented database CRUD operations with support for both mock and database mod
 - `roomExists()` / `getRoomCount()` - Room queries
 
 **Participant Operations:**
+
 - `addParticipant()` - Add participant with capacity checks and status updates
 - `removeParticipant()` - Remove participant with time tracking
 - `kickParticipant()` - Remove with audit event
@@ -1856,10 +2065,12 @@ Implemented database CRUD operations with support for both mock and database mod
 - `getParticipants()` / `getParticipantByPeerId()` / `getParticipantCount()` - Queries
 
 **History Operations:**
+
 - `recordRoomEvent()` - Record events (room_created, participant_joined, role_changed, etc.)
 - `getRoomHistory()` - Retrieve history with filtering and pagination
 
 **Key Features:**
+
 - Mock mode for development/testing without database
 - DatabaseClient interface for Drizzle/Supabase integration
 - Automatic room status updates based on participant count
@@ -1873,26 +2084,31 @@ Implemented database CRUD operations with support for both mock and database mod
 ---
 
 ### FEAT-403: Room Permissions - Owner and Participant Roles
+
 **Date:** 2024-12-06
 **Test:** `tests/unit/permissions/roles.test.ts`
 
 Implemented comprehensive role-based permission system for room management:
 
 **Files Created:**
+
 - `src/lib/permissions/index.ts` - Complete permission system
 
 **Role Hierarchy:**
+
 - `owner`: Full permissions (level 2)
 - `moderator`: Limited management permissions (level 1)
 - `participant`: No special permissions (level 0)
 
 **Permission Types:**
+
 - Room: `room:update`, `room:close`, `room:delete`, `room:voice_settings`
 - Participant: `participant:kick`, `participant:ban`, `participant:mute`, `participant:role`
 - AI: `ai:interrupt`, `ai:personality`, `ai:settings`
 - Moderator: `moderator:assign`, `moderator:revoke`
 
 **Permission Checking Functions:**
+
 - `hasPermission(role, permission)` - Check if role has permission
 - `isHigherRole(roleA, roleB)` - Compare role hierarchy
 - `canPerformAction(role, permission)` - Get detailed result
@@ -1900,6 +2116,7 @@ Implemented comprehensive role-based permission system for room management:
 - `canInterruptAI()`, `canChangeAISettings()`, `canUpdateRoom()`, etc.
 
 **PermissionManager Class:**
+
 - Room and participant tracking
 - Ban management with expiration
 - Permission checking by peer ID
@@ -1908,6 +2125,7 @@ Implemented comprehensive role-based permission system for room management:
 - Ban expiration cleanup
 
 **Key Features:**
+
 - Cannot kick/ban owner
 - Cannot kick/ban yourself
 - Role hierarchy enforcement (can only manage lower roles)
@@ -1920,20 +2138,24 @@ Implemented comprehensive role-based permission system for room management:
 ---
 
 ### FEAT-404: Error Recovery - Reconnection Handling
+
 **Date:** 2024-12-07
 **Test:** `tests/unit/reliability/reconnection.test.ts`
 
 Implemented comprehensive reconnection handling for Socket.io, WebRTC, and AI sessions:
 
 **Files Created:**
+
 - `src/lib/reconnection/index.ts` - Complete reconnection management system
 
 **Utility Functions:**
+
 - `calculateReconnectionDelay()` - Exponential backoff with jitter
 - `shouldReconnect()` - Check if reconnection should be attempted (filters non-recoverable errors)
 - `formatReconnectionStatus()` - Human-readable status messages
 
 **ReconnectionManager Class:**
+
 - Manages reconnection for signaling, WebRTC, and AI session connections
 - Configurable max attempts, base delay, max delay, exponential backoff
 - Room state preservation across reconnects
@@ -1941,20 +2163,24 @@ Implemented comprehensive reconnection handling for Socket.io, WebRTC, and AI se
 - Cancellation and reset support
 
 **WebRTCReconnectionManager Class:**
+
 - Manages per-peer WebRTC reconnection
 - Individual peer state tracking
 - Automatic retry with backoff
 
 **Non-Recoverable Errors:**
+
 - unauthorized, banned, room_not_found, room_closed, kicked, invalid_token
 - These errors skip reconnection attempts
 
 **React Integration:**
+
 - `getReconnectionDisplayStatus()` - Combined status for UI display
 - `UseReconnectionStatus` type for React components
 - Overall state calculation across all connection types
 
 **Key Features:**
+
 - Exponential backoff with configurable jitter
 - Room state snapshot for restoration after reconnect
 - Per-connection-type status tracking with history
@@ -1972,6 +2198,7 @@ Each completed feature entry follows this format:
 
 ```markdown
 ### FEAT-XXX: Feature Title
+
 **Date:** YYYY-MM-DD
 **Commit:** `abc1234`
 **Test:** `tests/unit/path/to/test.ts`
@@ -1979,6 +2206,7 @@ Each completed feature entry follows this format:
 Brief description of what was implemented.
 
 **Changes:**
+
 - File 1 change
 - File 2 change
 
@@ -2018,13 +2246,56 @@ Brief description of what was implemented.
 ### Dependencies to Add
 
 Phase 2:
+
 - `socket.io` and `socket.io-client`
 - `nanoid` for room IDs
 
 Phase 5:
+
 - `@supabase/supabase-js`
 - `drizzle-orm` or similar for database
 - `husky` and `lint-staged`
+
+---
+
+### FEAT-411: Custom Server with Integrated Socket.io Signaling
+
+**Date:** 2024-12-07
+**Test:** `tests/unit/signaling/custom-server.test.ts`
+
+Implemented custom Next.js server with integrated Socket.io for real-time signaling:
+
+**Files Created:**
+
+- `server.ts` - Custom Next.js server with Socket.io integration
+- `tsconfig.server.json` - TypeScript config for server compilation
+
+**Key Features:**
+
+- Custom HTTP server that runs Next.js and Socket.io together
+- Room management with auto-creation for testing
+- WebRTC signaling relay (offer/answer/ice candidates)
+- Presence update broadcasting
+- CORS configuration for production domains
+- In-memory room and peer tracking
+- Clean disconnection handling
+
+**Socket.io Events:**
+
+- `room:join` - Join room with peer discovery
+- `room:leave` - Leave room with peer notification
+- `signal:offer` / `signal:answer` / `signal:ice` - WebRTC signaling relay
+- `presence:update` - Real-time presence updates
+- `presence:heartbeat` - Keep-alive mechanism
+
+**Package.json Changes:**
+
+- `dev` now uses custom server with Socket.io
+- `start` now uses custom server for production
+- Added `dev:next` and `start:next` for Next.js-only mode
+
+**Test Results:**
+✅ 10 tests passing (connection, room join/leave, WebRTC signaling, presence updates, CORS)
 
 ---
 
@@ -2038,6 +2309,7 @@ This project follows the **Long-Horizon Engineering Protocol**:
 - ✅ Git history for permanent state
 
 **Agent Instructions:**
+
 1. Read `features_list.json` to find next `passes: false` feature
 2. Implement the feature
 3. Write and run tests
