@@ -161,32 +161,47 @@ swensync/
 
 ## Features
 
-- **Native WebRTC**: Direct connection to OpenAI Realtime API
-- **High-Fidelity Audio Visualizer**: "Neural Swarm" or "Digital Pulse" style visualization
-- **Latency Stopwatch**: Real-time measurement of response latency
-- **Session Management**: 10-minute sessions with 8-minute warning
-- **Turn History**: Last 5 turn latencies with color-coded performance
+- **Multi-Peer Voice Rooms**: Create and join rooms where multiple participants share a single AI session
+- **Push-to-Talk (PTT)**: Hold Space or on-screen button to address the AI
+- **Speaker Blocking**: Only one person can address the AI at a time - others are blocked until the current speaker finishes
+- **Interrupt Button**: "Excuse Me" button to interrupt AI responses for urgent interjections
+- **AI Personality Presets**: Choose from Facilitator, Assistant, Expert, or Brainstorm personalities
+- **Topic Expertise**: Optionally configure AI with domain-specific knowledge
+- **Real-time Audio Streaming**: Low-latency voice communication via OpenAI Realtime API
+- **Presence Indicators**: See who's speaking, muted, or idle in real-time
+- **Audio Visualization**: Visual feedback during AI responses
+- **Session Management**: Automatic cleanup when rooms empty
 
 ## Speaking Modes
 
-The application architecture supports four distinct modes for addressing the AI, catering to different collaboration scenarios.
+The application uses Push-to-Talk (PTT) as the default mode for addressing the AI.
 
 ### Currently Implemented
 
-- **Push to Talk (`pushToTalk`)**: Users must hold a specific key (default: Space) or on-screen button to address the AI. This is the default mode to prevent accidental activation.
+- **Push to Talk (`pushToTalk`)**: Users must hold a specific key (default: Space) or on-screen button to address the AI. This is the default mode to prevent accidental activation. **Only one user can PTT at a time** - if another user is addressing the AI, you'll be blocked until they finish.
 
 ### Planned / Roadmap
 
-- **Open Mic (`open`)**: Microphone is always active (gated by Voice Activity Detection). All audio is sent to the AI. Ideal for small, trusted groups.
-- **Wake Word (`wakeWord`)**: AI activates only when a specific phrase is spoken (e.g., "Hey Swensync").
-- **Designated Speaker (`designatedSpeaker`)**: Restricted mode where only specific users with permission can address the AI. Perfect for moderated sessions.
+- **Open Mic (`open`)**: Microphone is always active (gated by Voice Activity Detection). All audio is sent to the AI. Ideal for small, trusted groups. _Requires VAD integration._
+- **Wake Word (`wakeWord`)**: AI activates only when a specific phrase is spoken (e.g., "Hey Swensync"). _Requires speech-to-text integration._
+- **Designated Speaker (`designatedSpeaker`)**: Restricted mode where only specific users with permission can address the AI. Perfect for moderated sessions. _Type definitions exist, UI partially implemented._
 
 ## Architecture
 
 The application uses:
 
-- Next.js 14 with App Router
-- Native WebRTC (RTCPeerConnection)
-- OpenAI Realtime API (gpt-4o-realtime-preview)
-- Tailwind CSS for styling
-- TypeScript for type safety
+- **Next.js 15** with App Router and custom server (server.ts)
+- **Socket.io** for real-time signaling and room management
+- **OpenAI Realtime API** (gpt-4o-realtime-preview) via WebSocket
+- **Tailwind CSS** for styling
+- **TypeScript** for type safety
+
+### Data Flow
+
+```
+Participant A ──PTT──► Socket.io Server ──► OpenAI Realtime API
+Participant B ◄────────── Audio Broadcast ◄────── AI Response
+Participant C ◄──────────────────────────────────────────────┘
+```
+
+All participants in a room hear the same AI response simultaneously.

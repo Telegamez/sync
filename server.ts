@@ -1112,6 +1112,25 @@ app
         // Get or create AI session for this room
         const session = getOrCreateAISession(io, roomId);
 
+        // Check if another user is already addressing the AI
+        // Allow same user to restart PTT, but block other users
+        if (
+          session.activeSpeakerId &&
+          session.activeSpeakerId !== peerId &&
+          (session.state === "listening" || session.state === "processing")
+        ) {
+          console.log(
+            `[Socket.io] PTT BLOCKED - ${session.activeSpeakerName} is already addressing AI`,
+          );
+          socket.emit("ai:ptt_blocked", {
+            roomId,
+            reason: "another_speaker",
+            activeSpeakerId: session.activeSpeakerId,
+            activeSpeakerName: session.activeSpeakerName,
+          });
+          return;
+        }
+
         // ALWAYS interrupt when PTT starts - audio may still be playing on clients
         // even if server state is idle (audio is queued/scheduled on client AudioContext)
         const previousState = session.state;

@@ -5,27 +5,27 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-100 & FEAT-150
  */
 
-import type { PeerId } from './peer';
-import type { RoomId } from './room';
+import type { PeerId } from "./peer";
+import type { RoomId } from "./room";
 
 /**
  * Voice activation modes for addressing the AI
  */
 export type VoiceMode =
-  | 'open' // All audio sent to AI (small trusted groups)
-  | 'pushToTalk' // Hold button/key to address AI
-  | 'wakeWord' // Say wake word to activate
-  | 'designatedSpeaker'; // Only specific roles can address AI
+  | "open" // All audio sent to AI (small trusted groups)
+  | "pushToTalk" // Hold button/key to address AI
+  | "wakeWord" // Say wake word to activate
+  | "designatedSpeaker"; // Only specific roles can address AI
 
 /**
  * AI response state machine
  */
 export type AIResponseState =
-  | 'idle' // Waiting for input
-  | 'listening' // Receiving audio input
-  | 'processing' // Processing input (after VAD end)
-  | 'speaking' // AI is responding (LOCKED state)
-  | 'locked'; // Explicit lock (queue processing)
+  | "idle" // Waiting for input
+  | "listening" // Receiving audio input
+  | "processing" // Processing input (after VAD end)
+  | "speaking" // AI is responding (LOCKED state)
+  | "locked"; // Explicit lock (queue processing)
 
 /**
  * Voice mode settings for a room
@@ -63,7 +63,7 @@ export interface RoomVoiceSettings {
  * Default voice settings
  */
 export const DEFAULT_VOICE_SETTINGS: RoomVoiceSettings = {
-  mode: 'pushToTalk',
+  mode: "pushToTalk",
   lockDuringResponse: true,
   enableQueue: true,
   maxQueueSize: 10,
@@ -132,13 +132,13 @@ export interface RoomAIState {
  * AI state event types
  */
 export type AIStateEventType =
-  | 'ai:state_changed'
-  | 'ai:queue_updated'
-  | 'ai:turn_started'
-  | 'ai:turn_ended'
-  | 'ai:interrupt'
-  | 'ai:error'
-  | 'ai:session_reconnected';
+  | "ai:state_changed"
+  | "ai:queue_updated"
+  | "ai:turn_started"
+  | "ai:turn_ended"
+  | "ai:interrupt"
+  | "ai:error"
+  | "ai:session_reconnected";
 
 /**
  * AI state event payload
@@ -169,7 +169,11 @@ export interface PTTState {
   /** Whether PTT can be activated (based on AI state) */
   canActivate: boolean;
   /** Reason if cannot activate */
-  blockReason?: 'ai_speaking' | 'queue_full' | 'not_designated';
+  blockReason?:
+    | "ai_speaking"
+    | "another_speaker"
+    | "queue_full"
+    | "not_designated";
 }
 
 /**

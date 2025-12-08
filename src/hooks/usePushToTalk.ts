@@ -7,15 +7,19 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-151
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import type { PTTState, AIResponseState } from '@/types/voice-mode';
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import type { PTTState, AIResponseState } from "@/types/voice-mode";
 
 /**
  * PTT activation method
  */
-export type PTTActivationMethod = 'keyboard' | 'mouse' | 'touch' | 'programmatic';
+export type PTTActivationMethod =
+  | "keyboard"
+  | "mouse"
+  | "touch"
+  | "programmatic";
 
 /**
  * PTT hook options
@@ -44,7 +48,7 @@ export interface UsePushToTalkOptions {
   /** Whether the local user is a designated speaker */
   isDesignatedSpeaker?: boolean;
   /** Voice mode (affects PTT behavior) */
-  voiceMode?: 'open' | 'pushToTalk' | 'wakeWord' | 'designatedSpeaker';
+  voiceMode?: "open" | "pushToTalk" | "wakeWord" | "designatedSpeaker";
 }
 
 /**
@@ -56,7 +60,7 @@ export interface UsePushToTalkCallbacks {
   /** Called when PTT is released */
   onPTTEnd?: (duration: number) => void;
   /** Called when PTT activation is blocked */
-  onPTTBlocked?: (reason: PTTState['blockReason']) => void;
+  onPTTBlocked?: (reason: PTTState["blockReason"]) => void;
   /** Called when PTT state changes */
   onPTTStateChange?: (state: PTTState) => void;
 }
@@ -72,7 +76,7 @@ export interface UsePushToTalkReturn {
   /** Whether PTT can be activated */
   canActivate: boolean;
   /** Reason if PTT cannot be activated */
-  blockReason: PTTState['blockReason'];
+  blockReason: PTTState["blockReason"];
   /** How long PTT has been active in ms */
   activeDuration: number;
   /** Programmatically start PTT */
@@ -90,7 +94,7 @@ export interface UsePushToTalkReturn {
     onTouchEnd: (e: React.TouchEvent) => void;
     onKeyDown: (e: React.KeyboardEvent) => void;
     onKeyUp: (e: React.KeyboardEvent) => void;
-    'aria-pressed': boolean;
+    "aria-pressed": boolean;
     disabled: boolean;
   };
   /** Ref for the target element to attach global keyboard events */
@@ -100,9 +104,14 @@ export interface UsePushToTalkReturn {
 /**
  * Default options
  */
-const DEFAULT_OPTIONS: Required<Omit<UsePushToTalkOptions, 'aiState' | 'isInQueue' | 'isDesignatedSpeaker' | 'voiceMode'>> = {
+const DEFAULT_OPTIONS: Required<
+  Omit<
+    UsePushToTalkOptions,
+    "aiState" | "isInQueue" | "isDesignatedSpeaker" | "voiceMode"
+  >
+> = {
   enabled: true,
-  activationKey: ' ', // Space key
+  activationKey: " ", // Space key
   enableKeyboard: true,
   enableTouch: true,
   enableMouse: true,
@@ -134,7 +143,7 @@ const DEFAULT_OPTIONS: Required<Omit<UsePushToTalkOptions, 'aiState' | 'isInQueu
  */
 export function usePushToTalk(
   options: UsePushToTalkOptions = {},
-  callbacks: UsePushToTalkCallbacks = {}
+  callbacks: UsePushToTalkCallbacks = {},
 ): UsePushToTalkReturn {
   const {
     enabled = DEFAULT_OPTIONS.enabled,
@@ -145,10 +154,10 @@ export function usePushToTalk(
     minHoldTimeMs = DEFAULT_OPTIONS.minHoldTimeMs,
     maxDurationMs = DEFAULT_OPTIONS.maxDurationMs,
     enableHapticFeedback = DEFAULT_OPTIONS.enableHapticFeedback,
-    aiState = 'idle',
+    aiState = "idle",
     isInQueue = false,
     isDesignatedSpeaker = true,
-    voiceMode = 'pushToTalk',
+    voiceMode = "pushToTalk",
   } = options;
 
   const { onPTTStart, onPTTEnd, onPTTBlocked, onPTTStateChange } = callbacks;
@@ -157,14 +166,19 @@ export function usePushToTalk(
   const [isActive, setIsActive] = useState(false);
   const [activatedAt, setActivatedAt] = useState<Date | null>(null);
   const [activeDuration, setActiveDuration] = useState(0);
-  const [activationMethod, setActivationMethod] = useState<PTTActivationMethod | null>(null);
+  const [activationMethod, setActivationMethod] =
+    useState<PTTActivationMethod | null>(null);
 
   // Refs
   const targetRef = useRef<HTMLElement>(null);
   const holdStartRef = useRef<number | null>(null);
   const minHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const isActivatingRef = useRef(false);
   const endPTTRef = useRef<() => void>(() => {});
 
@@ -174,18 +188,23 @@ export function usePushToTalk(
       return { canActivate: false, blockReason: undefined };
     }
 
-    // Check AI state - cannot activate if AI is speaking
-    if (aiState === 'speaking' || aiState === 'locked') {
-      return { canActivate: false, blockReason: 'ai_speaking' as const };
+    // Check AI state - cannot activate if AI is speaking or another user is addressing AI
+    if (aiState === "speaking" || aiState === "locked") {
+      return { canActivate: false, blockReason: "ai_speaking" as const };
+    }
+
+    // Block if another user is currently addressing the AI (listening/processing state)
+    if (aiState === "listening" || aiState === "processing") {
+      return { canActivate: false, blockReason: "another_speaker" as const };
     }
 
     // Check designated speaker mode
-    if (voiceMode === 'designatedSpeaker' && !isDesignatedSpeaker) {
-      return { canActivate: false, blockReason: 'not_designated' as const };
+    if (voiceMode === "designatedSpeaker" && !isDesignatedSpeaker) {
+      return { canActivate: false, blockReason: "not_designated" as const };
     }
 
     // In open mode, PTT is not used for gating
-    if (voiceMode === 'open') {
+    if (voiceMode === "open") {
       return { canActivate: true, blockReason: undefined };
     }
 
@@ -193,12 +212,15 @@ export function usePushToTalk(
   }, [enabled, aiState, voiceMode, isDesignatedSpeaker]);
 
   // PTT state object
-  const pttState: PTTState = useMemo(() => ({
-    isActive,
-    activatedAt: activatedAt || undefined,
-    canActivate,
-    blockReason,
-  }), [isActive, activatedAt, canActivate, blockReason]);
+  const pttState: PTTState = useMemo(
+    () => ({
+      isActive,
+      activatedAt: activatedAt || undefined,
+      canActivate,
+      blockReason,
+    }),
+    [isActive, activatedAt, canActivate, blockReason],
+  );
 
   // Notify state changes
   useEffect(() => {
@@ -222,7 +244,7 @@ export function usePushToTalk(
 
   // Haptic feedback helper
   const triggerHaptic = useCallback(() => {
-    if (enableHapticFeedback && 'vibrate' in navigator) {
+    if (enableHapticFeedback && "vibrate" in navigator) {
       navigator.vibrate(50);
     }
   }, [enableHapticFeedback]);
@@ -244,40 +266,43 @@ export function usePushToTalk(
     // If there's a minimum hold time, wait before activating
     if (minHoldTimeMs > 0) {
       minHoldTimerRef.current = setTimeout(() => {
-        activatePTT('programmatic');
+        activatePTT("programmatic");
       }, minHoldTimeMs);
     } else {
-      activatePTT('programmatic');
+      activatePTT("programmatic");
     }
 
     return true;
   }, [canActivate, isActive, minHoldTimeMs, blockReason, onPTTBlocked]);
 
   // Activate PTT (internal)
-  const activatePTT = useCallback((method: PTTActivationMethod) => {
-    const now = new Date();
-    setIsActive(true);
-    setActivatedAt(now);
-    setActivationMethod(method);
-    setActiveDuration(0);
+  const activatePTT = useCallback(
+    (method: PTTActivationMethod) => {
+      const now = new Date();
+      setIsActive(true);
+      setActivatedAt(now);
+      setActivationMethod(method);
+      setActiveDuration(0);
 
-    triggerHaptic();
-    onPTTStart?.(method);
+      triggerHaptic();
+      onPTTStart?.(method);
 
-    // Start duration tracking
-    durationIntervalRef.current = setInterval(() => {
-      if (holdStartRef.current) {
-        setActiveDuration(Date.now() - holdStartRef.current);
+      // Start duration tracking
+      durationIntervalRef.current = setInterval(() => {
+        if (holdStartRef.current) {
+          setActiveDuration(Date.now() - holdStartRef.current);
+        }
+      }, 100);
+
+      // Set max duration timer
+      if (maxDurationMs > 0) {
+        maxDurationTimerRef.current = setTimeout(() => {
+          endPTTRef.current();
+        }, maxDurationMs);
       }
-    }, 100);
-
-    // Set max duration timer
-    if (maxDurationMs > 0) {
-      maxDurationTimerRef.current = setTimeout(() => {
-        endPTTRef.current();
-      }, maxDurationMs);
-    }
-  }, [triggerHaptic, maxDurationMs, onPTTStart]);
+    },
+    [triggerHaptic, maxDurationMs, onPTTStart],
+  );
 
   // End PTT
   const endPTT = useCallback(() => {
@@ -300,7 +325,9 @@ export function usePushToTalk(
     }
 
     // Calculate duration
-    const duration = holdStartRef.current ? Date.now() - holdStartRef.current : 0;
+    const duration = holdStartRef.current
+      ? Date.now() - holdStartRef.current
+      : 0;
 
     // Only call onPTTEnd if we actually activated (not just holding for min time)
     if (isActive) {
@@ -330,12 +357,63 @@ export function usePushToTalk(
   }, [isActive, startPTT, endPTT]);
 
   // Keyboard event handlers
-  const handleKeyDown = useCallback((e: KeyboardEvent | React.KeyboardEvent) => {
-    if (!enableKeyboard || !enabled) return;
-    if (e.repeat) return; // Ignore key repeat
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent | React.KeyboardEvent) => {
+      if (!enableKeyboard || !enabled) return;
+      if (e.repeat) return; // Ignore key repeat
 
-    if (e.key === activationKey) {
-      e.preventDefault();
+      if (e.key === activationKey) {
+        e.preventDefault();
+        if (!canActivate) {
+          onPTTBlocked?.(blockReason);
+          return;
+        }
+
+        if (!isActive && !isActivatingRef.current) {
+          isActivatingRef.current = true;
+          holdStartRef.current = Date.now();
+
+          if (minHoldTimeMs > 0) {
+            minHoldTimerRef.current = setTimeout(() => {
+              activatePTT("keyboard");
+            }, minHoldTimeMs);
+          } else {
+            activatePTT("keyboard");
+          }
+        }
+      }
+    },
+    [
+      enableKeyboard,
+      enabled,
+      activationKey,
+      canActivate,
+      isActive,
+      minHoldTimeMs,
+      blockReason,
+      activatePTT,
+      onPTTBlocked,
+    ],
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent | React.KeyboardEvent) => {
+      if (!enableKeyboard || !enabled) return;
+
+      if (e.key === activationKey) {
+        e.preventDefault();
+        endPTT();
+      }
+    },
+    [enableKeyboard, enabled, activationKey, endPTT],
+  );
+
+  // Mouse event handlers
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!enableMouse || !enabled) return;
+      if (e.button !== 0) return; // Only left click
+
       if (!canActivate) {
         onPTTBlocked?.(blockReason);
         return;
@@ -347,88 +425,86 @@ export function usePushToTalk(
 
         if (minHoldTimeMs > 0) {
           minHoldTimerRef.current = setTimeout(() => {
-            activatePTT('keyboard');
+            activatePTT("mouse");
           }, minHoldTimeMs);
         } else {
-          activatePTT('keyboard');
+          activatePTT("mouse");
         }
       }
-    }
-  }, [enableKeyboard, enabled, activationKey, canActivate, isActive, minHoldTimeMs, blockReason, activatePTT, onPTTBlocked]);
+    },
+    [
+      enableMouse,
+      enabled,
+      canActivate,
+      isActive,
+      minHoldTimeMs,
+      blockReason,
+      activatePTT,
+      onPTTBlocked,
+    ],
+  );
 
-  const handleKeyUp = useCallback((e: KeyboardEvent | React.KeyboardEvent) => {
-    if (!enableKeyboard || !enabled) return;
-
-    if (e.key === activationKey) {
-      e.preventDefault();
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      if (!enableMouse || !enabled) return;
       endPTT();
-    }
-  }, [enableKeyboard, enabled, activationKey, endPTT]);
+    },
+    [enableMouse, enabled, endPTT],
+  );
 
-  // Mouse event handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!enableMouse || !enabled) return;
-    if (e.button !== 0) return; // Only left click
-
-    if (!canActivate) {
-      onPTTBlocked?.(blockReason);
-      return;
-    }
-
-    if (!isActive && !isActivatingRef.current) {
-      isActivatingRef.current = true;
-      holdStartRef.current = Date.now();
-
-      if (minHoldTimeMs > 0) {
-        minHoldTimerRef.current = setTimeout(() => {
-          activatePTT('mouse');
-        }, minHoldTimeMs);
-      } else {
-        activatePTT('mouse');
+  const handleMouseLeave = useCallback(
+    (e: React.MouseEvent) => {
+      if (!enableMouse || !enabled) return;
+      // End PTT if mouse leaves while held
+      if (isActive || isActivatingRef.current) {
+        endPTT();
       }
-    }
-  }, [enableMouse, enabled, canActivate, isActive, minHoldTimeMs, blockReason, activatePTT, onPTTBlocked]);
-
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (!enableMouse || !enabled) return;
-    endPTT();
-  }, [enableMouse, enabled, endPTT]);
-
-  const handleMouseLeave = useCallback((e: React.MouseEvent) => {
-    if (!enableMouse || !enabled) return;
-    // End PTT if mouse leaves while held
-    if (isActive || isActivatingRef.current) {
-      endPTT();
-    }
-  }, [enableMouse, enabled, isActive, endPTT]);
+    },
+    [enableMouse, enabled, isActive, endPTT],
+  );
 
   // Touch event handlers
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!enableTouch || !enabled) return;
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (!enableTouch || !enabled) return;
 
-    if (!canActivate) {
-      onPTTBlocked?.(blockReason);
-      return;
-    }
-
-    if (!isActive && !isActivatingRef.current) {
-      isActivatingRef.current = true;
-      holdStartRef.current = Date.now();
-
-      if (minHoldTimeMs > 0) {
-        minHoldTimerRef.current = setTimeout(() => {
-          activatePTT('touch');
-        }, minHoldTimeMs);
-      } else {
-        activatePTT('touch');
+      if (!canActivate) {
+        onPTTBlocked?.(blockReason);
+        return;
       }
-    }
-  }, [enableTouch, enabled, canActivate, isActive, minHoldTimeMs, blockReason, activatePTT, onPTTBlocked]);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!enableTouch || !enabled) return;
-    endPTT();
-  }, [enableTouch, enabled, endPTT]);
+      if (!isActive && !isActivatingRef.current) {
+        isActivatingRef.current = true;
+        holdStartRef.current = Date.now();
+
+        if (minHoldTimeMs > 0) {
+          minHoldTimerRef.current = setTimeout(() => {
+            activatePTT("touch");
+          }, minHoldTimeMs);
+        } else {
+          activatePTT("touch");
+        }
+      }
+    },
+    [
+      enableTouch,
+      enabled,
+      canActivate,
+      isActive,
+      minHoldTimeMs,
+      blockReason,
+      activatePTT,
+      onPTTBlocked,
+    ],
+  );
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (!enableTouch || !enabled) return;
+      endPTT();
+    },
+    [enableTouch, enabled, endPTT],
+  );
 
   // Global keyboard event listeners
   useEffect(() => {
@@ -437,11 +513,11 @@ export function usePushToTalk(
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Only handle if no input element is focused
       const activeElement = document.activeElement;
-      const isInputFocused = activeElement && (
-        activeElement.tagName === 'INPUT' ||
-        activeElement.tagName === 'TEXTAREA' ||
-        activeElement.getAttribute('contenteditable') === 'true'
-      );
+      const isInputFocused =
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          activeElement.getAttribute("contenteditable") === "true");
 
       if (!isInputFocused) {
         handleKeyDown(e);
@@ -452,12 +528,12 @@ export function usePushToTalk(
       handleKeyUp(e);
     };
 
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    window.addEventListener('keyup', handleGlobalKeyUp);
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    window.addEventListener("keyup", handleGlobalKeyUp);
 
     return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown);
-      window.removeEventListener('keyup', handleGlobalKeyUp);
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+      window.removeEventListener("keyup", handleGlobalKeyUp);
     };
   }, [enableKeyboard, enabled, handleKeyDown, handleKeyUp]);
 
@@ -471,35 +547,38 @@ export function usePushToTalk(
       }
     };
 
-    window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener("mouseup", handleGlobalMouseUp);
 
     return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
     };
   }, [enableMouse, enabled, isActive, endPTT]);
 
   // Button props to spread on a PTT button element
-  const buttonProps = useMemo(() => ({
-    onMouseDown: handleMouseDown,
-    onMouseUp: handleMouseUp,
-    onMouseLeave: handleMouseLeave,
-    onTouchStart: handleTouchStart,
-    onTouchEnd: handleTouchEnd,
-    onKeyDown: handleKeyDown as (e: React.KeyboardEvent) => void,
-    onKeyUp: handleKeyUp as (e: React.KeyboardEvent) => void,
-    'aria-pressed': isActive,
-    disabled: !canActivate,
-  }), [
-    handleMouseDown,
-    handleMouseUp,
-    handleMouseLeave,
-    handleTouchStart,
-    handleTouchEnd,
-    handleKeyDown,
-    handleKeyUp,
-    isActive,
-    canActivate,
-  ]);
+  const buttonProps = useMemo(
+    () => ({
+      onMouseDown: handleMouseDown,
+      onMouseUp: handleMouseUp,
+      onMouseLeave: handleMouseLeave,
+      onTouchStart: handleTouchStart,
+      onTouchEnd: handleTouchEnd,
+      onKeyDown: handleKeyDown as (e: React.KeyboardEvent) => void,
+      onKeyUp: handleKeyUp as (e: React.KeyboardEvent) => void,
+      "aria-pressed": isActive,
+      disabled: !canActivate,
+    }),
+    [
+      handleMouseDown,
+      handleMouseUp,
+      handleMouseLeave,
+      handleTouchStart,
+      handleTouchEnd,
+      handleKeyDown,
+      handleKeyUp,
+      isActive,
+      canActivate,
+    ],
+  );
 
   return {
     pttState,
@@ -520,7 +599,7 @@ export function usePushToTalk(
  */
 export function createPushToTalk(
   options?: UsePushToTalkOptions,
-  callbacks?: UsePushToTalkCallbacks
+  callbacks?: UsePushToTalkCallbacks,
 ) {
   return () => usePushToTalk(options, callbacks);
 }
