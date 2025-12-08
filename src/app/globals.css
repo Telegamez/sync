@@ -37,11 +37,20 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Hide scrollbars but allow scroll when needed */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Swensync-specific animations */
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
   }
   50% {
@@ -55,7 +64,8 @@
 
 /* Stopwatch running animation */
 @keyframes stopwatch-tick {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -65,4 +75,28 @@
 
 .animate-stopwatch {
   animation: stopwatch-tick 0.5s ease-in-out infinite;
+}
+
+/* Inward pulse animation for speaking indicator - high visibility */
+@keyframes inward-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+
+.animate-inward-pulse {
+  animation: inward-pulse ease-in-out infinite;
 }

@@ -292,6 +292,7 @@ export function useSharedAI(
   const playbackPositionRef = useRef(0);
   const nextPlaybackTimeRef = useRef(0); // Track when next chunk should start
   const isInterruptedRef = useRef(false); // Block audio during PTT
+  const playbackEndTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track when to mark playback as ended
 
   // Callback refs
   const onAIStateChangeRef = useRef(onAIStateChange);
@@ -384,6 +385,52 @@ export function useSharedAI(
   );
 
   /**
+   * Schedule playback end detection
+   * Called after each chunk to ensure we detect when all audio has finished
+   */
+  const schedulePlaybackEndCheck = useCallback(
+    (endTimeSeconds: number) => {
+      // Clear any existing timeout
+      if (playbackEndTimeoutRef.current) {
+        clearTimeout(playbackEndTimeoutRef.current);
+      }
+
+      // Calculate how long until the scheduled audio finishes
+      const audioContext = audioContextRef.current;
+      if (!audioContext) return;
+
+      const currentTime = audioContext.currentTime;
+      const timeUntilEnd = Math.max(0, (endTimeSeconds - currentTime) * 1000);
+
+      console.log(
+        `[useSharedAI] Scheduling playback end check in ${timeUntilEnd + 100}ms (endTime: ${endTimeSeconds}, currentTime: ${currentTime})`,
+      );
+
+      // Add small buffer (100ms) to ensure audio has finished
+      playbackEndTimeoutRef.current = setTimeout(() => {
+        // Only mark as not playing if we haven't received new audio
+        // Check if the expected end time has passed
+        if (
+          audioContextRef.current &&
+          audioContextRef.current.currentTime >= endTimeSeconds - 0.05
+        ) {
+          console.log(
+            `[useSharedAI] Playback end detected - marking isPlaying=false`,
+          );
+          isPlayingRef.current = false;
+          updatePlaybackState();
+          onPlaybackEndRef.current?.();
+        } else {
+          console.log(
+            `[useSharedAI] Playback end check skipped - more audio expected`,
+          );
+        }
+      }, timeUntilEnd + 100);
+    },
+    [updatePlaybackState],
+  );
+
+  /**
    * Play audio chunk with proper scheduling (streaming playback)
    */
   const playAudioChunk = useCallback(
@@ -444,7 +491,8 @@ export function useSharedAI(
         source.start(startTime);
 
         // Update next playback time for the following chunk
-        nextPlaybackTimeRef.current = startTime + duration;
+        const endTime = startTime + duration;
+        nextPlaybackTimeRef.current = endTime;
 
         // Mark as playing on first chunk
         if (!isPlayingRef.current && chunk.isFirst) {
@@ -454,20 +502,30 @@ export function useSharedAI(
           onPlaybackStartRef.current?.();
           updatePlaybackState();
         }
+
+        // Schedule end detection - this will be reset by subsequent chunks
+        schedulePlaybackEndCheck(endTime);
       } catch (error) {
         console.error("[useSharedAI] Failed to play audio chunk:", error);
       }
     },
-    [sampleRate, updatePlaybackState],
+    [sampleRate, updatePlaybackState, schedulePlaybackEndCheck],
   );
+
+  // Track previous AI state for callbacks (avoid stale closure)
+  const previousAIStateRef = useRef<AIResponseState>("idle");
 
   /**
    * Handle AI state event
    */
   const handleAIStateEvent = useCallback(
     (event: AIStateEvent) => {
-      const previousState = state.aiState;
       const newAIState = event.state.state;
+      const previousState = previousAIStateRef.current;
+
+      console.log(
+        `[useSharedAI] AI state event: ${previousState} -> ${newAIState}`,
+      );
 
       setState((prev) => ({
         ...prev,
@@ -479,6 +537,9 @@ export function useSharedAI(
         lastError: event.state.lastError ?? null,
       }));
 
+      // Update ref for next comparison
+      previousAIStateRef.current = newAIState;
+
       // Notify state change
       if (newAIState !== previousState) {
         onAIStateChangeRef.current?.(newAIState, previousState);
@@ -489,7 +550,7 @@ export function useSharedAI(
         onErrorRef.current?.(event.state.lastError ?? "Unknown error");
       }
     },
-    [state.aiState],
+    [], // No dependencies - uses refs for mutable state
   );
 
   /**
@@ -625,6 +686,12 @@ export function useSharedAI(
         // Set interrupted flag FIRST to block any new audio from being played
         isInterruptedRef.current = true;
 
+        // Clear any pending playback end timeout
+        if (playbackEndTimeoutRef.current) {
+          clearTimeout(playbackEndTimeoutRef.current);
+          playbackEndTimeoutRef.current = null;
+        }
+
         // Immediately stop audio playback by closing and recreating audio context
         // This is the only way to stop already-scheduled audio
         if (audioContextRef.current) {
@@ -725,6 +792,11 @@ export function useSharedAI(
    * Stop audio playback
    */
   const stopPlayback = useCallback(() => {
+    // Clear playback end timeout
+    if (playbackEndTimeoutRef.current) {
+      clearTimeout(playbackEndTimeoutRef.current);
+      playbackEndTimeoutRef.current = null;
+    }
     isPlayingRef.current = false;
     playbackPositionRef.current = 0;
     nextPlaybackTimeRef.current = 0; // Reset scheduling
@@ -838,6 +910,11 @@ export function useSharedAI(
    */
   useEffect(() => {
     return () => {
+      // Clear playback end timeout
+      if (playbackEndTimeoutRef.current) {
+        clearTimeout(playbackEndTimeoutRef.current);
+        playbackEndTimeoutRef.current = null;
+      }
       if (audioContextRef.current) {
         audioContextRef.current.close();
         audioContextRef.current = null;

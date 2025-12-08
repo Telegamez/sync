@@ -3,14 +3,16 @@
  *
  * Displays all participants in a room with real-time speaking/muted indicators.
  * Highlights the current active speaker and supports responsive layouts.
+ * Includes AI participant with special avatar and audio waveform visualization.
  *
  * Part of the Long-Horizon Engineering Protocol - FEAT-114
  */
 
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import type { PeerId, PeerSummary, PeerRole, PeerConnectionState } from '@/types/peer';
+import { useMemo, useState, useEffect } from "react";
+import type { PeerId, PeerRole, PeerConnectionState } from "@/types/peer";
+import { InwardWaveform, type InwardWaveformColor } from "./InwardWaveform";
 
 /**
  * Extended participant info with presence state
@@ -36,12 +38,14 @@ export interface ParticipantInfo {
   connectionState?: PeerConnectionState;
   /** Whether this is the local user */
   isLocal?: boolean;
+  /** Whether this is the AI participant */
+  isAI?: boolean;
 }
 
 /**
  * Layout orientation
  */
-export type ParticipantListLayout = 'horizontal' | 'vertical' | 'grid';
+export type ParticipantListLayout = "horizontal" | "vertical" | "grid";
 
 /**
  * ParticipantList props
@@ -65,6 +69,8 @@ export interface ParticipantListProps {
   onParticipantClick?: (participantId: PeerId) => void;
   /** Custom class name */
   className?: string;
+  /** Use viewport-aware sizing to prevent scrolling */
+  viewportAware?: boolean;
 }
 
 /**
@@ -83,14 +89,14 @@ function getInitials(name: string): string {
  */
 function getRoleLabel(role: PeerRole): string {
   switch (role) {
-    case 'owner':
-      return 'Host';
-    case 'moderator':
-      return 'Mod';
-    case 'participant':
-      return '';
+    case "owner":
+      return "Host";
+    case "moderator":
+      return "Mod";
+    case "participant":
+      return "";
     default:
-      return '';
+      return "";
   }
 }
 
@@ -99,51 +105,273 @@ function getRoleLabel(role: PeerRole): string {
  */
 function getRoleBadgeColor(role: PeerRole): string {
   switch (role) {
-    case 'owner':
-      return 'bg-amber-500 text-white';
-    case 'moderator':
-      return 'bg-blue-500 text-white';
+    case "owner":
+      return "bg-amber-500 text-white";
+    case "moderator":
+      return "bg-blue-500 text-white";
     default:
-      return '';
+      return "";
   }
 }
 
 /**
  * Get connection status color
  */
-function getConnectionStatusColor(state: PeerConnectionState | undefined): string {
+function getConnectionStatusColor(
+  state: PeerConnectionState | undefined,
+): string {
   switch (state) {
-    case 'connected':
-      return 'bg-green-500';
-    case 'connecting':
-    case 'reconnecting':
-      return 'bg-yellow-500';
-    case 'disconnected':
-    case 'failed':
-      return 'bg-red-500';
+    case "connected":
+      return "bg-green-500";
+    case "connecting":
+    case "reconnecting":
+      return "bg-yellow-500";
+    case "disconnected":
+    case "failed":
+      return "bg-red-500";
     default:
-      return 'bg-gray-400';
+      return "bg-gray-400";
   }
 }
 
 /**
  * Get connection status label
  */
-function getConnectionStatusLabel(state: PeerConnectionState | undefined): string {
+function getConnectionStatusLabel(
+  state: PeerConnectionState | undefined,
+): string {
   switch (state) {
-    case 'connected':
-      return 'Connected';
-    case 'connecting':
-      return 'Connecting...';
-    case 'reconnecting':
-      return 'Reconnecting...';
-    case 'disconnected':
-      return 'Disconnected';
-    case 'failed':
-      return 'Connection failed';
+    case "connected":
+      return "Connected";
+    case "connecting":
+      return "Connecting...";
+    case "reconnecting":
+      return "Reconnecting...";
+    case "disconnected":
+      return "Disconnected";
+    case "failed":
+      return "Connection failed";
     default:
-      return 'Unknown status';
+      return "Unknown status";
   }
+}
+
+/**
+ * Avatar color palette - each participant gets a unique color
+ * Colors are assigned consistently based on participant ID hash
+ */
+const AVATAR_COLORS: Array<{
+  name: InwardWaveformColor;
+  border: string;
+  text: string;
+  bg: string;
+}> = [
+  {
+    name: "blue",
+    border: "border-blue-500",
+    text: "text-blue-500",
+    bg: "bg-blue-500/20",
+  },
+  {
+    name: "emerald",
+    border: "border-emerald-500",
+    text: "text-emerald-500",
+    bg: "bg-emerald-500/20",
+  },
+  {
+    name: "amber",
+    border: "border-amber-500",
+    text: "text-amber-500",
+    bg: "bg-amber-500/20",
+  },
+  {
+    name: "rose",
+    border: "border-rose-500",
+    text: "text-rose-500",
+    bg: "bg-rose-500/20",
+  },
+  {
+    name: "cyan",
+    border: "border-cyan-500",
+    text: "text-cyan-500",
+    bg: "bg-cyan-500/20",
+  },
+  {
+    name: "orange",
+    border: "border-orange-500",
+    text: "text-orange-500",
+    bg: "bg-orange-500/20",
+  },
+  {
+    name: "pink",
+    border: "border-pink-500",
+    text: "text-pink-500",
+    bg: "bg-pink-500/20",
+  },
+  {
+    name: "indigo",
+    border: "border-indigo-500",
+    text: "text-indigo-500",
+    bg: "bg-indigo-500/20",
+  },
+  {
+    name: "green",
+    border: "border-green-500",
+    text: "text-green-500",
+    bg: "bg-green-500/20",
+  },
+];
+
+/**
+ * Get a consistent color for a participant based on their ID
+ * Uses a simple hash to ensure the same ID always gets the same color
+ */
+function getAvatarColor(id: string): (typeof AVATAR_COLORS)[0] {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
+}
+
+/**
+ * Avatar size configuration - dynamic based on participant count
+ */
+type AvatarSizeConfig = "xs" | "sm" | "md" | "lg" | "xl";
+
+const AVATAR_SIZE_CLASSES: Record<
+  AvatarSizeConfig,
+  {
+    container: string;
+    avatar: string;
+    icon: string;
+    text: string;
+    waveform: number;
+    badge: string;
+  }
+> = {
+  xs: {
+    container: "w-16",
+    avatar: "w-10 h-10",
+    icon: "w-5 h-5",
+    text: "text-xs",
+    waveform: 40,
+    badge: "w-3 h-3 p-0.5",
+  },
+  sm: {
+    container: "w-20",
+    avatar: "w-14 h-14",
+    icon: "w-7 h-7",
+    text: "text-sm",
+    waveform: 56,
+    badge: "w-4 h-4 p-0.5",
+  },
+  md: {
+    container: "w-24",
+    avatar: "w-18 h-18",
+    icon: "w-9 h-9",
+    text: "text-base",
+    waveform: 72,
+    badge: "w-5 h-5 p-1",
+  },
+  lg: {
+    container: "w-28",
+    avatar: "w-20 h-20",
+    icon: "w-10 h-10",
+    text: "text-lg",
+    waveform: 80,
+    badge: "w-5 h-5 p-1",
+  },
+  xl: {
+    container: "w-32",
+    avatar: "w-24 h-24",
+    icon: "w-12 h-12",
+    text: "text-xl",
+    waveform: 96,
+    badge: "w-6 h-6 p-1",
+  },
+};
+
+/**
+ * Get avatar size based on participant count and available height
+ * Uses viewport height to ensure avatars fit without scrolling
+ */
+function getAvatarSize(
+  participantCount: number,
+  availableHeight?: number,
+): AvatarSizeConfig {
+  // If we have available height info, use it to constrain size
+  if (availableHeight !== undefined) {
+    // Estimate height needed per participant row (avatar + name + padding)
+    // Each size has different height requirements
+    const heightPerItem: Record<AvatarSizeConfig, number> = {
+      xl: 160, // 96px avatar + name + padding
+      lg: 130, // 80px avatar + name + padding
+      md: 110, // 72px avatar + name + padding
+      sm: 90, // 56px avatar + name + padding
+      xs: 70, // 40px avatar + name + padding
+    };
+
+    // Calculate how many rows we'd have (3 participants per row for mobile)
+    const itemsPerRow = Math.max(2, Math.min(4, Math.floor(300 / 80))); // ~80px per item minimum
+    const rows = Math.ceil(participantCount / itemsPerRow);
+
+    // Find the largest size that fits
+    const sizes: AvatarSizeConfig[] = ["xl", "lg", "md", "sm", "xs"];
+    for (const size of sizes) {
+      if (rows * heightPerItem[size] <= availableHeight) {
+        return size;
+      }
+    }
+    return "xs"; // Fallback to smallest
+  }
+
+  // Fallback to count-based sizing
+  if (participantCount <= 2) return "xl";
+  if (participantCount <= 4) return "lg";
+  if (participantCount <= 6) return "md";
+  if (participantCount <= 10) return "sm";
+  return "xs";
+}
+
+/**
+ * AI Avatar component - special avatar for the AI participant
+ * Uses transparent background with purple color theme
+ */
+function AIAvatar({
+  sizeConfig,
+}: {
+  sizeConfig: (typeof AVATAR_SIZE_CLASSES)[AvatarSizeConfig];
+}) {
+  return (
+    <div
+      className={`
+        ${sizeConfig.avatar}
+        bg-purple-500/20
+        rounded-full flex items-center justify-center
+        border-2 border-purple-500 transition-all
+      `}
+    >
+      {/* AI Icon - stylized bot/brain icon */}
+      <svg
+        className={`${sizeConfig.icon} text-purple-500`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+        />
+      </svg>
+    </div>
+  );
 }
 
 /**
@@ -155,7 +383,7 @@ function ParticipantItem({
   isLocal,
   showConnectionStatus,
   showRoleBadge,
-  layout,
+  sizeConfig,
   onClick,
 }: {
   participant: ParticipantInfo;
@@ -163,7 +391,7 @@ function ParticipantItem({
   isLocal: boolean;
   showConnectionStatus: boolean;
   showRoleBadge: boolean;
-  layout: ParticipantListLayout;
+  sizeConfig: (typeof AVATAR_SIZE_CLASSES)[AvatarSizeConfig];
   onClick?: () => void;
 }) {
   const {
@@ -175,31 +403,21 @@ function ParticipantItem({
     isAddressingAI,
     audioLevel = 0,
     connectionState,
+    isAI = false,
   } = participant;
 
   const initials = getInitials(displayName);
-  const roleLabel = getRoleLabel(role);
-  const roleBadgeColor = getRoleBadgeColor(role);
+  const roleLabel = isAI ? "AI" : getRoleLabel(role);
+  const roleBadgeColor = isAI
+    ? "bg-purple-500 text-white"
+    : getRoleBadgeColor(role);
   const connectionColor = getConnectionStatusColor(connectionState);
   const connectionLabel = getConnectionStatusLabel(connectionState);
 
-  // Ring animation intensity based on audio level
-  const ringIntensity = isSpeaking ? Math.min(audioLevel * 2 + 0.3, 1) : 0;
-  const speakingRingStyle = isSpeaking
-    ? {
-        boxShadow: `0 0 0 ${3 + ringIntensity * 4}px rgba(34, 197, 94, ${ringIntensity * 0.6})`,
-      }
-    : {};
-
-  // PTT indicator style
-  const pttIndicatorStyle = isAddressingAI
-    ? {
-        boxShadow: `0 0 0 3px rgba(168, 85, 247, 0.7)`,
-      }
-    : {};
-
-  const isHorizontal = layout === 'horizontal';
-  const isGrid = layout === 'grid';
+  // Get consistent color for this participant based on their ID
+  const avatarColor = getAvatarColor(participant.id);
+  // AI always uses purple, others use their assigned color
+  const waveformColor: InwardWaveformColor = isAI ? "purple" : avatarColor.name;
 
   return (
     <button
@@ -207,50 +425,57 @@ function ParticipantItem({
       onClick={onClick}
       disabled={!onClick}
       className={`
-        flex items-center gap-2 p-2 rounded-lg transition-all duration-200
-        ${onClick ? 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer' : 'cursor-default'}
-        ${isActiveSpeaker ? 'bg-green-50 dark:bg-green-900/20 ring-2 ring-green-500' : ''}
-        ${isHorizontal ? 'flex-col w-20' : isGrid ? 'flex-col w-24' : 'w-full'}
+        flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200
+        ${sizeConfig.container}
+        ${onClick ? "hover:bg-gray-100 dark:hover:bg-gray-700/50 cursor-pointer active:scale-95" : "cursor-default"}
+        ${isActiveSpeaker && !isAI ? "bg-green-50 dark:bg-green-900/20 ring-2 ring-green-500" : ""}
+        ${isActiveSpeaker && isAI ? "bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-500" : ""}
       `}
-      aria-label={`${displayName}${isLocal ? ' (You)' : ''}${isMuted ? ', muted' : ''}${isSpeaking ? ', speaking' : ''}${isActiveSpeaker ? ', active speaker' : ''}`}
+      aria-label={`${displayName}${isLocal ? " (You)" : ""}${isMuted ? ", muted" : ""}${isSpeaking ? ", speaking" : ""}${isActiveSpeaker ? ", active speaker" : ""}${isAI ? ", AI assistant" : ""}`}
     >
       {/* Avatar */}
-      <div
-        className="relative"
-        style={{ ...speakingRingStyle, ...pttIndicatorStyle }}
-      >
-        {avatarUrl ? (
+      <div className="relative">
+        {isAI ? (
+          <AIAvatar sizeConfig={sizeConfig} />
+        ) : avatarUrl ? (
           <img
             src={avatarUrl}
             alt={displayName}
             className={`
               rounded-full object-cover border-2 transition-all
-              ${isSpeaking ? 'border-green-500' : 'border-gray-200 dark:border-gray-600'}
-              ${isHorizontal || isGrid ? 'w-12 h-12' : 'w-10 h-10'}
+              ${avatarColor.border}
+              ${sizeConfig.avatar}
             `}
           />
         ) : (
           <div
             className={`
-              rounded-full flex items-center justify-center font-medium
-              bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200
-              border-2 transition-all
-              ${isSpeaking ? 'border-green-500' : 'border-gray-300 dark:border-gray-500'}
-              ${isHorizontal || isGrid ? 'w-12 h-12 text-sm' : 'w-10 h-10 text-xs'}
+              rounded-full flex items-center justify-center font-semibold
+              ${avatarColor.bg} ${avatarColor.text}
+              border-2 ${avatarColor.border} transition-all
+              ${sizeConfig.avatar} ${sizeConfig.text}
             `}
           >
             {initials}
           </div>
         )}
 
-        {/* Mute indicator */}
-        {isMuted && (
+        {/* Inward waveform overlay for speaking indicator */}
+        <InwardWaveform
+          isSpeaking={isSpeaking || !!isAddressingAI}
+          audioLevel={audioLevel}
+          color={waveformColor}
+          size={sizeConfig.waveform}
+        />
+
+        {/* Mute indicator - don't show for AI */}
+        {isMuted && !isAI && (
           <div
-            className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-0.5"
+            className={`absolute -bottom-1 -right-1 bg-red-500 rounded-full flex items-center justify-center ${sizeConfig.badge}`}
             title="Muted"
           >
             <svg
-              className="w-3 h-3 text-white"
+              className="w-full h-full text-white"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -272,22 +497,25 @@ function ParticipantItem({
           </div>
         )}
 
-        {/* Connection status indicator */}
-        {showConnectionStatus && connectionState && connectionState !== 'connected' && (
-          <div
-            className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${connectionColor}`}
-            title={connectionLabel}
-          />
-        )}
+        {/* Connection status indicator - don't show for AI */}
+        {showConnectionStatus &&
+          connectionState &&
+          connectionState !== "connected" &&
+          !isAI && (
+            <div
+              className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${connectionColor}`}
+              title={connectionLabel}
+            />
+          )}
 
-        {/* PTT indicator */}
-        {isAddressingAI && (
+        {/* PTT indicator - don't show for AI */}
+        {isAddressingAI && !isAI && (
           <div
-            className="absolute -top-1 -left-1 bg-purple-500 rounded-full p-0.5"
+            className={`absolute -top-1 -left-1 bg-purple-500 rounded-full flex items-center justify-center ${sizeConfig.badge}`}
             title="Addressing AI"
           >
             <svg
-              className="w-3 h-3 text-white"
+              className="w-full h-full text-white"
               fill="currentColor"
               viewBox="0 0 24 24"
               aria-hidden="true"
@@ -299,16 +527,12 @@ function ParticipantItem({
       </div>
 
       {/* Name and role */}
-      <div
-        className={`
-          flex flex-col items-center overflow-hidden
-          ${isHorizontal || isGrid ? 'w-full text-center' : 'flex-1 items-start'}
-        `}
-      >
+      <div className="flex flex-col items-center overflow-hidden w-full text-center">
         <span
           className={`
-            font-medium text-gray-900 dark:text-white truncate max-w-full
-            ${isHorizontal || isGrid ? 'text-xs' : 'text-sm'}
+            font-medium truncate max-w-full leading-tight
+            ${isAI ? "text-purple-600 dark:text-purple-400" : "text-gray-900 dark:text-white"}
+            ${sizeConfig.text}
           `}
         >
           {displayName}
@@ -321,39 +545,14 @@ function ParticipantItem({
         {showRoleBadge && roleLabel && (
           <span
             className={`
-              text-xs px-1.5 py-0.5 rounded-full mt-0.5
+              text-[10px] px-1.5 py-0.5 rounded-full mt-0.5
               ${roleBadgeColor}
             `}
           >
             {roleLabel}
           </span>
         )}
-
-        {/* Speaking indicator text (vertical layout only) */}
-        {!isHorizontal && !isGrid && isSpeaking && (
-          <span className="text-xs text-green-600 dark:text-green-400">
-            Speaking
-          </span>
-        )}
       </div>
-
-      {/* Speaking indicator wave (horizontal/grid only) */}
-      {(isHorizontal || isGrid) && isSpeaking && (
-        <div className="flex items-center gap-0.5 h-3">
-          <div
-            className="w-0.5 bg-green-500 rounded-full animate-pulse"
-            style={{ height: `${Math.max(30, audioLevel * 100)}%` }}
-          />
-          <div
-            className="w-0.5 bg-green-500 rounded-full animate-pulse"
-            style={{ height: `${Math.max(50, audioLevel * 100)}%`, animationDelay: '0.1s' }}
-          />
-          <div
-            className="w-0.5 bg-green-500 rounded-full animate-pulse"
-            style={{ height: `${Math.max(30, audioLevel * 100)}%`, animationDelay: '0.2s' }}
-          />
-        </div>
-      )}
     </button>
   );
 }
@@ -363,20 +562,17 @@ function ParticipantItem({
  */
 function OverflowIndicator({
   count,
-  layout,
+  sizeConfig,
 }: {
   count: number;
-  layout: ParticipantListLayout;
+  sizeConfig: (typeof AVATAR_SIZE_CLASSES)[AvatarSizeConfig];
 }) {
-  const isHorizontal = layout === 'horizontal';
-  const isGrid = layout === 'grid';
-
   return (
     <div
       className={`
-        flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700
-        text-gray-600 dark:text-gray-300 font-medium
-        ${isHorizontal ? 'flex-col w-20 p-2' : isGrid ? 'flex-col w-24 p-2' : 'w-full p-2'}
+        flex flex-col items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700
+        text-gray-600 dark:text-gray-300 font-medium p-2
+        ${sizeConfig.container}
       `}
       aria-label={`${count} more participants`}
     >
@@ -384,19 +580,12 @@ function OverflowIndicator({
         className={`
           rounded-full flex items-center justify-center
           bg-gray-200 dark:bg-gray-600
-          ${isHorizontal || isGrid ? 'w-12 h-12 text-lg' : 'w-10 h-10 text-base'}
+          ${sizeConfig.avatar} ${sizeConfig.text}
         `}
       >
         +{count}
       </div>
-      {(isHorizontal || isGrid) && (
-        <span className="text-xs mt-1">more</span>
-      )}
-      {!isHorizontal && !isGrid && (
-        <span className="ml-2 text-sm">
-          {count} more {count === 1 ? 'participant' : 'participants'}
-        </span>
-      )}
+      <span className={`mt-1 ${sizeConfig.text}`}>more</span>
     </div>
   );
 }
@@ -424,24 +613,57 @@ export function ParticipantList({
   participants,
   activeSpeakerId,
   localPeerId,
-  layout = 'vertical',
+  layout = "vertical",
   maxVisible,
   showConnectionStatus = false,
   showRoleBadge = true,
   onParticipantClick,
-  className = '',
+  className = "",
+  viewportAware = false,
 }: ParticipantListProps) {
-  // Sort participants: local first, then by role (owner > moderator > participant), then by name
+  // Track available height for viewport-aware sizing
+  const [availableHeight, setAvailableHeight] = useState<number | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    if (!viewportAware) return;
+
+    const calculateHeight = () => {
+      // Estimate fixed UI elements:
+      // Header: ~100px (with status row)
+      // Footer controls: ~140px
+      // Padding: ~32px
+      // Safe area (mobile): ~40px
+      const fixedHeight = 100 + 140 + 32 + 40;
+      const available = window.innerHeight - fixedHeight;
+      setAvailableHeight(Math.max(100, available)); // Minimum 100px
+    };
+
+    calculateHeight();
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, [viewportAware]);
+
+  // Sort participants: AI first, then local, then by role, then by name
   const sortedParticipants = useMemo(() => {
     return [...participants].sort((a, b) => {
-      // Local user first
+      // AI always first
+      if (a.isAI && !b.isAI) return -1;
+      if (!a.isAI && b.isAI) return 1;
+
+      // Local user second
       if (a.isLocal && !b.isLocal) return -1;
       if (!a.isLocal && b.isLocal) return 1;
       if (a.id === localPeerId && b.id !== localPeerId) return -1;
       if (a.id !== localPeerId && b.id === localPeerId) return 1;
 
       // Then by role
-      const roleOrder: Record<PeerRole, number> = { owner: 0, moderator: 1, participant: 2 };
+      const roleOrder: Record<PeerRole, number> = {
+        owner: 0,
+        moderator: 1,
+        participant: 2,
+      };
       const roleCompare = roleOrder[a.role] - roleOrder[b.role];
       if (roleCompare !== 0) return roleCompare;
 
@@ -458,18 +680,12 @@ export function ParticipantList({
     ? Math.max(0, sortedParticipants.length - maxVisible)
     : 0;
 
-  // Container styles based on layout
-  const containerClasses = useMemo(() => {
-    switch (layout) {
-      case 'horizontal':
-        return 'flex flex-row flex-wrap items-start gap-1';
-      case 'grid':
-        return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2';
-      case 'vertical':
-      default:
-        return 'flex flex-col gap-1';
-    }
-  }, [layout]);
+  // Get dynamic size based on participant count and available height
+  const avatarSize = getAvatarSize(
+    visibleParticipants.length + (overflowCount > 0 ? 1 : 0),
+    viewportAware ? availableHeight : undefined,
+  );
+  const sizeConfig = AVATAR_SIZE_CLASSES[avatarSize];
 
   if (participants.length === 0) {
     return (
@@ -484,7 +700,7 @@ export function ParticipantList({
 
   return (
     <div
-      className={`${containerClasses} ${className}`}
+      className={`flex flex-wrap items-center justify-center gap-2 ${className}`}
       role="list"
       aria-label="Room participants"
     >
@@ -496,13 +712,17 @@ export function ParticipantList({
           isLocal={participant.isLocal || participant.id === localPeerId}
           showConnectionStatus={showConnectionStatus}
           showRoleBadge={showRoleBadge}
-          layout={layout}
-          onClick={onParticipantClick ? () => onParticipantClick(participant.id) : undefined}
+          sizeConfig={sizeConfig}
+          onClick={
+            onParticipantClick
+              ? () => onParticipantClick(participant.id)
+              : undefined
+          }
         />
       ))}
 
       {overflowCount > 0 && (
-        <OverflowIndicator count={overflowCount} layout={layout} />
+        <OverflowIndicator count={overflowCount} sizeConfig={sizeConfig} />
       )}
     </div>
   );

@@ -22,14 +22,13 @@ import {
   LogOut,
   Copy,
   Check,
-  Mic,
   MicOff,
-  Pencil,
 } from "lucide-react";
 import {
   ParticipantList,
   RoomControls,
   UsernameModal,
+  ParticipantModal,
 } from "@/components/room";
 import type { ParticipantInfo } from "@/components/room";
 import type { Room } from "@/types/room";
@@ -137,21 +136,25 @@ export default function RoomPage() {
     return "User";
   });
   const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [showParticipantModal, setShowParticipantModal] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] =
+    useState<ParticipantInfo | null>(null);
   const [isAddressingAI, setIsAddressingAI] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
 
-  // Track local mute state - start muted by default
-  const [localIsMuted, setLocalIsMuted] = useState(true);
+  // Track local mute state - start unmuted by default
+  const [localIsMuted, setLocalIsMuted] = useState(false);
 
   // Local media stream ref
   const localStreamRef = useRef<MediaStream | null>(null);
 
-  // Audio capture refs for PTT streaming
+  // Audio capture refs for PTT streaming (using AudioWorklet)
   const audioContextRef = useRef<AudioContext | null>(null);
-  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const workletReadyRef = useRef<boolean>(false);
 
   // Socket.io room connection hook - provides real signaling
   const {
@@ -202,7 +205,12 @@ export default function RoomPage() {
   });
 
   // Audio playback hook - manages audio elements for each peer
-  const { addPeerStream, removePeerStream, peerAudio } = useRoomAudio({
+  const {
+    addPeerStream,
+    removePeerStream,
+    setLocalStream: setLocalAudioStream,
+    peerAudio,
+  } = useRoomAudio({
     autoPlay: true,
     onPeerAudioStart: (peerId) => {
       console.log("[Room] Peer audio started:", peerId);
@@ -258,35 +266,80 @@ export default function RoomPage() {
     },
   );
 
+  // Determine if AI is actually speaking
+  // Use isPlaying as primary indicator - server state may go idle before audio buffer finishes
+  // Also show as speaking if server says speaking (even if audio hasn't started yet)
+  const isAIActuallySpeaking =
+    aiPlayback.isPlaying || aiState.aiState === "speaking";
+
   // Convert signaling peers to ParticipantInfo format
   // Use local mute state for accurate UI and WebRTC peer states for remote peers
+  // Use client-side audio analysis for remote peer speaking detection (isSpeaking from peerAudio)
   const participants: ParticipantInfo[] = [
-    // Add local peer first with actual local mute state
+    // Add AI as the first participant - always present in rooms
+    {
+      id: "ai-assistant" as string,
+      displayName: "AI Assistant",
+      role: "participant" as const,
+      isMuted: false,
+      isSpeaking: isAIActuallySpeaking,
+      isLocal: false,
+      connectionState: "connected" as const,
+      isAI: true,
+      audioLevel: isAIActuallySpeaking ? 0.7 : 0, // Simulated audio level when speaking
+    },
+    // Add local peer with actual local mute state
+    // Use client-side VAD for speaking detection when mic is active
     ...(localPeer
-      ? [
-          {
-            id: localPeer.id,
-            displayName: localPeer.displayName,
-            avatarUrl: localPeer.avatarUrl,
-            role: localPeer.role as "owner" | "moderator" | "participant",
-            isMuted: localIsMuted, // Use actual local mute state
-            isSpeaking: localPresence.isSpeaking || isAddressingAI,
-            isLocal: true,
-            connectionState: "connected" as const,
-          },
-        ]
+      ? (() => {
+          const localAudioState = peerAudio.get(localPeer.id);
+          // Only use VAD when not muted, otherwise rely on addressing AI state
+          const isSpeaking = localIsMuted
+            ? isAddressingAI
+            : (localAudioState?.isSpeaking ?? false) || isAddressingAI;
+          const audioLevel = localIsMuted
+            ? isAddressingAI
+              ? 0.5
+              : 0
+            : (localAudioState?.audioLevel ?? 0);
+
+          return [
+            {
+              id: localPeer.id,
+              displayName: localPeer.displayName,
+              avatarUrl: localPeer.avatarUrl,
+              role: localPeer.role as "owner" | "moderator" | "participant",
+              isMuted: localIsMuted, // Use actual local mute state
+              isSpeaking,
+              isLocal: true,
+              connectionState: "connected" as const,
+              isAI: false,
+              audioLevel,
+            },
+          ];
+        })()
       : []),
     // Add remote peers with WebRTC connection states
-    ...webrtcPeers.map((peer) => ({
-      id: peer.id,
-      displayName: peer.displayName,
-      avatarUrl: peer.avatarUrl,
-      role: peer.role as "owner" | "moderator" | "participant",
-      isMuted: peer.isMuted,
-      isSpeaking: peer.isSpeaking,
-      isLocal: false,
-      connectionState: peer.webrtcState,
-    })),
+    // Use client-side audio analysis for speaking detection
+    ...webrtcPeers.map((peer) => {
+      const peerAudioState = peerAudio.get(peer.id);
+      // Use client-side VAD from audio analysis, fallback to server presence
+      const isSpeaking = peerAudioState?.isSpeaking ?? peer.isSpeaking;
+      const audioLevel = peerAudioState?.audioLevel ?? 0;
+
+      return {
+        id: peer.id,
+        displayName: peer.displayName,
+        avatarUrl: peer.avatarUrl,
+        role: peer.role as "owner" | "moderator" | "participant",
+        isMuted: peer.isMuted,
+        isSpeaking,
+        isLocal: false,
+        connectionState: peer.webrtcState,
+        isAI: false,
+        audioLevel,
+      };
+    }),
   ];
 
   /**
@@ -447,9 +500,10 @@ export default function RoomPage() {
       stopMicrophoneRef.current();
 
       // Clean up audio capture
-      if (scriptProcessorRef.current) {
-        scriptProcessorRef.current.disconnect();
-        scriptProcessorRef.current = null;
+      if (workletNodeRef.current) {
+        workletNodeRef.current.port.onmessage = null;
+        workletNodeRef.current.disconnect();
+        workletNodeRef.current = null;
       }
       if (sourceNodeRef.current) {
         sourceNodeRef.current.disconnect();
@@ -461,6 +515,20 @@ export default function RoomPage() {
       }
     };
   }, [roomId, displayName]); // Only depend on roomId and displayName
+
+  // Set up local audio stream for VAD analysis once we have peer ID and stream
+  useEffect(() => {
+    if (localPeer?.id && localStreamRef.current) {
+      console.log("[Room] Setting up local audio stream for VAD analysis");
+      setLocalAudioStream(localPeer.id, localStreamRef.current);
+    }
+
+    return () => {
+      if (localPeer?.id) {
+        setLocalAudioStream(localPeer.id, null);
+      }
+    };
+  }, [localPeer?.id, setLocalAudioStream]);
 
   /**
    * Handle mute toggle - controls actual microphone track
@@ -504,6 +572,18 @@ export default function RoomPage() {
    * Note: Voice interrupt detection is managed automatically by useEffect when AI is speaking
    */
   const handlePTTStart = useCallback(() => {
+    // Block PTT if another user is already addressing the AI
+    // Check if AI is in listening or processing state (someone else is talking)
+    if (
+      (aiState.aiState === "listening" || aiState.aiState === "processing") &&
+      aiState.currentSpeakerId !== localPeer?.id
+    ) {
+      console.log(
+        `[Room] PTT blocked - ${aiState.currentSpeakerName || "Someone"} is already addressing AI (state: ${aiState.aiState})`,
+      );
+      return;
+    }
+
     // Allow PTT even when AI is speaking - user may want to interrupt
     // Voice interrupt detection will handle the "excuse me" keyword
 
@@ -531,67 +611,82 @@ export default function RoomPage() {
       console.log("[Room] Sent ai:ptt_start to server");
     }
 
-    // Set up audio capture for streaming to server
-    try {
-      // Create AudioContext at 24kHz (OpenAI Realtime API requirement)
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+    // Set up audio capture for streaming to server (using AudioWorklet)
+    const setupAudioCapture = async () => {
+      try {
+        // Create AudioContext at 24kHz (OpenAI Realtime API requirement)
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+        }
+
+        const audioContext = audioContextRef.current;
+
+        // Resume if suspended (browser autoplay policy)
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        // Load AudioWorklet module if not already loaded
+        if (!workletReadyRef.current) {
+          await audioContext.audioWorklet.addModule(
+            "/audio/pcm-capture-processor.js",
+          );
+          workletReadyRef.current = true;
+        }
+
+        // Create source from microphone stream
+        const source = audioContext.createMediaStreamSource(
+          localStreamRef.current!,
+        );
+        sourceNodeRef.current = source;
+
+        // Create AudioWorkletNode for audio capture
+        const workletNode = new AudioWorkletNode(
+          audioContext,
+          "pcm-capture-processor",
+        );
+        workletNodeRef.current = workletNode;
+
+        // Handle PCM16 audio chunks from worklet
+        workletNode.port.onmessage = (event) => {
+          if (event.data.type === "audio") {
+            const pcm16Buffer = event.data.pcm16;
+            const uint8Array = new Uint8Array(pcm16Buffer);
+
+            // Convert to base64
+            let binary = "";
+            for (let i = 0; i < uint8Array.length; i++) {
+              binary += String.fromCharCode(uint8Array[i]);
+            }
+            const audioBase64 = btoa(binary);
+
+            // Send to server
+            const socket = client?.getSocket();
+            if (socket) {
+              socket.emit("ai:audio_data", { roomId, audio: audioBase64 });
+            }
+          }
+        };
+
+        // Connect: source -> workletNode (no need to connect to destination)
+        source.connect(workletNode);
+
+        console.log("[Room] Audio capture started for PTT (AudioWorklet)");
+      } catch (err) {
+        console.error("[Room] Failed to start audio capture:", err);
       }
-
-      const audioContext = audioContextRef.current;
-
-      // Resume if suspended (browser autoplay policy)
-      if (audioContext.state === "suspended") {
-        audioContext.resume();
-      }
-
-      // Create source from microphone stream
-      const source = audioContext.createMediaStreamSource(
-        localStreamRef.current,
-      );
-      sourceNodeRef.current = source;
-
-      // Create ScriptProcessor for audio capture
-      // Buffer size 4096 gives ~170ms chunks at 24kHz - good balance
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      scriptProcessorRef.current = processor;
-
-      // Process audio chunks and send to server
-      processor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-
-        // Convert Float32 to PCM16
-        const pcm16 = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          // Clamp and convert to 16-bit integer
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        }
-
-        // Convert to base64
-        const uint8Array = new Uint8Array(pcm16.buffer);
-        let binary = "";
-        for (let i = 0; i < uint8Array.length; i++) {
-          binary += String.fromCharCode(uint8Array[i]);
-        }
-        const audioBase64 = btoa(binary);
-
-        // Send to server
-        const socket = client?.getSocket();
-        if (socket) {
-          socket.emit("ai:audio_data", { roomId, audio: audioBase64 });
-        }
-      };
-
-      // Connect: source -> processor -> destination (required for processor to work)
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-
-      console.log("[Room] Audio capture started for PTT");
-    } catch (err) {
-      console.error("[Room] Failed to start audio capture:", err);
-    }
-  }, [setPresenceAddressingAI, setSpeaking, getClient, roomId]);
+    };
+    setupAudioCapture();
+  }, [
+    setPresenceAddressingAI,
+    setSpeaking,
+    getClient,
+    roomId,
+    aiState.aiState,
+    aiState.currentSpeakerId,
+    aiState.currentSpeakerName,
+    localPeer?.id,
+  ]);
 
   /**
    * Handle PTT end - stop audio capture and restore mute state
@@ -604,10 +699,10 @@ export default function RoomPage() {
     console.log("[Room] PTT ended");
 
     // Stop audio capture
-    if (scriptProcessorRef.current) {
-      scriptProcessorRef.current.disconnect();
-      scriptProcessorRef.current.onaudioprocess = null;
-      scriptProcessorRef.current = null;
+    if (workletNodeRef.current) {
+      workletNodeRef.current.port.onmessage = null;
+      workletNodeRef.current.disconnect();
+      workletNodeRef.current = null;
     }
     if (sourceNodeRef.current) {
       sourceNodeRef.current.disconnect();
@@ -698,6 +793,20 @@ export default function RoomPage() {
   );
 
   /**
+   * Handle participant click - open modal with options
+   */
+  const handleParticipantClick = useCallback(
+    (participantId: string) => {
+      const participant = participants.find((p) => p.id === participantId);
+      if (participant) {
+        setSelectedParticipant(participant);
+        setShowParticipantModal(true);
+      }
+    },
+    [participants],
+  );
+
+  /**
    * Render loading state
    */
   if (roomState === "loading" || roomState === "joining") {
@@ -778,9 +887,9 @@ export default function RoomPage() {
    * Render connected room experience
    */
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="flex-shrink-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Back / Leave */}
@@ -832,159 +941,98 @@ export default function RoomPage() {
             </button>
           </div>
 
-          {/* Username row */}
+          {/* Dynamic status row */}
           <div className="flex items-center justify-center py-2 border-t border-border/50">
-            <button
-              onClick={() => setShowUsernameModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors group"
-              aria-label="Edit your username"
-            >
-              <span>
-                You:{" "}
-                <span className="text-foreground font-medium">
-                  {displayName}
+            <div className="text-sm font-medium">
+              {/* AI Speaking */}
+              {aiState.aiState === "speaking" || aiPlayback.isPlaying ? (
+                <span className="text-green-400 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  AI is speaking
                 </span>
-              </span>
-              <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
+              ) : /* AI Processing */
+              aiState.aiState === "processing" ? (
+                <span className="text-yellow-400 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  AI is thinking...
+                </span>
+              ) : /* AI Listening to someone else */
+              aiState.aiState === "listening" &&
+                aiState.currentSpeakerId !== localPeer?.id ? (
+                <span className="text-purple-400 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                  {aiState.currentSpeakerName || "Someone"} is speaking
+                </span>
+              ) : /* Local user addressing AI */
+              isAddressingAI ||
+                (aiState.aiState === "listening" &&
+                  aiState.currentSpeakerId === localPeer?.id) ? (
+                <span className="text-purple-400 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                  Listening... Release to send
+                </span>
+              ) : /* Remote peer speaking (not to AI) */
+              activeSpeaker &&
+                activeSpeaker !== localPeer?.id &&
+                activeSpeaker !== "ai-assistant" ? (
+                <span className="text-blue-400 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  {webrtcPeers.find((p) => p.id === activeSpeaker)
+                    ?.displayName || "Someone"}{" "}
+                  is speaking
+                </span>
+              ) : (
+                /* Default idle state */
+                <span className="text-muted-foreground">
+                  Hold To Speak to AI
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col">
-        {/* Room description */}
-        {room?.description && (
-          <div className="px-4 sm:px-6 lg:px-8 py-3 bg-muted/50 border-b border-border">
-            <p className="text-sm text-muted-foreground max-w-7xl mx-auto">
-              {room.description}
-            </p>
-          </div>
-        )}
-
-        {/* Participants area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Participants area - fills available space, no scroll */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden">
           <div className="w-full max-w-4xl">
             {/* Participant list */}
             <ParticipantList
               participants={participants}
               localPeerId={localPeer?.id || ""}
               activeSpeakerId={activeSpeaker}
-              layout="grid"
               showConnectionStatus
               showRoleBadge
-              className="justify-center"
+              onParticipantClick={handleParticipantClick}
+              viewportAware
             />
 
-            {/* Room status */}
-            <div className="mt-8 text-center space-y-3">
-              {/* Connection status */}
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-full text-green-400 text-sm">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                Connected
+            {/* Error indicator only - show mic errors if any */}
+            {micError && (
+              <div className="mt-4 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 text-sm">
+                  <MicOff className="w-4 h-4" />
+                  Microphone error: {micError}
+                </div>
               </div>
+            )}
 
-              {/* Microphone status */}
-              <div className="block">
-                {micError ? (
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 text-sm">
-                    <MicOff className="w-4 h-4" />
-                    Microphone error: {micError}
-                  </div>
-                ) : localStreamRef.current ? (
-                  <div
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm ${
-                      localIsMuted
-                        ? "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400"
-                        : "bg-blue-500/10 border border-blue-500/30 text-blue-400"
-                    }`}
-                  >
-                    {localIsMuted ? (
-                      <>
-                        <MicOff className="w-4 h-4" />
-                        Microphone muted
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="w-4 h-4" />
-                        Microphone active
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500/10 border border-gray-500/30 rounded-full text-gray-400 text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Initializing microphone...
-                  </div>
-                )}
-              </div>
-
-              {/* Active speaker indicator */}
-              {activeSpeaker && activeSpeaker !== localPeer?.id && (
-                <div className="block">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full text-purple-400 text-sm">
-                    <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                    {webrtcPeers.find((p) => p.id === activeSpeaker)
-                      ?.displayName || "Someone"}{" "}
-                    is speaking
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* AI status */}
-        <div className="px-4 sm:px-6 lg:px-8 py-4 border-t border-border bg-card/50">
-          <div className="max-w-7xl mx-auto text-center">
-            <div className="flex items-center justify-center gap-2">
-              {/* AI state indicator */}
-              {aiState.aiState === "idle" && !isAddressingAI && (
-                <p className="text-sm text-muted-foreground">
-                  Hold the Talk button to address the AI assistant
-                </p>
-              )}
-              {aiState.aiState === "idle" && isAddressingAI && (
-                <div className="flex items-center gap-2 text-purple-400">
-                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                  <span className="text-sm">Listening... Release to send</span>
-                </div>
-              )}
-              {aiState.aiState === "listening" && (
-                <div className="flex items-center gap-2 text-purple-400">
-                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                  <span className="text-sm">
-                    AI is listening
-                    {aiState.currentSpeakerName &&
-                      ` to ${aiState.currentSpeakerName}`}
-                  </span>
-                </div>
-              )}
-              {aiState.aiState === "processing" && (
-                <div className="flex items-center gap-2 text-yellow-400">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">AI is thinking...</span>
-                </div>
-              )}
-              {aiState.aiState === "speaking" && (
-                <div className="flex items-center gap-2 text-green-400">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-sm">AI is speaking</span>
-                </div>
-              )}
-              {aiState.lastError && (
-                <div className="flex items-center gap-2 text-red-400">
+            {/* AI error indicator */}
+            {aiState.lastError && (
+              <div className="mt-4 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 text-sm">
                   <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">{aiState.lastError}</span>
+                  {aiState.lastError}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
 
       {/* Controls footer */}
-      <footer className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border">
+      <footer className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <RoomControls
             isMuted={localIsMuted}
@@ -1006,6 +1054,22 @@ export default function RoomPage() {
         currentName={displayName}
         onSave={handleUsernameChange}
         onClose={() => setShowUsernameModal(false)}
+      />
+
+      {/* Participant options modal */}
+      <ParticipantModal
+        isOpen={showParticipantModal}
+        participant={selectedParticipant}
+        isLocalUser={selectedParticipant?.id === localPeer?.id}
+        onClose={() => {
+          setShowParticipantModal(false);
+          setSelectedParticipant(null);
+        }}
+        onMuteToggle={handleMuteToggle}
+        onEditUsername={() => {
+          setShowParticipantModal(false);
+          setShowUsernameModal(true);
+        }}
       />
     </div>
   );

@@ -7,8 +7,8 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-305
  */
 
-import type { RoomId } from '@/types/room';
-import type { AIPersonality } from '@/types/room';
+import type { RoomId } from "@/types/room";
+import type { AIPersonality } from "@/types/room";
 
 /**
  * Personality preset definition
@@ -23,7 +23,16 @@ export interface PersonalityPreset {
   /** System instructions for the AI */
   instructions: string;
   /** Suggested voice for this personality */
-  suggestedVoice?: 'alloy' | 'echo' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage' | 'verse';
+  suggestedVoice?:
+    | "alloy"
+    | "echo"
+    | "shimmer"
+    | "ash"
+    | "ballad"
+    | "coral"
+    | "sage"
+    | "marin"
+    | "verse";
   /** Suggested temperature (0-2) */
   suggestedTemperature?: number;
   /** Tags for categorization */
@@ -41,7 +50,16 @@ export interface RoomAIConfig {
   /** Custom instructions (when personality is 'custom') */
   customInstructions?: string;
   /** Voice override */
-  voice?: 'alloy' | 'echo' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage' | 'verse';
+  voice?:
+    | "alloy"
+    | "echo"
+    | "shimmer"
+    | "ash"
+    | "ballad"
+    | "coral"
+    | "sage"
+    | "marin"
+    | "verse";
   /** Temperature override */
   temperature?: number;
   /** Additional context to append to instructions */
@@ -82,7 +100,16 @@ export interface AIPersonalityManagerOptions {
   /** Default personality for new rooms */
   defaultPersonality?: AIPersonality;
   /** Default voice */
-  defaultVoice?: 'alloy' | 'echo' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage' | 'verse';
+  defaultVoice?:
+    | "alloy"
+    | "echo"
+    | "shimmer"
+    | "ash"
+    | "ballad"
+    | "coral"
+    | "sage"
+    | "marin"
+    | "verse";
   /** Default temperature */
   defaultTemperature?: number;
   /** Maximum custom instructions length */
@@ -96,111 +123,74 @@ export interface AIPersonalityManagerOptions {
 /**
  * Default personality presets
  */
-export const PERSONALITY_PRESETS: Record<Exclude<AIPersonality, 'custom'>, PersonalityPreset> = {
+export const PERSONALITY_PRESETS: Record<
+  Exclude<AIPersonality, "custom">,
+  PersonalityPreset
+> = {
   facilitator: {
-    id: 'facilitator',
-    name: 'Discussion Facilitator',
-    description: 'Guides discussions, summarizes points, and keeps conversations on track',
-    instructions: `You are a skilled discussion facilitator in a multi-person voice conversation.
+    id: "facilitator",
+    name: "Discussion Facilitator",
+    description:
+      "Guides discussions, summarizes points, and keeps conversations on track",
+    instructions: `You're a discussion facilitator in a group voice chat. Keep things moving.
 
-Your role:
-- Guide the conversation to stay productive and on-topic
-- Summarize key points when discussions get lengthy
-- Ensure all participants have a chance to contribute
-- Ask clarifying questions to deepen understanding
-- Gently redirect off-topic tangents
-- Identify areas of agreement and disagreement
-- Synthesize different viewpoints into actionable insights
+CRITICAL: Max 4 sentences per response. Be pithy and direct.
 
-Communication style:
-- Speak clearly and concisely
-- Use inclusive language ("we", "let's", "together")
-- Acknowledge each speaker's contributions
-- Be neutral and fair to all perspectives
-- Keep energy positive and constructive
+Your job: Keep discussions productive. Summarize when needed. Make sure everyone gets heard. Redirect tangents with a light touch.
 
-When multiple people are speaking, address them by name when possible. Help the group reach conclusions and next steps.`,
-    suggestedVoice: 'coral',
+Style: Inclusive ("we", "let's"), neutral, warm but efficient. No fluff — just facilitate.`,
+    suggestedVoice: "marin",
     suggestedTemperature: 0.7,
-    tags: ['professional', 'meetings', 'collaboration'],
+    tags: ["professional", "meetings", "collaboration"],
   },
 
   assistant: {
-    id: 'assistant',
-    name: 'General Assistant',
-    description: 'Helpful general-purpose assistant for any conversation',
-    instructions: `You are a helpful voice assistant participating in a group conversation.
+    id: "assistant",
+    name: "General Assistant",
+    description: "Helpful general-purpose assistant for any conversation",
+    instructions: `You're a helpful assistant in a group voice chat.
 
-Your role:
-- Answer questions accurately and helpfully
-- Provide information when asked
-- Help with tasks, planning, and problem-solving
-- Be friendly and approachable
-- Support the flow of conversation
+CRITICAL: Max 4 sentences per response. Short, punchy, conversational.
 
-Communication style:
-- Be conversational but professional
-- Give concise answers, elaborating only when asked
-- Admit when you don't know something
-- Be responsive to the group's needs
+Answer questions directly. Help with tasks. Be friendly but efficient. If you don't know something, just say so — no hedging.
 
-You're here to help the group accomplish whatever they're working on. Listen actively and contribute when you can add value.`,
-    suggestedVoice: 'alloy',
+Skip the preamble. No "Great question!" or "I'd be happy to help!" Just answer.`,
+    suggestedVoice: "marin",
     suggestedTemperature: 0.8,
-    tags: ['general', 'helpful', 'versatile'],
+    tags: ["general", "helpful", "versatile"],
   },
 
   expert: {
-    id: 'expert',
-    name: 'Domain Expert',
-    description: 'Technical depth and domain expertise for detailed discussions',
-    instructions: `You are a knowledgeable domain expert in a technical discussion.
+    id: "expert",
+    name: "Domain Expert",
+    description:
+      "Technical depth and domain expertise for detailed discussions",
+    instructions: `You're a domain expert in a group voice chat. Share knowledge concisely.
 
-Your role:
-- Provide in-depth, accurate technical information
-- Explain complex concepts clearly
-- Share best practices and industry standards
-- Point out potential issues or considerations
-- Suggest resources for further learning
+CRITICAL: Max 4 sentences per response. Dense with insight, light on words.
 
-Communication style:
-- Be precise with technical terminology
-- Provide context for your recommendations
-- Use examples to illustrate points
-- Be thorough but not overwhelming
-- Acknowledge uncertainty when appropriate
+Give the essential technical info. Use precise terms but explain briefly if needed. Point out gotchas. If they want more depth, they'll ask.
 
-Feel free to ask clarifying questions to better understand the group's needs. Provide actionable guidance based on your expertise.`,
-    suggestedVoice: 'sage',
+No lectures. Just the good stuff, fast.`,
+    suggestedVoice: "marin",
     suggestedTemperature: 0.6,
-    tags: ['technical', 'professional', 'detailed'],
+    tags: ["technical", "professional", "detailed"],
   },
 
   brainstorm: {
-    id: 'brainstorm',
-    name: 'Creative Partner',
-    description: 'Creative ideation partner for brainstorming sessions',
-    instructions: `You are an enthusiastic creative partner in a brainstorming session.
+    id: "brainstorm",
+    name: "Creative Partner",
+    description: "Creative ideation partner for brainstorming sessions",
+    instructions: `You're a creative brainstorm partner in a group voice chat. Spark ideas.
 
-Your role:
-- Generate diverse and creative ideas
-- Build on others' suggestions ("Yes, and...")
-- Challenge assumptions constructively
-- Explore unconventional approaches
-- Keep energy high and momentum going
-- Capture and organize ideas as they emerge
+CRITICAL: Max 4 sentences per response. Quick bursts of creativity, not monologues.
 
-Communication style:
-- Be enthusiastic and encouraging
-- No idea is too wild - embrace creativity
-- Make connections between different concepts
-- Ask "what if" questions
-- Celebrate bold thinking
+Riff on ideas. "Yes, and..." everything. Throw out wild what-ifs. Make unexpected connections.
 
-Help the group break out of conventional thinking. Encourage wild ideas that can be refined later. Keep the creative energy flowing!`,
-    suggestedVoice: 'shimmer',
+Energy high, words few. Let the group build on your sparks.`,
+    suggestedVoice: "marin",
     suggestedTemperature: 1.0,
-    tags: ['creative', 'ideation', 'innovation'],
+    tags: ["creative", "ideation", "innovation"],
   },
 };
 
@@ -224,12 +214,12 @@ export class AIPersonalityManager {
 
   constructor(
     options: AIPersonalityManagerOptions = {},
-    callbacks: AIPersonalityManagerCallbacks = {}
+    callbacks: AIPersonalityManagerCallbacks = {},
   ) {
     this.callbacks = callbacks;
     this.options = {
-      defaultPersonality: options.defaultPersonality ?? 'assistant',
-      defaultVoice: options.defaultVoice ?? 'alloy',
+      defaultPersonality: options.defaultPersonality ?? "assistant",
+      defaultVoice: options.defaultVoice ?? "alloy",
       defaultTemperature: options.defaultTemperature ?? 0.8,
       maxCustomInstructionsLength: options.maxCustomInstructionsLength ?? 4000,
       maxAdditionalContextLength: options.maxAdditionalContextLength ?? 1000,
@@ -240,19 +230,30 @@ export class AIPersonalityManager {
   /**
    * Initialize room with default or specified personality
    */
-  initRoom(roomId: RoomId, personality?: AIPersonality, customInstructions?: string): void {
+  initRoom(
+    roomId: RoomId,
+    personality?: AIPersonality,
+    customInstructions?: string,
+  ): void {
     const selectedPersonality = personality ?? this.options.defaultPersonality;
 
     // Validate custom personality
-    if (selectedPersonality === 'custom' && !this.options.allowCustomPersonality) {
-      this.callbacks.onValidationError?.(roomId, 'Custom personalities are not allowed');
+    if (
+      selectedPersonality === "custom" &&
+      !this.options.allowCustomPersonality
+    ) {
+      this.callbacks.onValidationError?.(
+        roomId,
+        "Custom personalities are not allowed",
+      );
       return;
     }
 
     const config: RoomAIConfig = {
       roomId,
       personality: selectedPersonality,
-      customInstructions: selectedPersonality === 'custom' ? customInstructions : undefined,
+      customInstructions:
+        selectedPersonality === "custom" ? customInstructions : undefined,
       updatedAt: new Date(),
     };
 
@@ -284,7 +285,7 @@ export class AIPersonalityManager {
    * Get a specific preset
    */
   getPreset(personality: AIPersonality): PersonalityPreset | null {
-    if (personality === 'custom') {
+    if (personality === "custom") {
       return null;
     }
     return PERSONALITY_PRESETS[personality] ?? null;
@@ -297,7 +298,7 @@ export class AIPersonalityManager {
     roomId: RoomId,
     personality: AIPersonality,
     customInstructions?: string,
-    changedBy?: string
+    changedBy?: string,
   ): boolean {
     const config = this.configs.get(roomId);
     if (!config) {
@@ -305,19 +306,27 @@ export class AIPersonalityManager {
     }
 
     // Validate
-    if (personality === 'custom') {
+    if (personality === "custom") {
       if (!this.options.allowCustomPersonality) {
-        this.callbacks.onValidationError?.(roomId, 'Custom personalities are not allowed');
+        this.callbacks.onValidationError?.(
+          roomId,
+          "Custom personalities are not allowed",
+        );
         return false;
       }
       if (!customInstructions || customInstructions.trim().length === 0) {
-        this.callbacks.onValidationError?.(roomId, 'Custom personality requires instructions');
-        return false;
-      }
-      if (customInstructions.length > this.options.maxCustomInstructionsLength) {
         this.callbacks.onValidationError?.(
           roomId,
-          `Custom instructions exceed maximum length of ${this.options.maxCustomInstructionsLength}`
+          "Custom personality requires instructions",
+        );
+        return false;
+      }
+      if (
+        customInstructions.length > this.options.maxCustomInstructionsLength
+      ) {
+        this.callbacks.onValidationError?.(
+          roomId,
+          `Custom instructions exceed maximum length of ${this.options.maxCustomInstructionsLength}`,
         );
         return false;
       }
@@ -325,7 +334,8 @@ export class AIPersonalityManager {
 
     const previousPersonality = config.personality;
     config.personality = personality;
-    config.customInstructions = personality === 'custom' ? customInstructions : undefined;
+    config.customInstructions =
+      personality === "custom" ? customInstructions : undefined;
     config.updatedAt = new Date();
 
     // Notify change
@@ -352,10 +362,10 @@ export class AIPersonalityManager {
       return false;
     }
 
-    if (config.personality !== 'custom') {
+    if (config.personality !== "custom") {
       this.callbacks.onValidationError?.(
         roomId,
-        'Can only set custom instructions for custom personality'
+        "Can only set custom instructions for custom personality",
       );
       return false;
     }
@@ -379,7 +389,16 @@ export class AIPersonalityManager {
    */
   setVoice(
     roomId: RoomId,
-    voice: 'alloy' | 'echo' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage' | 'verse'
+    voice:
+      | "alloy"
+      | "echo"
+      | "shimmer"
+      | "ash"
+      | "ballad"
+      | "coral"
+      | "sage"
+      | "marin"
+      | "verse",
   ): boolean {
     const config = this.configs.get(roomId);
     if (!config) {
@@ -402,7 +421,10 @@ export class AIPersonalityManager {
     }
 
     if (temperature < 0 || temperature > 2) {
-      this.callbacks.onValidationError?.(roomId, 'Temperature must be between 0 and 2');
+      this.callbacks.onValidationError?.(
+        roomId,
+        "Temperature must be between 0 and 2",
+      );
       return false;
     }
 
@@ -424,7 +446,7 @@ export class AIPersonalityManager {
     if (context.length > this.options.maxAdditionalContextLength) {
       this.callbacks.onValidationError?.(
         roomId,
-        `Additional context exceeds maximum length of ${this.options.maxAdditionalContextLength}`
+        `Additional context exceeds maximum length of ${this.options.maxAdditionalContextLength}`,
       );
       return false;
     }
@@ -461,11 +483,11 @@ export class AIPersonalityManager {
 
     let baseInstructions: string;
 
-    if (config.personality === 'custom') {
-      baseInstructions = config.customInstructions ?? '';
+    if (config.personality === "custom") {
+      baseInstructions = config.customInstructions ?? "";
     } else {
       const preset = PERSONALITY_PRESETS[config.personality];
-      baseInstructions = preset?.instructions ?? '';
+      baseInstructions = preset?.instructions ?? "";
     }
 
     // Build full instructions
@@ -473,7 +495,9 @@ export class AIPersonalityManager {
 
     // Add participant context
     if (config.participantContext) {
-      parts.push(`\nParticipants in this conversation:\n${config.participantContext}`);
+      parts.push(
+        `\nParticipants in this conversation:\n${config.participantContext}`,
+      );
     }
 
     // Add additional context
@@ -481,15 +505,24 @@ export class AIPersonalityManager {
       parts.push(`\nAdditional context:\n${config.additionalContext}`);
     }
 
-    return parts.join('\n');
+    return parts.join("\n");
   }
 
   /**
    * Get suggested voice for a room (considers personality preset)
    */
   getSuggestedVoice(
-    roomId: RoomId
-  ): 'alloy' | 'echo' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage' | 'verse' {
+    roomId: RoomId,
+  ):
+    | "alloy"
+    | "echo"
+    | "shimmer"
+    | "ash"
+    | "ballad"
+    | "coral"
+    | "sage"
+    | "marin"
+    | "verse" {
     const config = this.configs.get(roomId);
     if (!config) {
       return this.options.defaultVoice;
@@ -501,7 +534,7 @@ export class AIPersonalityManager {
     }
 
     // Use personality suggestion
-    if (config.personality !== 'custom') {
+    if (config.personality !== "custom") {
       const preset = PERSONALITY_PRESETS[config.personality];
       if (preset?.suggestedVoice) {
         return preset.suggestedVoice;
@@ -526,7 +559,7 @@ export class AIPersonalityManager {
     }
 
     // Use personality suggestion
-    if (config.personality !== 'custom') {
+    if (config.personality !== "custom") {
       const preset = PERSONALITY_PRESETS[config.personality];
       if (preset?.suggestedTemperature !== undefined) {
         return preset.suggestedTemperature;
@@ -543,12 +576,12 @@ export class AIPersonalityManager {
     const errors: string[] = [];
 
     if (!instructions || instructions.trim().length === 0) {
-      errors.push('Custom instructions cannot be empty');
+      errors.push("Custom instructions cannot be empty");
     }
 
     if (instructions.length > this.options.maxCustomInstructionsLength) {
       errors.push(
-        `Custom instructions exceed maximum length of ${this.options.maxCustomInstructionsLength}`
+        `Custom instructions exceed maximum length of ${this.options.maxCustomInstructionsLength}`,
       );
     }
 
@@ -563,14 +596,20 @@ export class AIPersonalityManager {
    */
   validatePersonality(personality: AIPersonality): ValidationResult {
     const errors: string[] = [];
-    const validPersonalities: AIPersonality[] = ['facilitator', 'assistant', 'expert', 'brainstorm', 'custom'];
+    const validPersonalities: AIPersonality[] = [
+      "facilitator",
+      "assistant",
+      "expert",
+      "brainstorm",
+      "custom",
+    ];
 
     if (!validPersonalities.includes(personality)) {
       errors.push(`Invalid personality: ${personality}`);
     }
 
-    if (personality === 'custom' && !this.options.allowCustomPersonality) {
-      errors.push('Custom personalities are not allowed');
+    if (personality === "custom" && !this.options.allowCustomPersonality) {
+      errors.push("Custom personalities are not allowed");
     }
 
     return {
@@ -586,25 +625,32 @@ export class AIPersonalityManager {
     const errors: string[] = [];
 
     if (config.personality) {
-      const personalityValidation = this.validatePersonality(config.personality);
+      const personalityValidation = this.validatePersonality(
+        config.personality,
+      );
       errors.push(...personalityValidation.errors);
     }
 
     if (config.customInstructions !== undefined) {
-      const instructionsValidation = this.validateCustomInstructions(config.customInstructions);
+      const instructionsValidation = this.validateCustomInstructions(
+        config.customInstructions,
+      );
       errors.push(...instructionsValidation.errors);
     }
 
     if (config.temperature !== undefined) {
       if (config.temperature < 0 || config.temperature > 2) {
-        errors.push('Temperature must be between 0 and 2');
+        errors.push("Temperature must be between 0 and 2");
       }
     }
 
     if (config.additionalContext !== undefined) {
-      if (config.additionalContext.length > this.options.maxAdditionalContextLength) {
+      if (
+        config.additionalContext.length >
+        this.options.maxAdditionalContextLength
+      ) {
         errors.push(
-          `Additional context exceeds maximum length of ${this.options.maxAdditionalContextLength}`
+          `Additional context exceeds maximum length of ${this.options.maxAdditionalContextLength}`,
         );
       }
     }
@@ -673,7 +719,7 @@ export class AIPersonalityManager {
  */
 export function createAIPersonalityManager(
   options?: AIPersonalityManagerOptions,
-  callbacks?: AIPersonalityManagerCallbacks
+  callbacks?: AIPersonalityManagerCallbacks,
 ): AIPersonalityManager {
   return new AIPersonalityManager(options, callbacks);
 }

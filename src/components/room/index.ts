@@ -79,3 +79,27 @@ export type {
 
 export { UsernameModal } from "./UsernameModal";
 export type { UsernameModalProps } from "./UsernameModal";
+
+export { ParticipantModal } from "./ParticipantModal";
+export type { ParticipantModalProps } from "./ParticipantModal";
+
+export {
+  AudioWaveform,
+  AIWaveform,
+  ParticipantWaveform,
+} from "./AudioWaveform";
+export type {
+  AudioWaveformProps,
+  WaveformSize,
+  WaveformColor,
+} from "./AudioWaveform";
+
+export {
+  InwardWaveform,
+  AIInwardWaveform,
+  ParticipantInwardWaveform,
+} from "./InwardWaveform";
+export type {
+  InwardWaveformProps,
+  InwardWaveformColor,
+} from "./InwardWaveform";

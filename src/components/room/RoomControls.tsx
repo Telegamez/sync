@@ -666,7 +666,7 @@ export function RoomControls({
             <span>
               {isPTTActive || isAddressingAI
                 ? "Speaking to AI..."
-                : "Hold to Talk"}
+                : "Hold To Speak to AI"}
             </span>
           </button>
         </div>
@@ -692,49 +692,6 @@ export function RoomControls({
         ) : (
           /* Invisible placeholder to maintain consistent spacing */
           <div className="h-10" aria-hidden="true" />
-        )}
-      </div>
-
-      {/* Row 3: Other controls - mute, settings */}
-      <div className={`flex items-center justify-center ${config.gap}`}>
-        {/* Mute/Unmute button */}
-        <ControlButton
-          onClick={onMuteToggle}
-          onKeyDown={handleMuteKeyDown}
-          label={isMuted ? "Unmute microphone (M)" : "Mute microphone (M)"}
-          icon={
-            isMuted ? (
-              <MicrophoneOffIcon className={config.icon} />
-            ) : (
-              <MicrophoneIcon className={config.icon} />
-            )
-          }
-          variant={isMuted ? "muted" : "default"}
-          size={size}
-        />
-
-        {/* Settings button (optional) */}
-        {showSettings && onSettingsClick && (
-          <ControlButton
-            onClick={onSettingsClick}
-            label="Room settings"
-            icon={<SettingsIcon className={config.icon} />}
-            variant="default"
-            size={size}
-          />
-        )}
-
-        {/* Leave room button (optional - usually in header instead) */}
-        {showLeaveButton && onLeaveRoom && (
-          <ControlButton
-            onClick={onLeaveRoom}
-            label="Leave room"
-            icon={<LeaveIcon className={config.icon} />}
-            variant="danger"
-            size={size}
-            isLoading={isLeaving}
-            disabled={isLeaving}
-          />
         )}
       </div>
     </div>
