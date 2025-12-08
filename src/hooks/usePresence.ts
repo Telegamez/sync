@@ -7,13 +7,17 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-110
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import type { SignalingClient } from '@/lib/signaling/client';
-import type { PeerId, PeerSummary, PeerAudioLevelUpdate } from '@/types/peer';
-import type { RoomId } from '@/types/room';
-import type { PresenceUpdatePayload, PresenceSyncPayload, AudioLevelsPayload } from '@/types/signaling';
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import type { SignalingClient } from "@/lib/signaling/client";
+import type { PeerId, PeerSummary, PeerAudioLevelUpdate } from "@/types/peer";
+import type { RoomId } from "@/types/room";
+import type {
+  PresenceUpdatePayload,
+  PresenceSyncPayload,
+  AudioLevelsPayload,
+} from "@/types/signaling";
 
 /**
  * Presence state for a single peer
@@ -177,7 +181,9 @@ function createPeerPresenceFromSummary(peer: PeerSummary): PeerPresenceState {
  * setSpeaking(true);
  * ```
  */
-export function usePresence(options: UsePresenceOptions): PresenceState & PresenceActions {
+export function usePresence(
+  options: UsePresenceOptions,
+): PresenceState & PresenceActions {
   const {
     client,
     roomId,
@@ -191,7 +197,9 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
   } = options;
 
   // Peer presence state
-  const [peerPresence, setPeerPresence] = useState<Map<PeerId, PeerPresenceState>>(() => {
+  const [peerPresence, setPeerPresence] = useState<
+    Map<PeerId, PeerPresenceState>
+  >(() => {
     const map = new Map<PeerId, PeerPresenceState>();
     initialPeers.forEach((peer) => {
       if (peer.id !== localPeerId) {
@@ -202,11 +210,15 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
   });
 
   // Local presence state
-  const [localPresence, setLocalPresence] = useState<LocalPresenceState>(INITIAL_LOCAL_PRESENCE);
+  const [localPresence, setLocalPresence] = useState<LocalPresenceState>(
+    INITIAL_LOCAL_PRESENCE,
+  );
 
   // Refs for debouncing and tracking
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSentPresenceRef = useRef<LocalPresenceState>(INITIAL_LOCAL_PRESENCE);
+  const lastSentPresenceRef = useRef<LocalPresenceState>(
+    INITIAL_LOCAL_PRESENCE,
+  );
   const previousActiveSpeakerRef = useRef<PeerId | null>(null);
 
   /**
@@ -226,7 +238,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
         client.updatePresence(update);
       }, debounceInterval);
     },
-    [client, roomId, debounceInterval]
+    [client, roomId, debounceInterval],
   );
 
   /**
@@ -242,7 +254,8 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
           next.isMuted !== lastSentPresenceRef.current.isMuted ||
           next.isSpeaking !== lastSentPresenceRef.current.isSpeaking ||
           next.isAddressingAI !== lastSentPresenceRef.current.isAddressingAI ||
-          Math.abs(next.audioLevel - lastSentPresenceRef.current.audioLevel) > audioLevelThreshold;
+          Math.abs(next.audioLevel - lastSentPresenceRef.current.audioLevel) >
+            audioLevelThreshold;
 
         if (shouldSend) {
           lastSentPresenceRef.current = next;
@@ -257,7 +270,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
         return next;
       });
     },
-    [sendPresenceUpdate, audioLevelThreshold]
+    [sendPresenceUpdate, audioLevelThreshold],
   );
 
   /**
@@ -267,7 +280,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
     (muted: boolean) => {
       updatePresence({ isMuted: muted });
     },
-    [updatePresence]
+    [updatePresence],
   );
 
   /**
@@ -289,7 +302,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
     (speaking: boolean) => {
       updatePresence({ isSpeaking: speaking });
     },
-    [updatePresence]
+    [updatePresence],
   );
 
   /**
@@ -299,7 +312,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
     (addressing: boolean) => {
       updatePresence({ isAddressingAI: addressing });
     },
-    [updatePresence]
+    [updatePresence],
   );
 
   /**
@@ -311,7 +324,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
       const clampedLevel = Math.max(0, Math.min(1, level));
       updatePresence({ audioLevel: clampedLevel });
     },
-    [updatePresence]
+    [updatePresence],
   );
 
   /**
@@ -321,7 +334,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
     (peerId: PeerId): PeerPresenceState | undefined => {
       return peerPresence.get(peerId);
     },
-    [peerPresence]
+    [peerPresence],
   );
 
   /**
@@ -331,7 +344,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
     (peerId: PeerId): boolean => {
       return peerPresence.get(peerId)?.isSpeaking ?? false;
     },
-    [peerPresence]
+    [peerPresence],
   );
 
   /**
@@ -341,7 +354,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
     (peerId: PeerId): boolean => {
       return peerPresence.get(peerId)?.isMuted ?? true;
     },
-    [peerPresence]
+    [peerPresence],
   );
 
   /**
@@ -367,7 +380,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
         return next;
       });
     },
-    [localPeerId, onPeerPresenceChange]
+    [localPeerId, onPeerPresenceChange],
   );
 
   /**
@@ -395,7 +408,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
         return next;
       });
     },
-    [roomId, localPeerId]
+    [roomId, localPeerId],
   );
 
   /**
@@ -416,7 +429,8 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
           if (existing) {
             // Only update if change is significant
             if (
-              Math.abs(existing.audioLevel - update.audioLevel) > audioLevelThreshold ||
+              Math.abs(existing.audioLevel - update.audioLevel) >
+                audioLevelThreshold ||
               existing.isSpeaking !== update.isSpeaking
             ) {
               next.set(update.peerId, {
@@ -433,7 +447,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
         return hasChanges ? next : prev;
       });
     },
-    [roomId, localPeerId, audioLevelThreshold]
+    [roomId, localPeerId, audioLevelThreshold],
   );
 
   /**
@@ -449,7 +463,7 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
         return next;
       });
     },
-    [localPeerId]
+    [localPeerId],
   );
 
   /**
@@ -467,18 +481,18 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
   useEffect(() => {
     if (!client) return;
 
-    client.on('onPresenceUpdate', handlePresenceUpdate);
-    client.on('onPresenceSync', handlePresenceSync);
-    client.on('onAudioLevels', handleAudioLevels);
-    client.on('onPeerJoined', handlePeerJoined);
-    client.on('onPeerLeft', handlePeerLeft);
+    client.on("onPresenceUpdate", handlePresenceUpdate);
+    client.on("onPresenceSync", handlePresenceSync);
+    client.on("onAudioLevels", handleAudioLevels);
+    client.on("onPeerJoined", handlePeerJoined);
+    client.on("onPeerLeft", handlePeerLeft);
 
     return () => {
-      client.off('onPresenceUpdate', handlePresenceUpdate);
-      client.off('onPresenceSync', handlePresenceSync);
-      client.off('onAudioLevels', handleAudioLevels);
-      client.off('onPeerJoined', handlePeerJoined);
-      client.off('onPeerLeft', handlePeerLeft);
+      client.off("onPresenceUpdate", handlePresenceUpdate);
+      client.off("onPresenceSync", handlePresenceSync);
+      client.off("onAudioLevels", handleAudioLevels);
+      client.off("onPeerJoined", handlePeerJoined);
+      client.off("onPeerLeft", handlePeerLeft);
     };
   }, [
     client,
@@ -493,6 +507,30 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
   useEffect(() => {
     onLocalPresenceChange?.(localPresence);
   }, [localPresence, onLocalPresenceChange]);
+
+  // Sync initial presence state when joining a room
+  // This ensures other peers see our correct mute state immediately
+  useEffect(() => {
+    if (!client || !roomId || !localPeerId) return;
+
+    // Send initial presence state to server so other peers see correct state
+    // Small delay to ensure room join is complete
+    const timer = setTimeout(() => {
+      sendPresenceUpdate({
+        isMuted: localPresence.isMuted,
+        isSpeaking: localPresence.isSpeaking,
+        isAddressingAI: localPresence.isAddressingAI,
+      });
+      console.log(
+        "[Presence] Synced initial presence state:",
+        localPresence.isMuted ? "muted" : "unmuted",
+      );
+    }, 100);
+
+    return () => clearTimeout(timer);
+    // Only run once when room is joined (roomId and localPeerId become available)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, roomId, localPeerId]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -519,7 +557,8 @@ export function usePresence(options: UsePresenceOptions): PresenceState & Presen
   const activeSpeaker = useMemo((): PeerId | null => {
     // Include local peer if speaking
     let maxLevel = localPresence.isSpeaking ? localPresence.audioLevel : 0;
-    let speaker: PeerId | null = localPresence.isSpeaking && localPeerId ? localPeerId : null;
+    let speaker: PeerId | null =
+      localPresence.isSpeaking && localPeerId ? localPeerId : null;
 
     peerPresence.forEach((presence) => {
       if (presence.isSpeaking && presence.audioLevel > maxLevel) {

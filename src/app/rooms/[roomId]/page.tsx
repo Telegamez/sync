@@ -144,8 +144,8 @@ export default function RoomPage() {
   const [copied, setCopied] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
 
-  // Track local mute state - start unmuted by default
-  const [localIsMuted, setLocalIsMuted] = useState(false);
+  // Track local mute state - start MUTED by default (matches server and audio track state)
+  const [localIsMuted, setLocalIsMuted] = useState(true);
 
   // Local media stream ref
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -615,23 +615,30 @@ export default function RoomPage() {
     const setupAudioCapture = async () => {
       try {
         // Create AudioContext at 24kHz (OpenAI Realtime API requirement)
-        if (!audioContextRef.current) {
+        // Each new AudioContext needs its own worklet module loaded
+        const needsNewContext =
+          !audioContextRef.current ||
+          audioContextRef.current.state === "closed";
+        if (needsNewContext) {
           audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+          workletReadyRef.current = false; // Reset worklet flag for new context
         }
 
-        const audioContext = audioContextRef.current;
+        const audioContext = audioContextRef.current!;
 
         // Resume if suspended (browser autoplay policy)
         if (audioContext.state === "suspended") {
           await audioContext.resume();
         }
 
-        // Load AudioWorklet module if not already loaded
+        // Load AudioWorklet module if not already loaded for THIS context
         if (!workletReadyRef.current) {
+          console.log("[Room] Loading AudioWorklet module...");
           await audioContext.audioWorklet.addModule(
             "/audio/pcm-capture-processor.js",
           );
           workletReadyRef.current = true;
+          console.log("[Room] AudioWorklet module loaded successfully");
         }
 
         // Create source from microphone stream
