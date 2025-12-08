@@ -7,9 +7,9 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-116
  */
 
-'use client';
+"use client";
 
-import { useCallback, useState, type KeyboardEvent } from 'react';
+import { useCallback, useState, type KeyboardEvent } from "react";
 
 /**
  * RoomControls props
@@ -35,10 +35,14 @@ export interface RoomControlsProps {
   showPTT?: boolean;
   /** Whether to show the settings button */
   showSettings?: boolean;
+  /** Whether AI is currently speaking (for interrupt button) */
+  isAISpeaking?: boolean;
+  /** Callback to interrupt AI audio */
+  onInterruptAI?: () => void;
   /** Layout orientation */
-  layout?: 'horizontal' | 'vertical';
+  layout?: "horizontal" | "vertical";
   /** Button size */
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   /** Custom class name */
   className?: string;
 }
@@ -48,22 +52,22 @@ export interface RoomControlsProps {
  */
 const SIZE_CONFIG = {
   sm: {
-    button: 'w-10 h-10',
-    icon: 'w-5 h-5',
-    text: 'text-xs',
-    gap: 'gap-2',
+    button: "w-10 h-10",
+    icon: "w-5 h-5",
+    text: "text-xs",
+    gap: "gap-2",
   },
   md: {
-    button: 'w-12 h-12',
-    icon: 'w-6 h-6',
-    text: 'text-sm',
-    gap: 'gap-3',
+    button: "w-12 h-12",
+    icon: "w-6 h-6",
+    text: "text-sm",
+    gap: "gap-3",
   },
   lg: {
-    button: 'w-14 h-14',
-    icon: 'w-7 h-7',
-    text: 'text-base',
-    gap: 'gap-4',
+    button: "w-14 h-14",
+    icon: "w-7 h-7",
+    text: "text-base",
+    gap: "gap-4",
   },
 };
 
@@ -190,6 +194,34 @@ function PTTIcon({ className }: { className?: string }) {
 }
 
 /**
+ * Stop/Interrupt icon (hand raised)
+ */
+function InterruptIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+      />
+    </svg>
+  );
+}
+
+/**
  * Loading spinner
  */
 function LoadingSpinner({ className }: { className?: string }) {
@@ -231,8 +263,8 @@ function ControlButton({
   onKeyUp,
   label,
   icon,
-  variant = 'default',
-  size = 'md',
+  variant = "default",
+  size = "md",
   isActive = false,
   isLoading = false,
   disabled = false,
@@ -247,8 +279,8 @@ function ControlButton({
   onKeyUp?: (e: KeyboardEvent<HTMLButtonElement>) => void;
   label: string;
   icon: React.ReactNode;
-  variant?: 'default' | 'danger' | 'active' | 'muted';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: "default" | "danger" | "active" | "muted" | "interrupt";
+  size?: "sm" | "md" | "lg";
   isActive?: boolean;
   isLoading?: boolean;
   disabled?: boolean;
@@ -256,10 +288,14 @@ function ControlButton({
   const config = SIZE_CONFIG[size];
 
   const variantClasses = {
-    default: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600',
-    danger: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50',
-    active: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 ring-2 ring-green-500',
-    muted: 'bg-red-500 text-white hover:bg-red-600',
+    default:
+      "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600",
+    danger:
+      "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50",
+    active:
+      "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 ring-2 ring-green-500",
+    muted: "bg-red-500 text-white hover:bg-red-600",
+    interrupt: "bg-orange-500 text-white hover:bg-orange-600 animate-pulse",
   };
 
   return (
@@ -277,18 +313,14 @@ function ControlButton({
       className={`
         ${config.button} rounded-full flex items-center justify-center
         transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
-        ${isActive ? 'ring-2 ring-purple-500' : ''}
+        ${isActive ? "ring-2 ring-purple-500" : ""}
         ${variantClasses[variant]}
-        ${disabled || isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        ${disabled || isLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
       `}
       aria-label={label}
       aria-pressed={isActive}
     >
-      {isLoading ? (
-        <LoadingSpinner className={config.icon} />
-      ) : (
-        icon
-      )}
+      {isLoading ? <LoadingSpinner className={config.icon} /> : icon}
     </button>
   );
 }
@@ -320,9 +352,11 @@ export function RoomControls({
   onPTTEnd,
   showPTT = false,
   showSettings = false,
-  layout = 'horizontal',
-  size = 'md',
-  className = '',
+  isAISpeaking = false,
+  onInterruptAI,
+  layout = "horizontal",
+  size = "md",
+  className = "",
 }: RoomControlsProps) {
   const config = SIZE_CONFIG[size];
   const [isPTTActive, setIsPTTActive] = useState(false);
@@ -352,24 +386,24 @@ export function RoomControls({
    */
   const handlePTTKeyDown = useCallback(
     (e: KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key === ' ' || e.key === 'Enter') {
+      if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         if (!isPTTActive) {
           handlePTTStart();
         }
       }
     },
-    [handlePTTStart, isPTTActive]
+    [handlePTTStart, isPTTActive],
   );
 
   const handlePTTKeyUp = useCallback(
     (e: KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key === ' ' || e.key === 'Enter') {
+      if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         handlePTTEnd();
       }
     },
-    [handlePTTEnd]
+    [handlePTTEnd],
   );
 
   /**
@@ -377,15 +411,15 @@ export function RoomControls({
    */
   const handleMuteKeyDown = useCallback(
     (e: KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key === 'm' || e.key === 'M') {
+      if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         onMuteToggle();
       }
     },
-    [onMuteToggle]
+    [onMuteToggle],
   );
 
-  const isHorizontal = layout === 'horizontal';
+  const isHorizontal = layout === "horizontal";
 
   return (
     <div
@@ -401,7 +435,7 @@ export function RoomControls({
       <ControlButton
         onClick={onMuteToggle}
         onKeyDown={handleMuteKeyDown}
-        label={isMuted ? 'Unmute microphone (M)' : 'Mute microphone (M)'}
+        label={isMuted ? "Unmute microphone (M)" : "Mute microphone (M)"}
         icon={
           isMuted ? (
             <MicrophoneOffIcon className={config.icon} />
@@ -409,7 +443,7 @@ export function RoomControls({
             <MicrophoneIcon className={config.icon} />
           )
         }
-        variant={isMuted ? 'muted' : 'default'}
+        variant={isMuted ? "muted" : "default"}
         size={size}
       />
 
@@ -423,12 +457,34 @@ export function RoomControls({
           onTouchEnd={handlePTTEnd}
           onKeyDown={handlePTTKeyDown}
           onKeyUp={handlePTTKeyUp}
-          label={isPTTActive || isAddressingAI ? 'Release to stop talking to AI' : 'Hold to talk to AI'}
+          label={
+            isPTTActive || isAddressingAI
+              ? "Release to stop talking to AI"
+              : "Hold to talk to AI"
+          }
           icon={<PTTIcon className={config.icon} />}
-          variant={isPTTActive || isAddressingAI ? 'active' : 'default'}
+          variant={isPTTActive || isAddressingAI ? "active" : "default"}
           size={size}
           isActive={isPTTActive || isAddressingAI}
         />
+      )}
+
+      {/* Excuse Me button - stops AI audio for everyone */}
+      {isAISpeaking && onInterruptAI && (
+        <button
+          type="button"
+          onClick={onInterruptAI}
+          className={`
+            px-4 py-2 rounded-full flex items-center gap-2
+            bg-orange-500 text-white hover:bg-orange-600
+            animate-pulse font-medium ${config.text}
+            transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-orange-400
+          `}
+          aria-label="Excuse Me - Stop AI"
+        >
+          <InterruptIcon className={config.icon} />
+          <span>Excuse Me</span>
+        </button>
       )}
 
       {/* Settings button (optional) */}

@@ -501,13 +501,11 @@ export default function RoomPage() {
 
   /**
    * Handle PTT start - unmute, address AI, and start audio capture
+   * Note: Voice interrupt detection is managed automatically by useEffect when AI is speaking
    */
   const handlePTTStart = useCallback(() => {
-    // Check if AI is already speaking/processing - don't allow PTT
-    if (aiState.aiState === "speaking" || aiState.aiState === "processing") {
-      console.log("[Room] PTT blocked - AI is", aiState.aiState);
-      return;
-    }
+    // Allow PTT even when AI is speaking - user may want to interrupt
+    // Voice interrupt detection will handle the "excuse me" keyword
 
     if (!localStreamRef.current) {
       console.error("[Room] No local stream available for PTT");
@@ -593,16 +591,11 @@ export default function RoomPage() {
     } catch (err) {
       console.error("[Room] Failed to start audio capture:", err);
     }
-  }, [
-    aiState.aiState,
-    setPresenceAddressingAI,
-    setSpeaking,
-    getClient,
-    roomId,
-  ]);
+  }, [setPresenceAddressingAI, setSpeaking, getClient, roomId]);
 
   /**
    * Handle PTT end - stop audio capture and restore mute state
+   * Note: Voice interrupt detection is managed automatically by useEffect when AI is speaking
    */
   const handlePTTEnd = useCallback(() => {
     if (!isAddressingAI) return; // Not in PTT mode
@@ -647,6 +640,29 @@ export default function RoomPage() {
     getClient,
     roomId,
   ]);
+
+  /**
+   * Handle interrupt AI button click - immediately stops AI audio for everyone
+   */
+  const handleInterruptAI = useCallback(() => {
+    const client = getClient();
+    if (client && isInRoom) {
+      client.voiceInterrupt(roomId, "button");
+      console.log("[Room] Sent interrupt via button");
+    }
+  }, [getClient, isInRoom, roomId]);
+
+  // Button visibility: show when AI is speaking/processing OR when audio is still playing
+  // This handles the case where server state goes idle but audio is still buffered/playing
+  const isAISpeakingForButton =
+    aiState.aiState === "speaking" ||
+    aiState.aiState === "processing" ||
+    aiPlayback.isPlaying;
+  useEffect(() => {
+    console.log(
+      `[Room] Interrupt button visible: ${isAISpeakingForButton} (aiState: ${aiState.aiState}, isPlaying: ${aiPlayback.isPlaying})`,
+    );
+  }, [isAISpeakingForButton, aiState.aiState, aiPlayback.isPlaying]);
 
   /**
    * Copy room link to clipboard
@@ -980,6 +996,8 @@ export default function RoomPage() {
               onPTTStart={handlePTTStart}
               onPTTEnd={handlePTTEnd}
               isAddressingAI={isAddressingAI}
+              isAISpeaking={isAISpeakingForButton}
+              onInterruptAI={handleInterruptAI}
               size="lg"
             />
           </div>

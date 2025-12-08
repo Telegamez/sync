@@ -598,6 +598,60 @@ export function useSharedAI(
       handleSessionDisconnect();
     };
 
+    // Handle voice interrupt - immediately stop all audio playback
+    const onInterrupted = (data: {
+      roomId: string;
+      interruptedBy: string;
+      interruptedByName: string;
+      reason: string;
+      previousState: string;
+    }) => {
+      if (data.roomId === roomId) {
+        console.log(
+          `[useSharedAI] Voice interrupt received from ${data.interruptedByName}: ${data.reason}`,
+        );
+
+        // Immediately stop audio playback by closing and recreating audio context
+        // This is the only way to stop already-scheduled audio
+        if (audioContextRef.current) {
+          try {
+            audioContextRef.current.close();
+          } catch {
+            // Already closed
+          }
+          audioContextRef.current = null;
+          gainNodeRef.current = null;
+        }
+
+        // Clear all refs
+        isPlayingRef.current = false;
+        playbackPositionRef.current = 0;
+        nextPlaybackTimeRef.current = 0;
+        audioBufferRef.current = [];
+
+        // Update state
+        setState((prev) => ({
+          ...prev,
+          aiState: "idle",
+          isResponding: false,
+          currentResponse: null,
+          currentSpeakerId: null,
+          currentSpeakerName: null,
+        }));
+
+        setPlayback({
+          isPlaying: false,
+          playbackPosition: 0,
+          bufferedDuration: 0,
+          chunksBuffered: 0,
+          isReady: false,
+        });
+
+        // Call playback end callback
+        onPlaybackEndRef.current?.();
+      }
+    };
+
     // Subscribe to AI events (these are extended events not in base SignalingEventHandlers)
     const client = signalingClient as any;
     const socket = client.getSocket?.();
@@ -606,6 +660,7 @@ export function useSharedAI(
       socket.on("ai:state", onAIState);
       socket.on("ai:audio", onAudioBase64); // Direct base64 audio from server
       socket.on("ai:audio_data", onAudioData); // Legacy structured format
+      socket.on("ai:interrupted", onInterrupted); // Voice interrupt handler
     }
 
     client.on("onConnect", onConnect);
@@ -621,6 +676,7 @@ export function useSharedAI(
         socket.off("ai:state", onAIState);
         socket.off("ai:audio", onAudioBase64);
         socket.off("ai:audio_data", onAudioData);
+        socket.off("ai:interrupted", onInterrupted);
       }
       client.off("onConnect", onConnect);
       client.off("onDisconnect", onDisconnect);

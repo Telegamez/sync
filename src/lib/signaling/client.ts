@@ -365,6 +365,16 @@ export class SignalingClient {
   }
 
   /**
+   * Voice-activated interrupt (any participant can trigger)
+   * Stops AI audio immediately for all participants when "excuse me" is detected
+   */
+  public voiceInterrupt(roomId: string, reason?: string): boolean {
+    if (!this.socket?.connected) return false;
+    this.socket.emit("ai:voice_interrupt", { roomId, reason });
+    return true;
+  }
+
+  /**
    * Start PTT (Push-to-Talk)
    */
   public startPTT(roomId: string): void {

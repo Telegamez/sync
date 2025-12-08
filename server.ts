@@ -92,6 +92,8 @@ interface RoomAISession {
   aiPersonality: AIPersonality;
   aiTopic?: string;
   customInstructions?: string;
+  // Interrupt handling - ignore audio events until next PTT session
+  isInterrupted: boolean;
 }
 
 /** OpenAI Realtime WebSocket endpoint */
@@ -403,6 +405,7 @@ function getOrCreateAISession(
     aiPersonality,
     aiTopic,
     customInstructions,
+    isInterrupted: false,
   };
 
   roomAISessions.set(roomId, session);
@@ -540,6 +543,12 @@ function handleOpenAIMessage(
       case "response.audio.delta":
         // Audio chunk received - broadcast to room
         if (event.delta) {
+          // Check if we should ignore audio (after interrupt, until next PTT)
+          if (session.isInterrupted) {
+            // Ignore this audio chunk - waiting for new PTT session
+            return;
+          }
+
           // First audio chunk - transition to speaking
           if (session.state !== "speaking") {
             session.state = "speaking";
@@ -1001,6 +1010,64 @@ app
         console.log(`[Socket.io] AI interrupt from ${peerId}:`, payload);
       });
 
+      // Handle voice-activated interrupt (any participant can trigger)
+      socket.on("ai:voice_interrupt", (payload) => {
+        const roomId = payload.roomId || (socket as any).roomId;
+        if (!roomId) return;
+
+        const displayName = (socket as any).displayName || "User";
+        const reason = payload.reason || "excuse_me";
+        console.log(
+          `[Socket.io] VOICE INTERRUPT from ${peerId} (${displayName}) in room ${roomId}: "${reason}"`,
+        );
+
+        const session = roomAISessions.get(roomId);
+        if (!session) {
+          console.log(`[Socket.io] No AI session for room ${roomId}`);
+          return;
+        }
+
+        // Allow interrupt even if state is idle - audio may still be playing on clients
+        // or OpenAI may have queued responses
+
+        // Set interrupt flag - will ignore all audio until next PTT session starts
+        session.isInterrupted = true;
+
+        // Send response.cancel to OpenAI to stop streaming
+        // Also clear the input audio buffer to prevent queued responses
+        if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+          // Cancel current response
+          session.ws.send(JSON.stringify({ type: "response.cancel" }));
+          // Clear input buffer to prevent any queued audio from triggering new responses
+          session.ws.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+          console.log(
+            `[OpenAI] Sent response.cancel and input_audio_buffer.clear for room ${roomId}`,
+          );
+        }
+
+        // Update session state to idle
+        const previousState = session.state;
+        session.state = "idle";
+        session.activeSpeakerId = null;
+        session.activeSpeakerName = null;
+
+        // Broadcast interrupt event to ALL clients in room
+        io.to(roomId).emit("ai:interrupted", {
+          roomId,
+          interruptedBy: peerId,
+          interruptedByName: displayName,
+          reason,
+          previousState,
+        });
+
+        // Broadcast updated AI state
+        broadcastAIState(io, session);
+
+        console.log(
+          `[Socket.io] Voice interrupt complete - AI audio stopped for all clients`,
+        );
+      });
+
       // Handle PTT start - user is addressing AI
       socket.on("ai:ptt_start", async (payload) => {
         const roomId = payload.roomId || (socket as any).roomId;
@@ -1013,6 +1080,9 @@ app
 
         // Get or create AI session for this room
         const session = getOrCreateAISession(io, roomId);
+
+        // Clear interrupt flag - new PTT session starts fresh
+        session.isInterrupted = false;
 
         // Update session state
         session.state = "listening";
