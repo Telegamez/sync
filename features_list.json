@@ -1073,6 +1073,23 @@
       "testFile": "tests/unit/ai/personality-topic.test.ts",
       "dependencies": ["FEAT-305", "FEAT-414"],
       "passes": true
+    },
+    {
+      "id": "FEAT-416",
+      "phase": 4,
+      "category": "ai",
+      "description": "Speaker attribution in conversation history - Text prefix before audio",
+      "priority": "high",
+      "steps": [
+        "Send conversation.item.create with speaker name prefix at PTT start",
+        "Format as '{displayName} says:' to attribute audio to speaker",
+        "Ensure text item is created before audio streaming begins",
+        "Log conversation item creation for debugging",
+        "Verify AI addresses correct speaker in multi-participant scenarios"
+      ],
+      "testFile": "tests/unit/ai/speaker-attribution.test.ts",
+      "dependencies": ["FEAT-413", "FEAT-414"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1096,12 +1113,12 @@
     "user-experience": "User experience and personalization"
   },
   "statistics": {
-    "total": 56,
+    "total": 57,
     "phase2": 23,
     "phase3": 14,
-    "phase4": 10,
+    "phase4": 11,
     "phase5": 14,
-    "passed": 56,
+    "passed": 57,
     "pending": 0
   }
 }

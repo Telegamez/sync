@@ -1196,6 +1196,30 @@ app
           console.log(
             `[OpenAI] Updated session instructions for speaker: ${displayName}`,
           );
+
+          // FEAT-416: Add speaker attribution as text item in conversation history
+          // This creates a text prefix before the audio, so the AI sees:
+          // [user text]: "Matt says:"
+          // [user audio]: <audio content>
+          // This puts speaker attribution directly in conversation history,
+          // making it harder for AI to confuse speakers in multi-participant rooms
+          const speakerAttributionEvent = {
+            type: "conversation.item.create",
+            item: {
+              type: "message",
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text: `${displayName} says:`,
+                },
+              ],
+            },
+          };
+          session.ws.send(JSON.stringify(speakerAttributionEvent));
+          console.log(
+            `[OpenAI] Created speaker attribution item: "${displayName} says:"`,
+          );
         }
       });
 

@@ -12,10 +12,10 @@
 | Phase 1: Foundation          | Complete     | 5/5      | 100%   |
 | Phase 2: Room Infrastructure | **Complete** | 23/23    | 100%   |
 | Phase 3: Multi-Peer Audio    | **Complete** | 13/13    | 100%   |
-| Phase 4: Shared AI Session   | **Complete** | 10/10    | 100%   |
+| Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | In Progress  | 9/14     | 64%    |
 
-**Latest:** FEAT-415 (AI Personality + Topic) - AI personality presets now fully work with optional topic expertise.
+**Latest:** FEAT-416 (Speaker Attribution) - Text prefix before audio in conversation history for reliable multi-speaker identification.
 
 ---
 
@@ -2590,3 +2590,78 @@ AI responds with brainstorm energy + real estate expertise + addressing user by 
 - Placeholder text: "e.g., real estate, software engineering, marketing strategy"
 - Helper text: "The AI will have deep expertise in this subject and tailor responses accordingly."
 - Max 200 characters with validation
+
+---
+
+### FEAT-416: Speaker Attribution in Conversation History
+
+**Date:** 2024-12-08
+**Test:** `tests/unit/ai/speaker-attribution.test.ts`
+
+Implemented text prefix before audio in OpenAI Realtime API conversation history to reliably identify speakers in multi-participant rooms. This addresses the issue where AI could confuse speakers when multiple participants engage sequentially with PTT.
+
+**Problem Solved:**
+
+When multiple participants use PTT sequentially, the AI maintains conversation history and could incorrectly reference previous speakers. While session instructions were updated with the current speaker name, the conversation history still contained context from previous exchanges.
+
+**Solution - Approach C (Sequential Items):**
+
+At PTT start, a text conversation item is created before audio streaming begins:
+
+```
+[user text]: "Matt says:"
+[user audio]: <audio content from PTT>
+[assistant]: AI response addressing Matt
+```
+
+This puts speaker attribution directly in the conversation history, not just in instructions.
+
+**Files Modified:**
+
+- `server.ts` - Added `conversation.item.create` event at PTT start (lines 1200-1222)
+- `tests/unit/ai/speaker-attribution.test.ts` - Comprehensive unit tests
+- `features_list.json` - Added FEAT-416 entry
+
+**Implementation Details:**
+
+At `ai:ptt_start` handler, after updating session instructions:
+
+```javascript
+const speakerAttributionEvent = {
+  type: "conversation.item.create",
+  item: {
+    type: "message",
+    role: "user",
+    content: [
+      {
+        type: "input_text",
+        text: `${displayName} says:`,
+      },
+    ],
+  },
+};
+session.ws.send(JSON.stringify(speakerAttributionEvent));
+```
+
+**Why This Works:**
+
+1. **Part of conversation history** - Not just instructions, but actual conversation context
+2. **Immediately precedes audio** - The AI processes "Matt says:" right before the audio content
+3. **Survives across turns** - Even if the AI looks back at history, it sees clear attribution
+4. **Complements existing system** - Works alongside session instructions and response-level instructions
+
+**Multi-Layer Speaker Identification:**
+
+1. **Session instructions** - Updated at PTT start with `CURRENT SPEAKER` section
+2. **Conversation history** - NEW: Text item `"{name} says:"` before audio
+3. **Response instructions** - Reinforced at PTT end: `IMPORTANT: {name} just spoke to you`
+
+**Test Coverage:**
+
+- Event structure validation
+- Special characters and unicode in names
+- WebSocket message ordering
+- Multi-participant scenarios
+- Rapid speaker changes
+- WebSocket state handling
+- Conversation history structure
