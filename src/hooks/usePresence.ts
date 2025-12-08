@@ -129,7 +129,7 @@ const DEFAULT_OPTIONS = {
  * Initial local presence state
  */
 const INITIAL_LOCAL_PRESENCE: LocalPresenceState = {
-  isMuted: true, // Default to muted
+  isMuted: false, // Default to unmuted
   isSpeaking: false,
   isAddressingAI: false,
   audioLevel: 0,

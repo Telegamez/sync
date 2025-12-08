@@ -144,8 +144,8 @@ export default function RoomPage() {
   const [copied, setCopied] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
 
-  // Track local mute state - start MUTED by default (matches server and audio track state)
-  const [localIsMuted, setLocalIsMuted] = useState(true);
+  // Track local mute state - start UNMUTED by default (matches server and audio track state)
+  const [localIsMuted, setLocalIsMuted] = useState(false);
 
   // Local media stream ref
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -430,9 +430,9 @@ export default function RoomPage() {
         if (stream) {
           // Set local stream for WebRTC peer connections
           setLocalStreamRef.current(stream);
-          // Start muted by default
+          // Start unmuted by default
           stream.getAudioTracks().forEach((track) => {
-            track.enabled = false;
+            track.enabled = true;
           });
           console.log("[Room] Local stream set for WebRTC");
         }

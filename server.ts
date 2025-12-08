@@ -315,13 +315,12 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 // Helper: Create default peer presence
-// NOTE: Peers start MUTED by default - this matches client-side behavior
-// where audio tracks are disabled on join for privacy/UX reasons
+// NOTE: Peers start UNMUTED by default - this matches client-side behavior
 function createDefaultPresence(): Peer["presence"] {
   return {
     connectionState: "connected",
     audio: {
-      isMuted: true, // Start muted - matches client default
+      isMuted: false, // Start unmuted - matches client default
       isSpeaking: false,
       isAddressingAI: false,
       audioLevel: 0,
