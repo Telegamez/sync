@@ -986,21 +986,17 @@ export default function RoomPage() {
       {/* Controls footer */}
       <footer className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-center">
-            <RoomControls
-              isMuted={localIsMuted}
-              onMuteToggle={handleMuteToggle}
-              onLeaveRoom={handleLeaveRoom}
-              isLeaving={isLeaving}
-              showPTT
-              onPTTStart={handlePTTStart}
-              onPTTEnd={handlePTTEnd}
-              isAddressingAI={isAddressingAI}
-              isAISpeaking={isAISpeakingForButton}
-              onInterruptAI={handleInterruptAI}
-              size="lg"
-            />
-          </div>
+          <RoomControls
+            isMuted={localIsMuted}
+            onMuteToggle={handleMuteToggle}
+            showPTT
+            onPTTStart={handlePTTStart}
+            onPTTEnd={handlePTTEnd}
+            isAddressingAI={isAddressingAI}
+            isAISpeaking={isAISpeakingForButton}
+            onInterruptAI={handleInterruptAI}
+            size="lg"
+          />
         </div>
       </footer>
 

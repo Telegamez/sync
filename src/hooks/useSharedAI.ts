@@ -291,6 +291,7 @@ export function useSharedAI(
   const isPlayingRef = useRef(false);
   const playbackPositionRef = useRef(0);
   const nextPlaybackTimeRef = useRef(0); // Track when next chunk should start
+  const isInterruptedRef = useRef(false); // Block audio during PTT
 
   // Callback refs
   const onAIStateChangeRef = useRef(onAIStateChange);
@@ -388,6 +389,11 @@ export function useSharedAI(
   const playAudioChunk = useCallback(
     async (chunk: AIAudioChunk) => {
       try {
+        // Block audio playback if interrupted (PTT is active)
+        if (isInterruptedRef.current) {
+          return;
+        }
+
         // Initialize audio context if needed
         if (!audioContextRef.current) {
           audioContextRef.current = new AudioContext({ sampleRate });
@@ -542,6 +548,11 @@ export function useSharedAI(
     // Define event handlers
     const onAIState = (event: AIStateEvent) => {
       if (event.roomId === roomId) {
+        // Clear interrupt flag when transitioning to processing (PTT ended)
+        // This allows audio to play for the new response
+        if (event.state.state === "processing") {
+          isInterruptedRef.current = false;
+        }
         handleAIStateEvent(event);
       }
     };
@@ -610,6 +621,9 @@ export function useSharedAI(
         console.log(
           `[useSharedAI] Voice interrupt received from ${data.interruptedByName}: ${data.reason}`,
         );
+
+        // Set interrupted flag FIRST to block any new audio from being played
+        isInterruptedRef.current = true;
 
         // Immediately stop audio playback by closing and recreating audio context
         // This is the only way to stop already-scheduled audio

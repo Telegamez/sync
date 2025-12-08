@@ -7,11 +7,19 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-111
  */
 
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, RefreshCw, Users, Loader2, AlertCircle } from 'lucide-react';
-import type { RoomSummary, RoomStatus } from '@/types/room';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  Search,
+  Plus,
+  RefreshCw,
+  Users,
+  Loader2,
+  AlertCircle,
+  X,
+} from "lucide-react";
+import type { RoomSummary, RoomStatus } from "@/types/room";
 
 /**
  * Props for the RoomLobby component
@@ -22,11 +30,15 @@ export interface RoomLobbyProps {
   /** Callback when user clicks create room button */
   onCreateRoom: () => void;
   /** Optional custom fetch function for rooms */
-  fetchRooms?: (status?: RoomStatus) => Promise<{ rooms: RoomSummary[]; total: number }>;
+  fetchRooms?: (
+    status?: RoomStatus,
+  ) => Promise<{ rooms: RoomSummary[]; total: number }>;
   /** Auto-refresh interval in ms (0 to disable) */
   refreshInterval?: number;
   /** Whether to show the create room button */
   showCreateButton?: boolean;
+  /** Whether to show delete buttons on rooms */
+  showDeleteButton?: boolean;
   /** Custom class name */
   className?: string;
 }
@@ -34,21 +46,23 @@ export interface RoomLobbyProps {
 /**
  * Status filter options
  */
-const STATUS_FILTERS: { value: RoomStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All Rooms' },
-  { value: 'waiting', label: 'Waiting' },
-  { value: 'active', label: 'Active' },
-  { value: 'full', label: 'Full' },
+const STATUS_FILTERS: { value: RoomStatus | "all"; label: string }[] = [
+  { value: "all", label: "All Rooms" },
+  { value: "waiting", label: "Waiting" },
+  { value: "active", label: "Active" },
+  { value: "full", label: "Full" },
 ];
 
 /**
  * Default fetch function using the rooms API
  */
-async function defaultFetchRooms(status?: RoomStatus): Promise<{ rooms: RoomSummary[]; total: number }> {
-  const url = status ? `/api/rooms?status=${status}` : '/api/rooms';
+async function defaultFetchRooms(
+  status?: RoomStatus,
+): Promise<{ rooms: RoomSummary[]; total: number }> {
+  const url = status ? `/api/rooms?status=${status}` : "/api/rooms";
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error('Failed to fetch rooms');
+    throw new Error("Failed to fetch rooms");
   }
   return response.json();
 }
@@ -58,16 +72,16 @@ async function defaultFetchRooms(status?: RoomStatus): Promise<{ rooms: RoomSumm
  */
 function getStatusBadgeClasses(status: RoomStatus): string {
   switch (status) {
-    case 'waiting':
-      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-    case 'active':
-      return 'bg-green-500/20 text-green-400 border-green-500/30';
-    case 'full':
-      return 'bg-red-500/20 text-red-400 border-red-500/30';
-    case 'closed':
-      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    case "waiting":
+      return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+    case "active":
+      return "bg-green-500/20 text-green-400 border-green-500/30";
+    case "full":
+      return "bg-red-500/20 text-red-400 border-red-500/30";
+    case "closed":
+      return "bg-gray-500/20 text-gray-400 border-gray-500/30";
     default:
-      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      return "bg-gray-500/20 text-gray-400 border-gray-500/30";
   }
 }
 
@@ -81,7 +95,7 @@ function formatRelativeTime(date: Date): string {
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 1) return 'Just now';
+  if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   return `${diffDays}d ago`;
@@ -107,38 +121,43 @@ export function RoomLobby({
   fetchRooms = defaultFetchRooms,
   refreshInterval = 30000,
   showCreateButton = true,
-  className = '',
+  showDeleteButton = true,
+  className = "",
 }: RoomLobbyProps) {
   // State
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<RoomStatus | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<RoomStatus | "all">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
 
   /**
    * Load rooms from API
    */
-  const loadRooms = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-    setError(null);
+  const loadRooms = useCallback(
+    async (showRefreshing = false) => {
+      if (showRefreshing) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
 
-    try {
-      const status = statusFilter === 'all' ? undefined : statusFilter;
-      const result = await fetchRooms(status);
-      setRooms(result.rooms);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load rooms');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [fetchRooms, statusFilter]);
+      try {
+        const status = statusFilter === "all" ? undefined : statusFilter;
+        const result = await fetchRooms(status);
+        setRooms(result.rooms);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load rooms");
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [fetchRooms, statusFilter],
+  );
 
   // Initial load and filter changes
   useEffect(() => {
@@ -166,7 +185,7 @@ export function RoomLobby({
     return rooms.filter(
       (room) =>
         room.name.toLowerCase().includes(query) ||
-        room.description?.toLowerCase().includes(query)
+        room.description?.toLowerCase().includes(query),
     );
   }, [rooms, searchQuery]);
 
@@ -182,10 +201,48 @@ export function RoomLobby({
    */
   const handleJoinClick = useCallback(
     (roomId: string, status: RoomStatus) => {
-      if (status === 'full' || status === 'closed') return;
+      if (status === "full" || status === "closed") return;
       onJoinRoom(roomId);
     },
-    [onJoinRoom]
+    [onJoinRoom],
+  );
+
+  /**
+   * Handle delete room click
+   */
+  const handleDeleteRoom = useCallback(
+    async (e: React.MouseEvent, roomId: string, roomName: string) => {
+      e.stopPropagation(); // Prevent triggering join
+
+      if (
+        !confirm(
+          `Are you sure you want to delete "${roomName}"? This cannot be undone.`,
+        )
+      ) {
+        return;
+      }
+
+      setDeletingRoomId(roomId);
+
+      try {
+        const response = await fetch(`/api/rooms/${roomId}?action=delete`, {
+          method: "DELETE",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to delete room");
+        }
+
+        // Remove from local state immediately
+        setRooms((prev) => prev.filter((room) => room.id !== roomId));
+      } catch (err) {
+        console.error("Failed to delete room:", err);
+        setError(err instanceof Error ? err.message : "Failed to delete room");
+      } finally {
+        setDeletingRoomId(null);
+      }
+    },
+    [],
   );
 
   return (
@@ -210,7 +267,9 @@ export function RoomLobby({
           {/* Status Filter */}
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as RoomStatus | 'all')}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as RoomStatus | "all")
+            }
             className="px-3 py-2 bg-card border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             aria-label="Filter by status"
           >
@@ -228,7 +287,9 @@ export function RoomLobby({
             className="p-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
             aria-label="Refresh rooms"
           >
-            <RefreshCw className={`w-5 h-5 text-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`w-5 h-5 text-foreground ${isRefreshing ? "animate-spin" : ""}`}
+            />
           </button>
 
           {/* Create Room Button */}
@@ -302,18 +363,31 @@ export function RoomLobby({
             {filteredRooms.map((room) => (
               <div
                 key={room.id}
-                className="flex flex-col p-4 bg-card border border-border rounded-lg hover:border-primary/50 transition-colors"
+                className={`flex flex-col p-4 bg-card border border-border rounded-lg hover:border-primary/50 transition-colors ${deletingRoomId === room.id ? "opacity-50" : ""}`}
               >
                 {/* Room Header */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold text-foreground truncate flex-1">
                     {room.name}
                   </h3>
-                  <span
-                    className={`px-2 py-0.5 text-xs font-medium border rounded-full ${getStatusBadgeClasses(room.status)}`}
-                  >
-                    {room.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-0.5 text-xs font-medium border rounded-full ${getStatusBadgeClasses(room.status)}`}
+                    >
+                      {room.status}
+                    </span>
+                    {showDeleteButton && (
+                      <button
+                        onClick={(e) => handleDeleteRoom(e, room.id, room.name)}
+                        disabled={deletingRoomId === room.id}
+                        className="p-1 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                        aria-label={`Delete ${room.name}`}
+                        title="Delete room"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Description */}
@@ -337,14 +411,14 @@ export function RoomLobby({
                 {/* Join Button */}
                 <button
                   onClick={() => handleJoinClick(room.id, room.status)}
-                  disabled={room.status === 'full' || room.status === 'closed'}
+                  disabled={room.status === "full" || room.status === "closed"}
                   className="w-full py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {room.status === 'full'
-                    ? 'Room Full'
-                    : room.status === 'closed'
-                    ? 'Closed'
-                    : 'Join Room'}
+                  {room.status === "full"
+                    ? "Room Full"
+                    : room.status === "closed"
+                      ? "Closed"
+                      : "Join Room"}
                 </button>
               </div>
             ))}
@@ -357,7 +431,7 @@ export function RoomLobby({
         <div className="mt-4 pt-4 border-t border-border text-sm text-muted-foreground text-center">
           {searchQuery
             ? `${filteredRooms.length} of ${rooms.length} rooms`
-            : `${rooms.length} room${rooms.length !== 1 ? 's' : ''} available`}
+            : `${rooms.length} room${rooms.length !== 1 ? "s" : ""} available`}
         </div>
       )}
     </div>

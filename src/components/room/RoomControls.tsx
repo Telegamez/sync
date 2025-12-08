@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useCallback, useState, type KeyboardEvent } from "react";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 
 /**
  * RoomControls props
@@ -19,8 +19,8 @@ export interface RoomControlsProps {
   isMuted: boolean;
   /** Callback to toggle mute state */
   onMuteToggle: () => void;
-  /** Callback when leaving the room */
-  onLeaveRoom: () => void;
+  /** Callback when leaving the room (optional - can use header button instead) */
+  onLeaveRoom?: () => void;
   /** Optional callback for settings button */
   onSettingsClick?: () => void;
   /** Whether leaving is in progress */
@@ -35,6 +35,8 @@ export interface RoomControlsProps {
   showPTT?: boolean;
   /** Whether to show the settings button */
   showSettings?: boolean;
+  /** Whether to show the leave room button (default: false) */
+  showLeaveButton?: boolean;
   /** Whether AI is currently speaking (for interrupt button) */
   isAISpeaking?: boolean;
   /** Callback to interrupt AI audio */
@@ -259,6 +261,7 @@ function ControlButton({
   onMouseLeave,
   onTouchStart,
   onTouchEnd,
+  onTouchCancel,
   onKeyDown,
   onKeyUp,
   label,
@@ -273,8 +276,9 @@ function ControlButton({
   onMouseDown?: () => void;
   onMouseUp?: () => void;
   onMouseLeave?: () => void;
-  onTouchStart?: () => void;
-  onTouchEnd?: () => void;
+  onTouchStart?: (e: React.TouchEvent) => void;
+  onTouchEnd?: (e: React.TouchEvent) => void;
+  onTouchCancel?: (e: React.TouchEvent) => void;
   onKeyDown?: (e: KeyboardEvent<HTMLButtonElement>) => void;
   onKeyUp?: (e: KeyboardEvent<HTMLButtonElement>) => void;
   label: string;
@@ -307,6 +311,7 @@ function ControlButton({
       onMouseLeave={onMouseLeave}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
       disabled={disabled || isLoading}
@@ -316,7 +321,13 @@ function ControlButton({
         ${isActive ? "ring-2 ring-purple-500" : ""}
         ${variantClasses[variant]}
         ${disabled || isLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+        select-none
       `}
+      style={{
+        touchAction: "none",
+        WebkitUserSelect: "none",
+        userSelect: "none",
+      }}
       aria-label={label}
       aria-pressed={isActive}
     >
@@ -352,6 +363,7 @@ export function RoomControls({
   onPTTEnd,
   showPTT = false,
   showSettings = false,
+  showLeaveButton = false,
   isAISpeaking = false,
   onInterruptAI,
   layout = "horizontal",
@@ -360,26 +372,181 @@ export function RoomControls({
 }: RoomControlsProps) {
   const config = SIZE_CONFIG[size];
   const [isPTTActive, setIsPTTActive] = useState(false);
+  const isPTTActiveRef = useRef(false); // Ref to avoid stale closures
+  const isTouchInteractionRef = useRef(false);
+  const pttStartTimeRef = useRef<number>(0); // Track when PTT started to prevent premature end
+  const MIN_PTT_DURATION_MS = 200; // Minimum PTT duration before allowing end
 
   /**
-   * Handle PTT start (mouse/touch down)
+   * Handle PTT mouse down (only if not a touch interaction)
    */
-  const handlePTTStart = useCallback(() => {
-    if (onPTTStart) {
+  const handlePTTMouseDown = useCallback(() => {
+    console.log(
+      "[RoomControls] handlePTTMouseDown called, isTouchInteraction:",
+      isTouchInteractionRef.current,
+      "isPTTActive:",
+      isPTTActiveRef.current,
+    );
+    // Skip if this is a touch-triggered mouse event
+    if (isTouchInteractionRef.current) return;
+
+    if (onPTTStart && !isPTTActiveRef.current) {
+      console.log("[RoomControls] Starting PTT via mouseDown");
+      pttStartTimeRef.current = Date.now();
+      isPTTActiveRef.current = true;
       setIsPTTActive(true);
       onPTTStart();
     }
   }, [onPTTStart]);
 
   /**
-   * Handle PTT end (mouse/touch up or leave)
+   * Handle PTT mouse up
    */
-  const handlePTTEnd = useCallback(() => {
-    if (onPTTEnd && isPTTActive) {
+  const handlePTTMouseUp = useCallback(() => {
+    const elapsed = Date.now() - pttStartTimeRef.current;
+    console.log(
+      "[RoomControls] handlePTTMouseUp called, isTouchInteraction:",
+      isTouchInteractionRef.current,
+      "isPTTActive:",
+      isPTTActiveRef.current,
+      "elapsed:",
+      elapsed,
+    );
+    // Skip if this is a touch-triggered mouse event
+    if (isTouchInteractionRef.current) return;
+
+    if (onPTTEnd && isPTTActiveRef.current) {
+      // Prevent premature end if PTT just started (likely a browser quirk)
+      if (elapsed < MIN_PTT_DURATION_MS) {
+        console.log(
+          "[RoomControls] Ignoring premature mouseUp, elapsed:",
+          elapsed,
+          "ms < MIN:",
+          MIN_PTT_DURATION_MS,
+        );
+        return;
+      }
+      console.log("[RoomControls] Ending PTT via mouseUp");
+      isPTTActiveRef.current = false;
       setIsPTTActive(false);
       onPTTEnd();
     }
-  }, [onPTTEnd, isPTTActive]);
+  }, [onPTTEnd]);
+
+  /**
+   * Handle PTT mouse leave (only end if using mouse, not touch)
+   */
+  const handlePTTMouseLeave = useCallback(() => {
+    const elapsed = Date.now() - pttStartTimeRef.current;
+    console.log(
+      "[RoomControls] handlePTTMouseLeave called, isTouchInteraction:",
+      isTouchInteractionRef.current,
+      "isPTTActive:",
+      isPTTActiveRef.current,
+      "elapsed:",
+      elapsed,
+    );
+    // Don't end PTT on mouse leave if using touch
+    if (isTouchInteractionRef.current) return;
+
+    if (onPTTEnd && isPTTActiveRef.current) {
+      // Prevent premature end if PTT just started (likely a browser quirk)
+      if (elapsed < MIN_PTT_DURATION_MS) {
+        console.log(
+          "[RoomControls] Ignoring premature mouseLeave, elapsed:",
+          elapsed,
+          "ms < MIN:",
+          MIN_PTT_DURATION_MS,
+        );
+        return;
+      }
+      console.log("[RoomControls] Ending PTT via mouseLeave");
+      isPTTActiveRef.current = false;
+      setIsPTTActive(false);
+      onPTTEnd();
+    }
+  }, [onPTTEnd]);
+
+  /**
+   * Handle PTT touch start
+   */
+  const handlePTTTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      console.log(
+        "[RoomControls] handlePTTTouchStart called, isPTTActive:",
+        isPTTActiveRef.current,
+      );
+      e.preventDefault(); // Prevent mouse event emulation
+      isTouchInteractionRef.current = true;
+
+      if (onPTTStart && !isPTTActiveRef.current) {
+        console.log("[RoomControls] Starting PTT via touchStart");
+        pttStartTimeRef.current = Date.now();
+        isPTTActiveRef.current = true;
+        setIsPTTActive(true);
+        onPTTStart();
+      }
+    },
+    [onPTTStart],
+  );
+
+  /**
+   * Handle PTT touch end
+   */
+  const handlePTTTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const elapsed = Date.now() - pttStartTimeRef.current;
+      console.log(
+        "[RoomControls] handlePTTTouchEnd called, isPTTActive:",
+        isPTTActiveRef.current,
+        "elapsed:",
+        elapsed,
+      );
+      e.preventDefault(); // Prevent mouse event emulation
+
+      if (onPTTEnd && isPTTActiveRef.current) {
+        // Prevent premature end if PTT just started (likely a browser quirk)
+        if (elapsed < MIN_PTT_DURATION_MS) {
+          console.log(
+            "[RoomControls] Ignoring premature touchEnd, elapsed:",
+            elapsed,
+            "ms < MIN:",
+            MIN_PTT_DURATION_MS,
+          );
+          // Don't reset touch flag - wait for real touchend
+          return;
+        }
+        console.log("[RoomControls] Ending PTT via touchEnd");
+        isPTTActiveRef.current = false;
+        setIsPTTActive(false);
+        onPTTEnd();
+      }
+
+      // Reset touch flag after a short delay (to handle any lingering mouse events)
+      setTimeout(() => {
+        isTouchInteractionRef.current = false;
+      }, 100);
+    },
+    [onPTTEnd],
+  );
+
+  /**
+   * Handle PTT touch cancel (e.g., when browser interrupts touch)
+   */
+  const handlePTTTouchCancel = useCallback((e: React.TouchEvent) => {
+    console.log(
+      "[RoomControls] handlePTTTouchCancel called, isPTTActive:",
+      isPTTActiveRef.current,
+    );
+    e.preventDefault();
+
+    // On touch cancel, we should NOT end PTT - just log it
+    // The user's finger is still down but the browser cancelled the gesture
+    // Let the user release naturally via touchend
+    console.log(
+      "[RoomControls] Touch cancelled by browser, PTT state maintained",
+    );
+  }, []);
 
   /**
    * Handle PTT keyboard events
@@ -387,23 +554,57 @@ export function RoomControls({
   const handlePTTKeyDown = useCallback(
     (e: KeyboardEvent<HTMLButtonElement>) => {
       if (e.key === " " || e.key === "Enter") {
+        console.log(
+          "[RoomControls] handlePTTKeyDown called, key:",
+          e.key,
+          "isPTTActive:",
+          isPTTActiveRef.current,
+        );
         e.preventDefault();
-        if (!isPTTActive) {
-          handlePTTStart();
+        if (!isPTTActiveRef.current && onPTTStart) {
+          console.log("[RoomControls] Starting PTT via keyDown");
+          pttStartTimeRef.current = Date.now();
+          isPTTActiveRef.current = true;
+          setIsPTTActive(true);
+          onPTTStart();
         }
       }
     },
-    [handlePTTStart, isPTTActive],
+    [onPTTStart],
   );
 
   const handlePTTKeyUp = useCallback(
     (e: KeyboardEvent<HTMLButtonElement>) => {
       if (e.key === " " || e.key === "Enter") {
+        const elapsed = Date.now() - pttStartTimeRef.current;
+        console.log(
+          "[RoomControls] handlePTTKeyUp called, key:",
+          e.key,
+          "isPTTActive:",
+          isPTTActiveRef.current,
+          "elapsed:",
+          elapsed,
+        );
         e.preventDefault();
-        handlePTTEnd();
+        if (isPTTActiveRef.current && onPTTEnd) {
+          // Prevent premature end if PTT just started (likely a browser quirk)
+          if (elapsed < MIN_PTT_DURATION_MS) {
+            console.log(
+              "[RoomControls] Ignoring premature keyUp, elapsed:",
+              elapsed,
+              "ms < MIN:",
+              MIN_PTT_DURATION_MS,
+            );
+            return;
+          }
+          console.log("[RoomControls] Ending PTT via keyUp");
+          isPTTActiveRef.current = false;
+          setIsPTTActive(false);
+          onPTTEnd();
+        }
       }
     },
-    [handlePTTEnd],
+    [onPTTEnd],
   );
 
   /**
@@ -419,95 +620,123 @@ export function RoomControls({
     [onMuteToggle],
   );
 
-  const isHorizontal = layout === "horizontal";
-
   return (
     <div
-      className={`
-        flex items-center justify-center
-        ${isHorizontal ? `flex-row ${config.gap}` : `flex-col ${config.gap}`}
-        ${className}
-      `}
+      className={`flex flex-col items-center gap-4 ${className}`}
       role="toolbar"
       aria-label="Room controls"
     >
-      {/* Mute/Unmute button */}
-      <ControlButton
-        onClick={onMuteToggle}
-        onKeyDown={handleMuteKeyDown}
-        label={isMuted ? "Unmute microphone (M)" : "Mute microphone (M)"}
-        icon={
-          isMuted ? (
-            <MicrophoneOffIcon className={config.icon} />
-          ) : (
-            <MicrophoneIcon className={config.icon} />
-          )
-        }
-        variant={isMuted ? "muted" : "default"}
-        size={size}
-      />
-
-      {/* PTT button (optional) */}
+      {/* Row 1: PTT button - large and prominent, always in same position */}
       {showPTT && (
+        <div className="w-full flex justify-center">
+          <button
+            type="button"
+            onMouseDown={handlePTTMouseDown}
+            onMouseUp={handlePTTMouseUp}
+            onMouseLeave={handlePTTMouseLeave}
+            onTouchStart={handlePTTTouchStart}
+            onTouchEnd={handlePTTTouchEnd}
+            onTouchCancel={handlePTTTouchCancel}
+            onKeyDown={handlePTTKeyDown}
+            onKeyUp={handlePTTKeyUp}
+            className={`
+              w-full max-w-xs px-8 py-4 rounded-2xl flex items-center justify-center gap-3
+              font-semibold text-lg transition-all duration-200
+              focus:outline-none focus:ring-2 focus:ring-offset-2
+              ${
+                isPTTActive || isAddressingAI
+                  ? "bg-green-500 text-white ring-2 ring-green-400 shadow-lg shadow-green-500/30"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }
+              select-none
+            `}
+            style={{
+              touchAction: "none",
+              WebkitUserSelect: "none",
+              userSelect: "none",
+            }}
+            aria-label={
+              isPTTActive || isAddressingAI
+                ? "Release to stop talking to AI"
+                : "Hold to talk to AI"
+            }
+            aria-pressed={isPTTActive || isAddressingAI}
+          >
+            <PTTIcon className="w-6 h-6" />
+            <span>
+              {isPTTActive || isAddressingAI
+                ? "Speaking to AI..."
+                : "Hold to Talk"}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Row 2: Excuse Me button - separate row, fixed height to prevent layout shift */}
+      <div className="h-12 flex items-center justify-center">
+        {isAISpeaking && onInterruptAI ? (
+          <button
+            type="button"
+            onClick={onInterruptAI}
+            className={`
+              px-6 py-2.5 rounded-full flex items-center gap-2
+              bg-orange-500 text-white hover:bg-orange-600
+              animate-pulse font-medium text-base
+              transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-orange-400
+            `}
+            aria-label="Excuse Me - Stop AI"
+          >
+            <InterruptIcon className="w-5 h-5" />
+            <span>Excuse Me</span>
+          </button>
+        ) : (
+          /* Invisible placeholder to maintain consistent spacing */
+          <div className="h-10" aria-hidden="true" />
+        )}
+      </div>
+
+      {/* Row 3: Other controls - mute, settings */}
+      <div className={`flex items-center justify-center ${config.gap}`}>
+        {/* Mute/Unmute button */}
         <ControlButton
-          onMouseDown={handlePTTStart}
-          onMouseUp={handlePTTEnd}
-          onMouseLeave={handlePTTEnd}
-          onTouchStart={handlePTTStart}
-          onTouchEnd={handlePTTEnd}
-          onKeyDown={handlePTTKeyDown}
-          onKeyUp={handlePTTKeyUp}
-          label={
-            isPTTActive || isAddressingAI
-              ? "Release to stop talking to AI"
-              : "Hold to talk to AI"
+          onClick={onMuteToggle}
+          onKeyDown={handleMuteKeyDown}
+          label={isMuted ? "Unmute microphone (M)" : "Mute microphone (M)"}
+          icon={
+            isMuted ? (
+              <MicrophoneOffIcon className={config.icon} />
+            ) : (
+              <MicrophoneIcon className={config.icon} />
+            )
           }
-          icon={<PTTIcon className={config.icon} />}
-          variant={isPTTActive || isAddressingAI ? "active" : "default"}
-          size={size}
-          isActive={isPTTActive || isAddressingAI}
-        />
-      )}
-
-      {/* Excuse Me button - stops AI audio for everyone */}
-      {isAISpeaking && onInterruptAI && (
-        <button
-          type="button"
-          onClick={onInterruptAI}
-          className={`
-            px-4 py-2 rounded-full flex items-center gap-2
-            bg-orange-500 text-white hover:bg-orange-600
-            animate-pulse font-medium ${config.text}
-            transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-orange-400
-          `}
-          aria-label="Excuse Me - Stop AI"
-        >
-          <InterruptIcon className={config.icon} />
-          <span>Excuse Me</span>
-        </button>
-      )}
-
-      {/* Settings button (optional) */}
-      {showSettings && onSettingsClick && (
-        <ControlButton
-          onClick={onSettingsClick}
-          label="Room settings"
-          icon={<SettingsIcon className={config.icon} />}
-          variant="default"
+          variant={isMuted ? "muted" : "default"}
           size={size}
         />
-      )}
 
-      {/* Leave room button */}
-      <ControlButton
-        onClick={onLeaveRoom}
-        label="Leave room"
-        icon={<LeaveIcon className={config.icon} />}
-        variant="danger"
-        size={size}
-        isLoading={isLeaving}
-        disabled={isLeaving}
-      />
+        {/* Settings button (optional) */}
+        {showSettings && onSettingsClick && (
+          <ControlButton
+            onClick={onSettingsClick}
+            label="Room settings"
+            icon={<SettingsIcon className={config.icon} />}
+            variant="default"
+            size={size}
+          />
+        )}
+
+        {/* Leave room button (optional - usually in header instead) */}
+        {showLeaveButton && onLeaveRoom && (
+          <ControlButton
+            onClick={onLeaveRoom}
+            label="Leave room"
+            icon={<LeaveIcon className={config.icon} />}
+            variant="danger"
+            size={size}
+            isLoading={isLeaving}
+            disabled={isLeaving}
+          />
+        )}
+      </div>
     </div>
   );
 }

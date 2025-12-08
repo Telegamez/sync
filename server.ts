@@ -94,6 +94,8 @@ interface RoomAISession {
   customInstructions?: string;
   // Interrupt handling - ignore audio events until next PTT session
   isInterrupted: boolean;
+  // Track which response we're expecting audio from (to ignore stale responses)
+  expectedResponseId: string | null;
 }
 
 /** OpenAI Realtime WebSocket endpoint */
@@ -406,6 +408,7 @@ function getOrCreateAISession(
     aiTopic,
     customInstructions,
     isInterrupted: false,
+    expectedResponseId: null,
   };
 
   roomAISessions.set(roomId, session);
@@ -540,12 +543,40 @@ function handleOpenAIMessage(
         console.log(`[OpenAI] Session ready for room ${session.roomId}`);
         break;
 
+      case "response.created":
+        // Track this response ID - only accept audio from this response
+        // This prevents stale audio from cancelled responses leaking through
+        const responseId = event.response?.id;
+        if (responseId && !session.isInterrupted) {
+          session.expectedResponseId = responseId;
+          console.log(
+            `[OpenAI] New response ${responseId} for room ${session.roomId} (state: ${session.state})`,
+          );
+        } else {
+          console.log(
+            `[OpenAI] Ignoring response ${responseId} for room ${session.roomId} (isInterrupted: ${session.isInterrupted})`,
+          );
+        }
+        break;
+
       case "response.audio.delta":
         // Audio chunk received - broadcast to room
         if (event.delta) {
           // Check if we should ignore audio (after interrupt, until next PTT)
           if (session.isInterrupted) {
-            // Ignore this audio chunk - waiting for new PTT session
+            return;
+          }
+
+          // Check if this audio is from the expected response
+          // Ignore audio from stale/cancelled responses
+          const audioResponseId = event.response_id;
+          if (
+            session.expectedResponseId &&
+            audioResponseId !== session.expectedResponseId
+          ) {
+            console.log(
+              `[OpenAI] Ignoring stale audio from response ${audioResponseId} (expected: ${session.expectedResponseId})`,
+            );
             return;
           }
 
@@ -1081,8 +1112,36 @@ app
         // Get or create AI session for this room
         const session = getOrCreateAISession(io, roomId);
 
-        // Clear interrupt flag - new PTT session starts fresh
-        session.isInterrupted = false;
+        // ALWAYS interrupt when PTT starts - audio may still be playing on clients
+        // even if server state is idle (audio is queued/scheduled on client AudioContext)
+        const previousState = session.state;
+        console.log(
+          `[Socket.io] PTT interrupting any AI audio (state: ${previousState}) in room ${roomId}`,
+        );
+
+        // Cancel OpenAI response and clear buffer (always, to be safe)
+        if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+          session.ws.send(JSON.stringify({ type: "response.cancel" }));
+          session.ws.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+          console.log(
+            `[OpenAI] PTT triggered response.cancel and input_audio_buffer.clear for room ${roomId}`,
+          );
+        }
+
+        // Broadcast interrupt to all clients so they close AudioContext
+        // This stops any scheduled/playing audio immediately
+        io.to(roomId).emit("ai:interrupted", {
+          roomId,
+          interruptedBy: peerId,
+          interruptedByName: displayName,
+          reason: "ptt_start",
+          previousState,
+        });
+
+        // Keep isInterrupted = true during PTT to block any late audio chunks
+        // Clear expectedResponseId so we don't accept audio from old responses
+        session.expectedResponseId = null;
+        session.isInterrupted = true;
 
         // Update session state
         session.state = "listening";
@@ -1152,9 +1211,11 @@ app
 
         const session = roomAISessions.get(roomId);
 
-        // Update state to processing
+        // Update state to processing and clear interrupt flag
+        // Now we're ready to receive audio for the response to this PTT session
         if (session) {
           session.state = "processing";
+          session.isInterrupted = false; // Ready to receive audio for this response
           broadcastAIState(io, session);
         }
 
