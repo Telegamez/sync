@@ -14,9 +14,9 @@
 | Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
-| Phase 6: Transcript System   | In Progress  | 1/14     | 7%     |
+| Phase 6: Transcript System   | In Progress  | 2/14     | 14%    |
 
-**Latest:** FEAT-500 (Transcript Types) - Defined TypeScript types for dual-track unified transcript system.
+**Latest:** FEAT-501 (PTT Context Injection) - AI can now reference prior conversation context on each PTT turn.
 
 ---
 
@@ -2747,3 +2747,54 @@ DEFAULT_TRANSCRIPT_SETTINGS = {
 
 **Test Results:**
 ✅ 29 tests passing (types validation, type guards, utility functions, entry formatting)
+
+---
+
+### FEAT-501: PTT Context Injection
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/ai/context-injection.test.ts`
+
+Wired ContextManager to inject prior conversation context on PTT start, enabling the AI to reference earlier parts of the conversation.
+
+**Files Modified:**
+
+- `src/server/signaling/openai-realtime-client.ts` - Added `injectContext()` and `updateInstructions()` methods
+- `server.ts` - Integrated ContextManager, context injection, and transcript capture
+
+**Key Changes:**
+
+1. **OpenAI Realtime Client Extensions:**
+   - `injectContext(roomId, context)` - Injects system message via `conversation.item.create`
+   - `updateInstructions(roomId, instructions)` - Updates session instructions dynamically
+
+2. **ContextManager Integration (server.ts):**
+   - Created `roomContextManagers` Map for per-room context tracking
+   - `getOrCreateContextManager(roomId)` - Initializes context on first use
+   - `cleanupContextManager(roomId)` - Cleans up when AI session ends
+   - `buildContextInjection(roomId, maxTokens)` - Formats recent conversation history
+
+3. **Transcript Capture:**
+   - Enabled `input_audio_transcription` with Whisper model in session config
+   - Handle `response.audio_transcript.done` - Store AI responses in ContextManager
+   - Handle `conversation.item.input_audio_transcription.completed` - Store user messages
+
+4. **Context Injection Flow:**
+   - On `ai:ptt_start`: Initialize context manager, add participant
+   - Build context from recent messages (up to 2000 tokens)
+   - Inject context as system message before speaker attribution
+   - Context formatted with timestamps and speaker names
+
+**Context Format:**
+
+```
+## RECENT CONVERSATION CONTEXT
+Here is what was discussed recently in this room. Use this context to provide more relevant and informed responses.
+
+[10:01 AM] Alice: I think we should focus on mobile this quarter.
+[10:02 AM] AI: That sounds like a good strategy, Alice.
+[10:03 AM] Bob: What about the backend improvements?
+```
+
+**Test Results:**
+✅ 20 tests passing (context storage, retrieval, formatting, callbacks, OpenAI client methods)

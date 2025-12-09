@@ -342,6 +342,72 @@ export class OpenAIRealtimeClient {
   }
 
   /**
+   * Inject context into the conversation via conversation.item.create
+   *
+   * This adds a system message to the conversation history before audio processing.
+   * Used to provide the AI with prior conversation context (summaries + recent transcript).
+   *
+   * @param roomId - Room to inject context into
+   * @param context - Context text to inject (formatted summary + recent messages)
+   * @returns boolean - Whether context was successfully injected
+   */
+  injectContext(roomId: RoomId, context: string): boolean {
+    const session = this.sessions.get(roomId);
+    if (!session || !session.ws || session.ws.readyState !== WebSocket.OPEN) {
+      console.log(
+        `[OpenAI] Cannot inject context - no active session for room ${roomId}`,
+      );
+      return false;
+    }
+
+    // Create a system message in the conversation history
+    const contextEvent = {
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: context,
+          },
+        ],
+      },
+    };
+
+    session.ws.send(JSON.stringify(contextEvent));
+    console.log(
+      `[OpenAI] Room ${roomId}: Injected context (${context.length} chars)`,
+    );
+    return true;
+  }
+
+  /**
+   * Update session instructions dynamically
+   *
+   * @param roomId - Room to update
+   * @param instructions - New instructions text
+   * @returns boolean - Whether update was sent
+   */
+  updateInstructions(roomId: RoomId, instructions: string): boolean {
+    const session = this.sessions.get(roomId);
+    if (!session || !session.ws || session.ws.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    const updateEvent = {
+      type: "session.update",
+      session: {
+        instructions,
+      },
+    };
+
+    session.ws.send(JSON.stringify(updateEvent));
+    console.log(`[OpenAI] Room ${roomId}: Updated session instructions`);
+    return true;
+  }
+
+  /**
    * Get active session count
    */
   getSessionCount(): number {

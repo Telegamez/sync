@@ -289,6 +289,122 @@ const roomPeers = new Map<string, Map<string, Peer>>();
 const socketToPeer = new Map<string, { peerId: string; roomId: string }>();
 const roomAISessions = new Map<string, RoomAISession>();
 
+// ============================================================
+// CONTEXT MANAGER FOR TRANSCRIPT AND AI MEMORY (FEAT-501)
+// ============================================================
+
+import {
+  ContextManager,
+  type ConversationMessage,
+} from "./src/server/signaling/context-manager";
+
+/** Room context managers for conversation history */
+const roomContextManagers = new Map<string, ContextManager>();
+
+/**
+ * Get or create a context manager for a room
+ */
+function getOrCreateContextManager(roomId: string): ContextManager {
+  let cm = roomContextManagers.get(roomId);
+  if (!cm) {
+    cm = new ContextManager(
+      {
+        maxTokensBeforeSummary: 8000,
+        targetTokensAfterSummary: 3000,
+        maxMessages: 100,
+        enableAutoSummary: true,
+      },
+      {
+        onMessageAdded: (rid, message) => {
+          console.log(
+            `[ContextManager] Room ${rid}: Added ${message.role} message from ${message.speakerName || "AI"}`,
+          );
+        },
+        onContextSummarized: (rid, summary) => {
+          console.log(
+            `[ContextManager] Room ${rid}: Context summarized (${summary.messageCount} messages -> ${summary.summaryTokens} tokens)`,
+          );
+        },
+        onNearTokenLimit: (rid, tokenCount) => {
+          console.log(
+            `[ContextManager] Room ${rid}: Near token limit (${tokenCount} tokens)`,
+          );
+        },
+      },
+    );
+    cm.initRoom(roomId);
+    roomContextManagers.set(roomId, cm);
+    console.log(`[ContextManager] Created context manager for room ${roomId}`);
+  }
+  return cm;
+}
+
+/**
+ * Clean up context manager for a room
+ */
+function cleanupContextManager(roomId: string): void {
+  const cm = roomContextManagers.get(roomId);
+  if (cm) {
+    cm.removeRoom(roomId);
+    roomContextManagers.delete(roomId);
+    console.log(
+      `[ContextManager] Cleaned up context manager for room ${roomId}`,
+    );
+  }
+}
+
+/**
+ * Build context injection text from recent conversation history
+ * Returns formatted context string for AI
+ */
+function buildContextInjection(
+  roomId: string,
+  maxTokens: number = 2000,
+): string {
+  const cm = roomContextManagers.get(roomId);
+  if (!cm) return "";
+
+  const messages = cm.getMessages(roomId);
+  if (messages.length === 0) return "";
+
+  // Get the last N messages that fit within token budget
+  const recentMessages: ConversationMessage[] = [];
+  let tokenCount = 0;
+
+  // Iterate from newest to oldest
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    const msgTokens = msg.tokenEstimate || Math.ceil(msg.content.length / 4);
+
+    if (tokenCount + msgTokens > maxTokens) break;
+
+    recentMessages.unshift(msg);
+    tokenCount += msgTokens;
+  }
+
+  if (recentMessages.length === 0) return "";
+
+  // Format as context string
+  const contextParts = [
+    "## RECENT CONVERSATION CONTEXT",
+    "Here is what was discussed recently in this room. Use this context to provide more relevant and informed responses.",
+    "",
+  ];
+
+  for (const msg of recentMessages) {
+    const timestamp = msg.timestamp.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const speaker =
+      msg.role === "assistant" ? "AI" : msg.speakerName || "Unknown";
+    contextParts.push(`[${timestamp}] ${speaker}: ${msg.content}`);
+  }
+
+  return contextParts.join("\n");
+}
+
 // Server configuration
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -458,6 +574,7 @@ function connectOpenAI(
       const personalityConfig = getPersonalityConfig(session.aiPersonality);
 
       // Send session configuration with personality-specific settings
+      // FEAT-501: Enable input_audio_transcription to capture user speech for context
       const config = {
         type: "session.update",
         session: {
@@ -473,6 +590,10 @@ function connectOpenAI(
           output_audio_format: "pcm16",
           temperature: personalityConfig.temperature,
           turn_detection: null, // Disable server VAD - we use PTT
+          // FEAT-501: Enable transcription of user input audio for context tracking
+          input_audio_transcription: {
+            model: "whisper-1",
+          },
         },
       };
       ws.send(JSON.stringify(config));
@@ -597,6 +718,44 @@ function handleOpenAIMessage(
         );
         break;
 
+      // FEAT-501: Capture AI response transcript for context
+      case "response.audio_transcript.done":
+        if (event.transcript) {
+          console.log(
+            `[OpenAI] Room ${session.roomId}: AI transcript complete (${event.transcript.length} chars)`,
+          );
+          // Store AI response in context manager
+          const aiCm = roomContextManagers.get(session.roomId);
+          if (aiCm) {
+            aiCm.addAssistantMessage(session.roomId, event.transcript);
+            console.log(
+              `[ContextManager] Room ${session.roomId}: Stored AI response`,
+            );
+          }
+        }
+        break;
+
+      // FEAT-501: Capture user speech transcript from input transcription
+      case "conversation.item.input_audio_transcription.completed":
+        if (event.transcript) {
+          console.log(
+            `[OpenAI] Room ${session.roomId}: User transcript complete from ${session.activeSpeakerName || "unknown"} (${event.transcript.length} chars)`,
+          );
+          // Store user message in context manager
+          const userCm = roomContextManagers.get(session.roomId);
+          if (userCm && session.activeSpeakerId) {
+            userCm.addUserMessage(
+              session.roomId,
+              event.transcript,
+              session.activeSpeakerId,
+            );
+            console.log(
+              `[ContextManager] Room ${session.roomId}: Stored user message from ${session.activeSpeakerName}`,
+            );
+          }
+        }
+        break;
+
       case "response.done":
         // Response complete - return to idle
         console.log(`[OpenAI] Response complete for room ${session.roomId}`);
@@ -656,6 +815,9 @@ function cleanupAISession(roomId: string): void {
 
   roomAISessions.delete(roomId);
   console.log(`[OpenAI] Cleaned up session for room ${roomId}`);
+
+  // FEAT-501: Also clean up context manager for this room
+  cleanupContextManager(roomId);
 }
 
 // Helper: Remove peer from room
@@ -1197,6 +1359,36 @@ app
           console.log(
             `[OpenAI] Updated session instructions for speaker: ${displayName}`,
           );
+
+          // FEAT-501: Initialize context manager and inject prior conversation context
+          // This allows the AI to reference earlier parts of the conversation
+          const cm = getOrCreateContextManager(roomId);
+
+          // Add the current speaker as a participant if not already added
+          cm.addParticipant(roomId, peerId, displayName);
+
+          // Build context injection from recent conversation history
+          const contextText = buildContextInjection(roomId, 2000);
+          if (contextText) {
+            // Inject context as a system message before the speaker's audio
+            const contextEvent = {
+              type: "conversation.item.create",
+              item: {
+                type: "message",
+                role: "system",
+                content: [
+                  {
+                    type: "input_text",
+                    text: contextText,
+                  },
+                ],
+              },
+            };
+            session.ws.send(JSON.stringify(contextEvent));
+            console.log(
+              `[OpenAI] Injected conversation context for room ${roomId}`,
+            );
+          }
 
           // FEAT-416: Add speaker attribution as text item in conversation history
           // This creates a text prefix before the audio, so the AI sees:
