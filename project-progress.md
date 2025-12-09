@@ -2686,11 +2686,11 @@ Implement dual-track unified transcript with AI context awareness, enabling:
 2. `FEAT-501` - PTT context injection ✅
 3. `FEAT-502` - Transcription service integration ✅
 4. `FEAT-503` - ContextManager transcript extensions ✅
-5. `FEAT-504` - Summarization service
-6. `FEAT-505` - Transcript Socket.io events
-7. `FEAT-506` - Transcript REST endpoints
-8. `FEAT-507` - useTranscript hook
-9. `FEAT-508` - TranscriptPanel component
+5. `FEAT-504` - Summarization service ✅
+6. `FEAT-505` - Transcript Socket.io events ✅
+7. `FEAT-506` - Transcript REST endpoints ✅
+8. `FEAT-507` - useTranscript hook ✅
+9. `FEAT-508` - TranscriptPanel component ✅
 10. `FEAT-509` - TranscriptEntry component
 11. `FEAT-510` - SummaryCard component
 12. `FEAT-511` - TranscriptDownloadModal component
@@ -3225,3 +3225,90 @@ const {
 
 **Test Results:**
 ✅ 24 tests passing (initialization, history handling, real-time updates, pagination, auto-scroll, local entry addition, error handling, refresh, cleanup)
+
+---
+
+### FEAT-508: TranscriptPanel Component
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/components/TranscriptPanel.test.tsx`
+
+Implemented the main transcript UI component with header controls, scrollable entry list, and footer actions.
+
+**Files Created:**
+
+- `src/components/room/TranscriptPanel.tsx` - Main transcript panel component
+
+**Key Features:**
+
+1. **Header Controls:**
+   - Title with FileText icon
+   - Entry count display
+   - Auto-scroll toggle button
+   - Collapse/expand button (optional)
+
+2. **Entry Rendering:**
+   - Renders transcript entries with speaker name and timestamp
+   - Type badges: PTT (blue), AI (purple), System (gray)
+   - System messages centered
+   - Entry type styling (ambient has no badge)
+
+3. **Summary Cards:**
+   - Collapsible summary display with toggle
+   - Shows bullet points on expansion
+   - Visual distinction from regular entries
+
+4. **Footer Actions:**
+   - Copy transcript button with success feedback
+   - Download .txt button
+   - Download .md button
+   - Buttons disabled when no entries
+
+5. **Pagination:**
+   - "Load older messages" button when hasMore
+   - Loading state during pagination
+   - Seamless prepending of older entries
+
+6. **Collapsed State:**
+   - Compact view with title and entry count
+   - Click to expand
+   - Passed via props
+
+7. **Mobile Sheet Variant:**
+   - Fixed bottom positioning
+   - Rounded top corners
+   - Shadow and border styling
+   - Max height constraint
+
+8. **Error Handling:**
+   - Error banner with dismiss button
+   - Calls onClearError callback
+
+**Props Interface:**
+
+```typescript
+interface TranscriptPanelProps {
+  entries: TranscriptEntry[];
+  summaries: TranscriptSummary[];
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  error: string | null;
+  hasMore: boolean;
+  autoScroll: boolean;
+  totalEntries: number;
+  onLoadMore: () => void;
+  onToggleAutoScroll: () => void;
+  onDownloadTxt: () => Promise<void>;
+  onDownloadMd: () => Promise<void>;
+  onCopy: () => Promise<boolean>;
+  onClearError: () => void;
+  isCollapsed?: boolean;
+  onCollapseChange?: (collapsed: boolean) => void;
+  title?: string;
+  mobileSheet?: boolean;
+  className?: string;
+}
+```
+
+**Test Results:**
+✅ 33 tests passing (rendering, header controls, collapsed state, error handling, pagination, footer actions, summary expansion, mobile sheet variant, entry types)
