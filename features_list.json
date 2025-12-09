@@ -2,10 +2,10 @@
   "$schema": "./features_list.schema.json",
   "metadata": {
     "project": "swensync",
-    "version": "0.2.0",
-    "lastUpdated": "2024-12-06T00:00:00.000Z",
+    "version": "0.3.0",
+    "lastUpdated": "2024-12-09T00:00:00.000Z",
     "protocol": "Long-Horizon Engineering Protocol v1.0",
-    "currentPhase": "Phase 2: Room Infrastructure"
+    "currentPhase": "Phase 6: Transcript System"
   },
   "phases": {
     "phase1": {
@@ -20,7 +20,7 @@
     },
     "phase3": {
       "name": "Multi-Peer Audio",
-      "status": "in_progress",
+      "status": "complete",
       "description": "Audio mixing, per-peer analysis, synchronization"
     },
     "phase4": {
@@ -30,8 +30,13 @@
     },
     "phase5": {
       "name": "Production Polish",
-      "status": "pending",
+      "status": "complete",
       "description": "Auth, persistence, permissions, optimization"
+    },
+    "phase6": {
+      "name": "Transcript System",
+      "status": "in_progress",
+      "description": "Dual-track unified transcript with AI context awareness"
     }
   },
   "features": [
@@ -1162,6 +1167,258 @@
       "testFile": "tests/unit/reliability/duplicate-connection-guard.test.ts",
       "dependencies": ["FEAT-109"],
       "passes": true
+    },
+    {
+      "id": "FEAT-500",
+      "phase": 6,
+      "category": "transcript",
+      "description": "Transcript types and data models",
+      "priority": "critical",
+      "steps": [
+        "Create src/types/transcript.ts with TranscriptEntry interface",
+        "Define TranscriptSummary interface for periodic summaries",
+        "Define RoomTranscriptSettings interface for room configuration",
+        "Define TranscriptState interface for client-side state management",
+        "Define TranscriptEntryType enum (ambient, ptt, ai_response, system)",
+        "Export all types from central index"
+      ],
+      "testFile": "tests/unit/types/transcript.test.ts",
+      "dependencies": ["FEAT-100"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-501",
+      "phase": 6,
+      "category": "ai",
+      "description": "PTT context injection - Wire ContextManager to inject context on PTT",
+      "priority": "critical",
+      "steps": [
+        "Add injectContext method to OpenAI Realtime client",
+        "Send conversation.item.create with system message for context",
+        "Capture PTT transcripts from response.audio_transcript.done",
+        "Store user messages in ContextManager on PTT completion",
+        "Store AI responses in ContextManager on response.done",
+        "Format context with latest summary + recent transcript"
+      ],
+      "testFile": "tests/unit/ai/context-injection.test.ts",
+      "dependencies": ["FEAT-500", "FEAT-304"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-502",
+      "phase": 6,
+      "category": "transcript",
+      "description": "Transcription service - WebSocket client for gpt-4o-mini-transcribe",
+      "priority": "critical",
+      "steps": [
+        "Create src/server/signaling/transcription-service.ts",
+        "Connect to OpenAI transcription WebSocket endpoint",
+        "Implement createSession for per-room transcription",
+        "Implement streamAudio to send audio chunks",
+        "Handle transcription callbacks with speaker attribution",
+        "Implement destroySession for cleanup"
+      ],
+      "testFile": "tests/unit/transcript/transcription-service.test.ts",
+      "dependencies": ["FEAT-500"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-503",
+      "phase": 6,
+      "category": "transcript",
+      "description": "ContextManager transcript extensions",
+      "priority": "critical",
+      "steps": [
+        "Add type field to ConversationMessage (ambient/ptt/ai_response/system)",
+        "Add getTranscriptEntries method for paginated retrieval",
+        "Add getSummaries method for all summaries",
+        "Add transcript-specific callbacks (onTranscriptEntry, onSummaryGenerated)",
+        "Support late-joiner history retrieval",
+        "Implement session-only retention cleanup"
+      ],
+      "testFile": "tests/unit/transcript/context-manager-transcript.test.ts",
+      "dependencies": ["FEAT-500", "FEAT-304"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-504",
+      "phase": 6,
+      "category": "transcript",
+      "description": "Summarization service - Periodic conversation summaries",
+      "priority": "high",
+      "steps": [
+        "Create src/server/signaling/summarization-service.ts",
+        "Monitor entry count and time elapsed per room",
+        "Trigger summarization at 5 minutes OR 20 segments",
+        "Use gpt-4o-mini for summarization with structured prompt",
+        "Store summaries in ContextManager",
+        "Broadcast summary events to room clients"
+      ],
+      "testFile": "tests/unit/transcript/summarization-service.test.ts",
+      "dependencies": ["FEAT-503"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-505",
+      "phase": 6,
+      "category": "signaling",
+      "description": "Transcript Socket.io events",
+      "priority": "critical",
+      "steps": [
+        "Add transcript:entry event for new entries",
+        "Add transcript:summary event for new summaries",
+        "Add transcript:request-history event handler",
+        "Add transcript:history response event",
+        "Broadcast entries to all room participants",
+        "Support pagination for history requests"
+      ],
+      "testFile": "tests/unit/signaling/transcript-events.test.ts",
+      "dependencies": ["FEAT-503", "FEAT-104"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-506",
+      "phase": 6,
+      "category": "api",
+      "description": "Transcript REST endpoints",
+      "priority": "high",
+      "steps": [
+        "Create src/app/api/rooms/[roomId]/transcript/route.ts",
+        "Implement GET handler for JSON transcript",
+        "Support txt and md format query parameter",
+        "Implement pagination with limit and offset",
+        "Create download endpoint with Content-Disposition header",
+        "Generate filename with room name and date"
+      ],
+      "testFile": "tests/unit/api/transcript.test.ts",
+      "dependencies": ["FEAT-503", "FEAT-103"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-507",
+      "phase": 6,
+      "category": "hooks",
+      "description": "useTranscript hook - Manage transcript state",
+      "priority": "critical",
+      "steps": [
+        "Create src/hooks/useTranscript.ts",
+        "Subscribe to transcript:entry and transcript:summary events",
+        "Manage entries and summaries arrays",
+        "Implement loadMore for pagination",
+        "Track autoScroll state with pause detection",
+        "Expose download methods for txt and md formats"
+      ],
+      "testFile": "tests/unit/hooks/useTranscript.test.ts",
+      "dependencies": ["FEAT-505", "FEAT-108"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-508",
+      "phase": 6,
+      "category": "components",
+      "description": "TranscriptPanel component - Main transcript UI",
+      "priority": "critical",
+      "steps": [
+        "Create src/components/room/TranscriptPanel.tsx",
+        "Implement header with title and collapse button",
+        "Implement scrollable entry list with auto-scroll",
+        "Detect scroll pause and show 'New messages' button",
+        "Implement footer with download and copy buttons",
+        "Support mobile bottom sheet variant"
+      ],
+      "testFile": "tests/unit/components/TranscriptPanel.test.tsx",
+      "dependencies": ["FEAT-507"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-509",
+      "phase": 6,
+      "category": "components",
+      "description": "TranscriptEntry component - Individual transcript entries",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/TranscriptEntry.tsx",
+        "Render ambient speech entries (no badge)",
+        "Render PTT entries with microphone badge",
+        "Render AI response entries with robot badge",
+        "Render system events (join/leave) centered",
+        "Format timestamps as relative or absolute"
+      ],
+      "testFile": "tests/unit/components/TranscriptEntry.test.tsx",
+      "dependencies": ["FEAT-500"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-510",
+      "phase": 6,
+      "category": "components",
+      "description": "SummaryCard component - Collapsible summary display",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/SummaryCard.tsx",
+        "Implement collapsible header with toggle",
+        "Display bullet points list",
+        "Show relative timestamp",
+        "Add visual styling distinct from entries",
+        "Animate expand/collapse transitions"
+      ],
+      "testFile": "tests/unit/components/SummaryCard.test.tsx",
+      "dependencies": ["FEAT-500"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-511",
+      "phase": 6,
+      "category": "components",
+      "description": "TranscriptDownloadModal component - Download options",
+      "priority": "medium",
+      "steps": [
+        "Create src/components/room/TranscriptDownloadModal.tsx",
+        "Implement format selection (txt, md)",
+        "Add include options checkboxes",
+        "Trigger download with correct filename",
+        "Show loading state during download",
+        "Handle download errors gracefully"
+      ],
+      "testFile": "tests/unit/components/TranscriptDownloadModal.test.tsx",
+      "dependencies": ["FEAT-506"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-512",
+      "phase": 6,
+      "category": "pages",
+      "description": "Room page transcript integration",
+      "priority": "critical",
+      "steps": [
+        "Add TranscriptPanel to room page layout",
+        "Add recording indicator to room header",
+        "Add mobile transcript toggle button",
+        "Initialize useTranscript hook",
+        "Handle transcript visibility state",
+        "Request transcript history on mount"
+      ],
+      "testFile": "tests/unit/pages/room-transcript-integration.test.tsx",
+      "dependencies": ["FEAT-508", "FEAT-119"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-513",
+      "phase": 6,
+      "category": "components",
+      "description": "CreateRoomForm transcript settings",
+      "priority": "high",
+      "steps": [
+        "Add transcript settings section to CreateRoomForm",
+        "Add enable transcript toggle",
+        "Add enable AI summaries toggle",
+        "Add retention period selector",
+        "Update Room type with transcriptSettings",
+        "Pass settings through room creation API"
+      ],
+      "testFile": "tests/unit/components/CreateRoomForm-transcript.test.tsx",
+      "dependencies": ["FEAT-500", "FEAT-113"],
+      "passes": false
     }
   ],
   "categories": {
@@ -1182,15 +1439,17 @@
     "ci": "Continuous integration",
     "quality": "Code quality tools",
     "e2e": "End-to-end testing",
-    "user-experience": "User experience and personalization"
+    "user-experience": "User experience and personalization",
+    "transcript": "Live transcript and AI context system"
   },
   "statistics": {
-    "total": 61,
+    "total": 75,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
     "phase5": 18,
-    "passed": 61,
-    "pending": 0
+    "phase6": 14,
+    "passed": 62,
+    "pending": 13
   }
 }

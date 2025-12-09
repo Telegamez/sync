@@ -5,19 +5,22 @@
  */
 
 // Original single-peer types
-export * from './swensync';
+export * from "./swensync";
 
 // Room types (FEAT-100)
-export * from './room';
+export * from "./room";
 
 // Peer types (FEAT-100)
-export * from './peer';
+export * from "./peer";
 
 // Voice mode and turn management types (FEAT-100, FEAT-150)
-export * from './voice-mode';
+export * from "./voice-mode";
 
 // Signaling types (FEAT-100)
-export * from './signaling';
+export * from "./signaling";
 
 // Auth types (FEAT-400)
-export * from './auth';
+export * from "./auth";
+
+// Transcript types (FEAT-500)
+export * from "./transcript";

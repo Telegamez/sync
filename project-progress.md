@@ -11,11 +11,12 @@
 | ---------------------------- | ------------ | -------- | ------ |
 | Phase 1: Foundation          | Complete     | 5/5      | 100%   |
 | Phase 2: Room Infrastructure | **Complete** | 23/23    | 100%   |
-| Phase 3: Multi-Peer Audio    | **Complete** | 13/13    | 100%   |
+| Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
-| Phase 5: Production Polish   | In Progress  | 9/14     | 64%    |
+| Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
+| Phase 6: Transcript System   | In Progress  | 1/14     | 7%     |
 
-**Latest:** FEAT-416 (Speaker Attribution) - Text prefix before audio in conversation history for reliable multi-speaker identification.
+**Latest:** FEAT-500 (Transcript Types) - Defined TypeScript types for dual-track unified transcript system.
 
 ---
 
@@ -2665,3 +2666,84 @@ session.ws.send(JSON.stringify(speakerAttributionEvent));
 - Rapid speaker changes
 - WebSocket state handling
 - Conversation history structure
+
+---
+
+## Phase 6: Transcript System (In Progress)
+
+### Goal
+
+Implement dual-track unified transcript with AI context awareness, enabling:
+
+1. AI to have full awareness of room conversations (not just PTT interactions)
+2. Live transcript display in room sidebar
+3. Downloadable meeting notes
+4. Late-joiner catch-up via transcript history
+
+### Planned Features:
+
+1. `FEAT-500` - Transcript types and data models ✅
+2. `FEAT-501` - PTT context injection
+3. `FEAT-502` - Transcription service integration
+4. `FEAT-503` - ContextManager transcript extensions
+5. `FEAT-504` - Summarization service
+6. `FEAT-505` - Transcript Socket.io events
+7. `FEAT-506` - Transcript REST endpoints
+8. `FEAT-507` - useTranscript hook
+9. `FEAT-508` - TranscriptPanel component
+10. `FEAT-509` - TranscriptEntry component
+11. `FEAT-510` - SummaryCard component
+12. `FEAT-511` - TranscriptDownloadModal component
+13. `FEAT-512` - Room page transcript integration
+14. `FEAT-513` - CreateRoomForm transcript settings
+
+---
+
+### FEAT-500: Transcript Types and Data Models
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/types/transcript.test.ts`
+
+Defined TypeScript types for the dual-track unified transcript system:
+
+**Files Created:**
+
+- `src/types/transcript.ts` - Complete transcript type definitions
+
+**Key Types:**
+
+- `TranscriptEntry` - Individual transcript entry with speaker, content, type
+- `TranscriptSummary` - Periodic AI-generated summary with bullet points
+- `RoomTranscriptSettings` - Room configuration for transcript feature
+- `TranscriptState` - Client-side state management interface
+- `TranscriptEntryType` - Enum: ambient, ptt, ai_response, system
+- `TranscriptRetention` - Enum: session, 7days, 30days
+
+**Utility Functions:**
+
+- `isSpeechEntry()` - Check if entry is speech (not system)
+- `isHumanEntry()` - Check if entry is from human (ambient or ptt)
+- `isAIEntry()` - Check if entry is AI response
+- `formatEntryTimestamp()` - Format timestamp for display
+- `formatRelativeTime()` - Format relative time (e.g., "2 min ago")
+
+**API Types:**
+
+- `TranscriptHistoryRequest` / `TranscriptHistoryResponse` - History pagination
+- `TranscriptEntryEvent` / `TranscriptSummaryEvent` - Real-time events
+- `TranscriptDownloadOptions` - Download configuration
+- `TranscriptApiResponse` - REST API response structure
+
+**Default Settings:**
+
+```typescript
+DEFAULT_TRANSCRIPT_SETTINGS = {
+  enabled: true,
+  summariesEnabled: true,
+  retention: "session",
+  allowDownload: true,
+};
+```
+
+**Test Results:**
+✅ 29 tests passing (types validation, type guards, utility functions, entry formatting)
