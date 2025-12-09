@@ -2691,7 +2691,7 @@ Implement dual-track unified transcript with AI context awareness, enabling:
 7. `FEAT-506` - Transcript REST endpoints ✅
 8. `FEAT-507` - useTranscript hook ✅
 9. `FEAT-508` - TranscriptPanel component ✅
-10. `FEAT-509` - TranscriptEntry component
+10. `FEAT-509` - TranscriptEntry component ✅
 11. `FEAT-510` - SummaryCard component
 12. `FEAT-511` - TranscriptDownloadModal component
 13. `FEAT-512` - Room page transcript integration
@@ -3312,3 +3312,64 @@ interface TranscriptPanelProps {
 
 **Test Results:**
 ✅ 33 tests passing (rendering, header controls, collapsed state, error handling, pagination, footer actions, summary expansion, mobile sheet variant, entry types)
+
+---
+
+### FEAT-509: TranscriptEntry Component
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/components/TranscriptEntry.test.tsx`
+
+Implemented standalone TranscriptEntry component with type-specific styling and interactions.
+
+**Files Created:**
+
+- `src/components/room/TranscriptEntry.tsx` - Standalone entry component
+
+**Key Features:**
+
+1. **Entry Type Rendering:**
+   - Ambient: No badge, white speaker name
+   - PTT: Blue microphone badge with icon
+   - AI Response: Purple robot badge, purple speaker name
+   - System: Centered layout, gray italic text
+
+2. **Badge Configuration:**
+   - Icon + label display
+   - Type-specific color classes
+   - Consistent styling across components
+
+3. **Timestamp Display:**
+   - Relative time mode (default): "2 min ago"
+   - Absolute time mode: "10:30 AM"
+   - Uses formatRelativeTime and formatEntryTimestamp utilities
+
+4. **Interactive Features:**
+   - Optional onClick handler
+   - Keyboard accessibility (Enter/Space)
+   - Proper ARIA roles when clickable
+   - isOwnEntry indicator shows "(you)"
+
+5. **Partial Entry Support:**
+   - Shows "(typing...)" indicator
+   - Supports real-time streaming updates
+
+6. **Compact Variant:**
+   - TranscriptEntryCompact for dense lists
+   - Inline badge display: [PTT], [AI]
+   - Minimal padding and spacing
+
+**Props Interface:**
+
+```typescript
+interface TranscriptEntryProps {
+  entry: TranscriptEntryType;
+  relativeTime?: boolean;
+  isOwnEntry?: boolean;
+  onClick?: (entry: TranscriptEntryType) => void;
+  className?: string;
+}
+```
+
+**Test Results:**
+✅ 26 tests passing (ambient entries, PTT entries, AI response entries, system entries, timestamps, own entry indicator, partial entries, click handling, keyboard accessibility, compact variant)
