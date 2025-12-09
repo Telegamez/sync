@@ -7,6 +7,7 @@
 
 import type { Peer, PeerId } from "./peer";
 import type { RoomVoiceSettings } from "./voice-mode";
+import type { RoomTranscriptSettings } from "./transcript";
 
 /**
  * Unique identifier for a room
@@ -46,6 +47,8 @@ export interface CreateRoomRequest {
   aiTopic?: string;
   /** Voice mode settings */
   voiceSettings?: Partial<RoomVoiceSettings>;
+  /** Transcript settings */
+  transcriptSettings?: Partial<RoomTranscriptSettings>;
 }
 
 /**
@@ -70,6 +73,8 @@ export interface Room {
   aiTopic?: string;
   /** Voice mode and turn management settings */
   voiceSettings: RoomVoiceSettings;
+  /** Transcript settings */
+  transcriptSettings: RoomTranscriptSettings;
   /** Room creator/owner peer ID */
   ownerId: PeerId;
   /** Current participants in the room */

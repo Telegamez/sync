@@ -1,16 +1,30 @@
 /**
  * CreateRoomForm Component
  *
- * Form for creating a new room with name, participants, and AI settings.
+ * Form for creating a new room with name, participants, AI, and transcript settings.
  *
  * Part of the Long-Horizon Engineering Protocol - FEAT-113
+ * Updated in FEAT-513 to add transcript settings
  */
 
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
-import { Loader2, Users, Bot, MessageSquare, Lightbulb } from "lucide-react";
+import {
+  Loader2,
+  Users,
+  Bot,
+  MessageSquare,
+  Lightbulb,
+  FileText,
+  Clock,
+} from "lucide-react";
 import type { CreateRoomRequest, AIPersonality } from "@/types/room";
+import type {
+  RoomTranscriptSettings,
+  TranscriptRetention,
+} from "@/types/transcript";
+import { DEFAULT_TRANSCRIPT_SETTINGS } from "@/types/transcript";
 
 /**
  * Props for the CreateRoomForm component
@@ -72,6 +86,31 @@ const AI_PERSONALITIES: {
  * Participant count options
  */
 const PARTICIPANT_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+/**
+ * Transcript retention options
+ */
+const RETENTION_OPTIONS: {
+  value: TranscriptRetention;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "session",
+    label: "Session Only",
+    description: "Deleted when room closes",
+  },
+  {
+    value: "7days",
+    label: "7 Days",
+    description: "Kept for one week",
+  },
+  {
+    value: "30days",
+    label: "30 Days",
+    description: "Kept for one month",
+  },
+];
 
 /**
  * Validation constants
@@ -154,6 +193,24 @@ export function CreateRoomForm({
     initialValues.aiPersonality ?? "assistant",
   );
   const [aiTopic, setAITopic] = useState(initialValues.aiTopic ?? "");
+
+  // Transcript settings state
+  const [transcriptEnabled, setTranscriptEnabled] = useState(
+    initialValues.transcriptSettings?.enabled ??
+      DEFAULT_TRANSCRIPT_SETTINGS.enabled,
+  );
+  const [summariesEnabled, setSummariesEnabled] = useState(
+    initialValues.transcriptSettings?.summariesEnabled ??
+      DEFAULT_TRANSCRIPT_SETTINGS.summariesEnabled,
+  );
+  const [retention, setRetention] = useState<TranscriptRetention>(
+    initialValues.transcriptSettings?.retention ??
+      DEFAULT_TRANSCRIPT_SETTINGS.retention,
+  );
+  const [allowDownload, setAllowDownload] = useState(
+    initialValues.transcriptSettings?.allowDownload ??
+      DEFAULT_TRANSCRIPT_SETTINGS.allowDownload,
+  );
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -281,6 +338,12 @@ export function CreateRoomForm({
           maxParticipants,
           aiPersonality,
           aiTopic: aiTopic.trim() || undefined,
+          transcriptSettings: {
+            enabled: transcriptEnabled,
+            summariesEnabled,
+            retention,
+            allowDownload,
+          },
         };
 
         await onSubmit(data);
@@ -294,6 +357,10 @@ export function CreateRoomForm({
       maxParticipants,
       aiPersonality,
       aiTopic,
+      transcriptEnabled,
+      summariesEnabled,
+      retention,
+      allowDownload,
       validateForm,
       onSubmit,
     ],
@@ -476,6 +543,136 @@ export function CreateRoomForm({
             accordingly.
           </p>
         )}
+      </div>
+
+      {/* Transcript Settings */}
+      <div className="flex flex-col gap-4 border-t border-border pt-6">
+        <label className="text-sm font-medium text-foreground flex items-center gap-2">
+          <FileText className="w-4 h-4" />
+          Transcript Settings
+        </label>
+
+        {/* Enable Transcript */}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-sm text-foreground">Enable Transcript</span>
+            <span className="text-xs text-muted-foreground">
+              Record and save conversation history
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={transcriptEnabled}
+            onClick={() => setTranscriptEnabled(!transcriptEnabled)}
+            disabled={isSubmitting}
+            className={`relative w-11 h-6 rounded-full transition-colors ${
+              transcriptEnabled ? "bg-primary" : "bg-muted"
+            } disabled:opacity-50`}
+            data-testid="transcript-enabled-toggle"
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                transcriptEnabled ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* AI Summaries - only when transcript enabled */}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span
+              className={`text-sm ${transcriptEnabled ? "text-foreground" : "text-muted-foreground"}`}
+            >
+              AI Summaries
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Generate periodic conversation summaries
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={summariesEnabled}
+            onClick={() => setSummariesEnabled(!summariesEnabled)}
+            disabled={isSubmitting || !transcriptEnabled}
+            className={`relative w-11 h-6 rounded-full transition-colors ${
+              summariesEnabled && transcriptEnabled ? "bg-primary" : "bg-muted"
+            } disabled:opacity-50`}
+            data-testid="summaries-enabled-toggle"
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                summariesEnabled && transcriptEnabled
+                  ? "translate-x-5"
+                  : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Retention Period */}
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="retention-select"
+            className={`text-sm flex items-center gap-2 ${
+              transcriptEnabled ? "text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Retention Period
+          </label>
+          <select
+            id="retention-select"
+            value={retention}
+            onChange={(e) =>
+              setRetention(e.target.value as TranscriptRetention)
+            }
+            disabled={isSubmitting || !transcriptEnabled}
+            className="px-4 py-2 bg-card border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            data-testid="retention-select"
+          >
+            {RETENTION_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label} - {option.description}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Allow Download */}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span
+              className={`text-sm ${transcriptEnabled ? "text-foreground" : "text-muted-foreground"}`}
+            >
+              Allow Download
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Participants can download transcript
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={allowDownload}
+            onClick={() => setAllowDownload(!allowDownload)}
+            disabled={isSubmitting || !transcriptEnabled}
+            className={`relative w-11 h-6 rounded-full transition-colors ${
+              allowDownload && transcriptEnabled ? "bg-primary" : "bg-muted"
+            } disabled:opacity-50`}
+            data-testid="allow-download-toggle"
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                allowDownload && transcriptEnabled
+                  ? "translate-x-5"
+                  : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Actions */}

@@ -1418,7 +1418,7 @@
       ],
       "testFile": "tests/unit/components/CreateRoomForm-transcript.test.tsx",
       "dependencies": ["FEAT-500", "FEAT-113"],
-      "passes": false
+      "passes": true
     }
   ],
   "categories": {
