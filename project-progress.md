@@ -2693,7 +2693,7 @@ Implement dual-track unified transcript with AI context awareness, enabling:
 9. `FEAT-508` - TranscriptPanel component ✅
 10. `FEAT-509` - TranscriptEntry component ✅
 11. `FEAT-510` - SummaryCard component ✅
-12. `FEAT-511` - TranscriptDownloadModal component
+12. `FEAT-511` - TranscriptDownloadModal component ✅
 13. `FEAT-512` - Room page transcript integration
 14. `FEAT-513` - CreateRoomForm transcript settings
 
@@ -3441,3 +3441,81 @@ interface SummaryCardProps {
 
 **Test Results:**
 ✅ 26 tests passing (header rendering, collapse behavior, content display, accessibility, styling, timestamp display, compact variant, skeleton)
+
+---
+
+### FEAT-511: TranscriptDownloadModal Component
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/components/TranscriptDownloadModal.test.tsx`
+
+Implemented modal dialog for configuring and initiating transcript downloads.
+
+**Files Created:**
+
+- `src/components/room/TranscriptDownloadModal.tsx` - Download modal component
+
+**Key Features:**
+
+1. **Format Selection:**
+   - Plain Text (.txt) option
+   - Markdown (.md) option
+   - Visual toggle buttons with icons
+   - Passes format to download callback
+
+2. **Include Options:**
+   - AI Summaries checkbox (disabled when 0 summaries)
+   - Timestamps checkbox
+   - Speaker names checkbox
+   - Entry type badges checkbox
+   - All checked by default
+
+3. **Download Flow:**
+   - Loading state with spinner
+   - Success message with checkmark
+   - Auto-close after successful download
+   - Disabled button when no entries
+
+4. **Error Handling:**
+   - Error message display with icon
+   - Supports Error objects and generic failures
+   - Error cleared on modal close
+
+5. **Modal Interactions:**
+   - Close via X button
+   - Close via Cancel button
+   - Close via backdrop click
+   - Prevents close during download
+
+6. **Accessibility:**
+   - role="dialog" attribute
+   - aria-modal="true"
+   - aria-labelledby linking to title
+   - Proper label associations for checkboxes
+
+**Props Interface:**
+
+```typescript
+interface TranscriptDownloadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onDownload: (
+    format: TranscriptDownloadFormat,
+    options: DownloadOptions,
+  ) => Promise<void>;
+  roomName?: string;
+  entryCount: number;
+  summaryCount: number;
+  className?: string;
+}
+
+interface DownloadOptions {
+  includeSummaries: boolean;
+  includeTimestamps: boolean;
+  includeSpeakerNames: boolean;
+  includeTypeBadges: boolean;
+}
+```
+
+**Test Results:**
+✅ 27 tests passing (rendering, format selection, include options, download flow, error handling, modal interactions, accessibility)
