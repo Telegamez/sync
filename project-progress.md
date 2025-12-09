@@ -14,9 +14,9 @@
 | Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
-| Phase 6: Transcript System   | In Progress  | 3/14     | 21%    |
+| Phase 6: Transcript System   | In Progress  | 4/14     | 29%    |
 
-**Latest:** FEAT-502 (Transcription Service) - WebSocket client for real-time ambient audio transcription.
+**Latest:** FEAT-503 (ContextManager Transcript Extensions) - Extended ContextManager with transcript types, retrieval methods, and callbacks.
 
 ---
 
@@ -2685,7 +2685,7 @@ Implement dual-track unified transcript with AI context awareness, enabling:
 1. `FEAT-500` - Transcript types and data models ✅
 2. `FEAT-501` - PTT context injection ✅
 3. `FEAT-502` - Transcription service integration ✅
-4. `FEAT-503` - ContextManager transcript extensions
+4. `FEAT-503` - ContextManager transcript extensions ✅
 5. `FEAT-504` - Summarization service
 6. `FEAT-505` - Transcript Socket.io events
 7. `FEAT-506` - Transcript REST endpoints
@@ -2864,3 +2864,66 @@ Created WebSocket client for OpenAI's `gpt-4o-mini-transcribe` model to enable r
 
 **Test Results:**
 ✅ 22 tests passing (service initialization, session management, speaker attribution, audio streaming, configuration options)
+
+---
+
+### FEAT-503: ContextManager Transcript Extensions
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/ai/context-manager-transcript.test.ts`
+
+Extended ContextManager with transcript entry types, retrieval methods, and real-time callbacks for the dual-track transcript system.
+
+**Files Modified:**
+
+- `src/server/signaling/context-manager.ts` - Extended with transcript capabilities
+
+**Key Changes:**
+
+1. **Entry Type Support:**
+   - Added `entryType` field to `ConversationMessage` interface
+   - Supports: `ambient`, `ptt`, `ai_response`, `system`
+   - `addUserMessage()` now accepts optional `entryType` parameter (default: `ptt`)
+   - `addAssistantMessage()` auto-sets type to `ai_response`
+   - `addSystemMessage()` auto-sets type to `system`
+
+2. **New Convenience Method:**
+   - `addAmbientMessage(roomId, content, speakerId, audioDurationMs)` - Add ambient speech entries
+
+3. **Transcript Retrieval Methods:**
+   - `getTranscriptEntries(roomId, limit, offset, beforeId)` - Paginated transcript retrieval
+   - `getTranscriptSummaries(roomId)` - Get all summaries as `TranscriptSummary[]`
+   - `getSummariesInRange(roomId, startTime, endTime)` - Time-filtered summaries
+   - `getEntryCount(roomId)` - Total entry count
+   - `getEntriesByType(roomId, type)` - Filter by entry type
+   - `getEntriesBySpeaker(roomId, speakerId)` - Filter by speaker
+
+4. **New Callbacks:**
+   - `onTranscriptEntry(roomId, entry)` - Called on every message for real-time broadcast
+   - `onTranscriptSummary(roomId, summary)` - Called when summaries are generated
+
+5. **Helper Methods:**
+   - `messageToTranscriptEntry()` - Convert internal message to `TranscriptEntry` type
+   - `inferEntryType()` - Backwards compatibility for messages without `entryType`
+   - `contextSummaryToTranscriptSummary()` - Convert to `TranscriptSummary` type
+
+**Transcript Entry Conversion:**
+
+```typescript
+// Internal ConversationMessage is converted to TranscriptEntry
+{
+  id: message.id,
+  roomId: roomId,
+  timestamp: message.timestamp,
+  speaker: message.speakerName || 'AI' | 'System',
+  speakerId: message.speakerId || null,
+  content: cleanContent,  // Without [Speaker]: prefix
+  type: message.entryType || inferredType,
+  tokenEstimate: message.tokenEstimate,
+  audioDurationMs: message.audioDurationMs,
+  isPartial: message.isPartial,
+}
+```
+
+**Test Results:**
+✅ 34 tests passing (entry types, retrieval methods, callbacks, formatting, backwards compatibility)
