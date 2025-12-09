@@ -5,77 +5,84 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-100
  */
 
-import type { Peer, PeerId, PeerEvent, PeerSummary, PeerAudioLevelUpdate } from './peer';
-import type { Room, RoomId, RoomEvent, RoomSummary } from './room';
-import type { AIStateEvent, RoomAIState, TurnRequest } from './voice-mode';
+import type {
+  Peer,
+  PeerId,
+  PeerEvent,
+  PeerSummary,
+  PeerAudioLevelUpdate,
+} from "./peer";
+import type { Room, RoomId, RoomEvent, RoomSummary } from "./room";
+import type { AIStateEvent, RoomAIState, TurnRequest } from "./voice-mode";
 
 /**
  * Socket connection state
  */
 export type SocketConnectionState =
-  | 'disconnected'
-  | 'connecting'
-  | 'connected'
-  | 'reconnecting'
-  | 'error';
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "error";
 
 /**
  * Client-to-server event types
  */
 export type ClientEventType =
   // Room events
-  | 'room:create'
-  | 'room:join'
-  | 'room:leave'
-  | 'room:update'
+  | "room:create"
+  | "room:join"
+  | "room:leave"
+  | "room:update"
   // Peer events
-  | 'peer:update'
-  | 'peer:mute'
-  | 'peer:unmute'
+  | "peer:update"
+  | "peer:update_name"
+  | "peer:mute"
+  | "peer:unmute"
   // Signaling events
-  | 'signal:offer'
-  | 'signal:answer'
-  | 'signal:ice'
+  | "signal:offer"
+  | "signal:answer"
+  | "signal:ice"
   // Presence events
-  | 'presence:update'
-  | 'presence:heartbeat'
+  | "presence:update"
+  | "presence:heartbeat"
   // AI/Turn events
-  | 'ai:request_turn'
-  | 'ai:cancel_turn'
-  | 'ai:interrupt'
-  | 'ai:ptt_start'
-  | 'ai:ptt_end';
+  | "ai:request_turn"
+  | "ai:cancel_turn"
+  | "ai:interrupt"
+  | "ai:ptt_start"
+  | "ai:ptt_end";
 
 /**
  * Server-to-client event types
  */
 export type ServerEventType =
   // Room events
-  | 'room:created'
-  | 'room:joined'
-  | 'room:left'
-  | 'room:updated'
-  | 'room:closed'
-  | 'room:error'
+  | "room:created"
+  | "room:joined"
+  | "room:left"
+  | "room:updated"
+  | "room:closed"
+  | "room:error"
   // Peer events
-  | 'peer:joined'
-  | 'peer:left'
-  | 'peer:updated'
-  | 'peer:kicked'
+  | "peer:joined"
+  | "peer:left"
+  | "peer:updated"
+  | "peer:kicked"
   // Signaling events
-  | 'signal:offer'
-  | 'signal:answer'
-  | 'signal:ice'
+  | "signal:offer"
+  | "signal:answer"
+  | "signal:ice"
   // Presence events
-  | 'presence:update'
-  | 'presence:sync'
+  | "presence:update"
+  | "presence:sync"
   // AI/Turn events
-  | 'ai:state'
-  | 'ai:turn_granted'
-  | 'ai:turn_denied'
-  | 'ai:queue_update'
+  | "ai:state"
+  | "ai:turn_granted"
+  | "ai:turn_denied"
+  | "ai:queue_update"
   // Audio level events (high frequency)
-  | 'audio:levels';
+  | "audio:levels";
 
 // ============================================
 // Client-to-Server Event Payloads
@@ -103,6 +110,13 @@ export interface LeaveRoomPayload {
 export interface UpdatePeerPayload {
   displayName?: string;
   avatarUrl?: string;
+}
+
+/**
+ * Display name update request
+ */
+export interface UpdateDisplayNamePayload {
+  displayName: string;
 }
 
 /**
@@ -180,7 +194,7 @@ export interface RoomJoinedPayload {
  */
 export interface RoomLeftPayload {
   roomId: RoomId;
-  reason?: 'left' | 'kicked' | 'room_closed';
+  reason?: "left" | "kicked" | "room_closed";
 }
 
 /**
@@ -221,7 +235,7 @@ export interface TurnGrantedPayload {
  */
 export interface TurnDeniedPayload {
   roomId: RoomId;
-  reason: 'queue_full' | 'not_allowed' | 'timeout' | 'cancelled';
+  reason: "queue_full" | "not_allowed" | "timeout" | "cancelled";
 }
 
 /**
@@ -316,10 +330,10 @@ export interface SignalingClient {
   // Event handlers
   on<K extends keyof SignalingEventHandlers>(
     event: K,
-    handler: SignalingEventHandlers[K]
+    handler: SignalingEventHandlers[K],
   ): void;
   off<K extends keyof SignalingEventHandlers>(
     event: K,
-    handler?: SignalingEventHandlers[K]
+    handler?: SignalingEventHandlers[K],
   ): void;
 }

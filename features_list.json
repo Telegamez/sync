@@ -1090,6 +1090,78 @@
       "testFile": "tests/unit/ai/speaker-attribution.test.ts",
       "dependencies": ["FEAT-413", "FEAT-414"],
       "passes": true
+    },
+    {
+      "id": "FEAT-417",
+      "phase": 5,
+      "category": "reliability",
+      "description": "Auto-reconnect failed WebRTC peer connections with exponential backoff",
+      "priority": "critical",
+      "steps": [
+        "Integrate WebRTCReconnectionManager into useRoomPeers hook",
+        "Trigger automatic reconnection when connection state becomes 'failed'",
+        "Implement exponential backoff with jitter for retry attempts",
+        "Add onPeerReconnecting and onPeerReconnectFailed callbacks",
+        "Limit max reconnection attempts to prevent infinite loops",
+        "Clean up reconnection state when peer leaves room"
+      ],
+      "testFile": "tests/unit/reliability/peer-reconnection.test.ts",
+      "dependencies": ["FEAT-109", "FEAT-404"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-418",
+      "phase": 5,
+      "category": "reliability",
+      "description": "Auto-rejoin room after signaling server reconnect",
+      "priority": "critical",
+      "steps": [
+        "Save room state snapshot before disconnect in useRoomConnection",
+        "Detect signaling reconnection via Socket.io reconnect event",
+        "Automatically call joinRoom with saved state after reconnect",
+        "Re-establish WebRTC connections with existing peers",
+        "Sync presence state after rejoin",
+        "Handle rejoin failures gracefully with user notification"
+      ],
+      "testFile": "tests/unit/reliability/room-rejoin.test.ts",
+      "dependencies": ["FEAT-108", "FEAT-404"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-419",
+      "phase": 5,
+      "category": "reliability",
+      "description": "WebRTC connection timeout with automatic retry",
+      "priority": "high",
+      "steps": [
+        "Add configurable connection timeout (default 20 seconds)",
+        "Monitor connection state during establishment",
+        "Trigger reconnection if connection not established within timeout",
+        "Track connection establishment start time per peer",
+        "Clear timeout on successful connection or peer departure",
+        "Log timeout events for debugging"
+      ],
+      "testFile": "tests/unit/reliability/peer-reconnection.test.ts",
+      "dependencies": ["FEAT-417"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-420",
+      "phase": 5,
+      "category": "reliability",
+      "description": "Duplicate connection guard for late join race conditions",
+      "priority": "high",
+      "steps": [
+        "Add connection-in-progress tracking Map in useRoomPeers",
+        "Check pendingConnections before initiating new connection",
+        "Prevent duplicate offers when both peers try to initiate simultaneously",
+        "Handle offer collision by comparing peer IDs deterministically",
+        "Clean up pending state on connection success or failure",
+        "Add logging for connection collision detection"
+      ],
+      "testFile": "tests/unit/reliability/duplicate-connection-guard.test.ts",
+      "dependencies": ["FEAT-109"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1113,12 +1185,12 @@
     "user-experience": "User experience and personalization"
   },
   "statistics": {
-    "total": 57,
+    "total": 61,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
-    "phase5": 14,
-    "passed": 57,
+    "phase5": 18,
+    "passed": 61,
     "pending": 0
   }
 }

@@ -147,6 +147,15 @@ export function useRoomConnection(
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const currentRoomIdRef = useRef<RoomId | null>(null);
 
+  // Track room state for auto-rejoin after reconnect
+  const savedRoomStateRef = useRef<{
+    roomId: RoomId;
+    displayName: string;
+    avatarUrl?: string;
+  } | null>(null);
+  // Flag to prevent multiple rejoin attempts
+  const isRejoiningRef = useRef<boolean>(false);
+
   // State
   const [state, setState] = useState<RoomConnectionState>(INITIAL_STATE);
 
@@ -222,7 +231,7 @@ export function useRoomConnection(
         opts.handlers?.onError?.(error);
       });
 
-      client.on("onReconnect", (attempt) => {
+      client.on("onReconnect", async (attempt) => {
         setState((prev) => ({
           ...prev,
           connectionState: "connected",
@@ -230,6 +239,68 @@ export function useRoomConnection(
           error: null,
         }));
         opts.handlers?.onReconnect?.(attempt);
+
+        // Auto-rejoin room after reconnect if we were in a room
+        if (savedRoomStateRef.current && !isRejoiningRef.current) {
+          const { roomId, displayName, avatarUrl } = savedRoomStateRef.current;
+          isRejoiningRef.current = true;
+
+          console.log(
+            `[useRoomConnection] Auto-rejoining room ${roomId} after reconnect`,
+          );
+
+          try {
+            // Clear current room state first (server has different peer ID now)
+            currentRoomIdRef.current = null;
+            setState((prev) => ({
+              ...prev,
+              isInRoom: false,
+              localPeer: null,
+              peers: [],
+            }));
+
+            // Rejoin the room
+            await client.joinRoom({
+              roomId,
+              displayName,
+              avatarUrl,
+            });
+
+            console.log(
+              `[useRoomConnection] Successfully rejoined room ${roomId}`,
+            );
+          } catch (error) {
+            console.error(
+              `[useRoomConnection] Failed to rejoin room ${roomId}:`,
+              error,
+            );
+
+            // Clear saved state on non-recoverable errors
+            const errorMessage =
+              error instanceof Error ? error.message : "Rejoin failed";
+            const isNonRecoverable =
+              errorMessage.includes("ROOM_NOT_FOUND") ||
+              errorMessage.includes("ROOM_CLOSED") ||
+              errorMessage.includes("banned") ||
+              errorMessage.includes("kicked");
+
+            if (isNonRecoverable) {
+              savedRoomStateRef.current = null;
+            }
+
+            setState((prev) => ({
+              ...prev,
+              error: {
+                code: "REJOIN_FAILED",
+                message: `Failed to rejoin room: ${errorMessage}`,
+                timestamp: new Date(),
+                roomId,
+              },
+            }));
+          } finally {
+            isRejoiningRef.current = false;
+          }
+        }
       });
 
       // Room events
@@ -258,6 +329,8 @@ export function useRoomConnection(
           isInRoom: false,
         }));
         currentRoomIdRef.current = null;
+        // Only clear saved state if this was intentional leave (not disconnect)
+        // savedRoomStateRef is cleared in leaveRoom() for intentional leaves
         stopHeartbeat();
         opts.handlers?.onRoomLeft?.(payload);
       });
@@ -274,6 +347,8 @@ export function useRoomConnection(
             error: createError("ROOM_CLOSED", "Room was closed", roomId),
           }));
           currentRoomIdRef.current = null;
+          // Clear saved state - can't rejoin a closed room
+          savedRoomStateRef.current = null;
           stopHeartbeat();
         }
         opts.handlers?.onRoomClosed?.(roomId);
@@ -428,6 +503,8 @@ export function useRoomConnection(
     }
 
     currentRoomIdRef.current = null;
+    // Clear saved room state on intentional disconnect
+    savedRoomStateRef.current = null;
 
     setState(INITIAL_STATE);
   }, [stopHeartbeat]);
@@ -462,6 +539,13 @@ export function useRoomConnection(
           avatarUrl,
         });
 
+        // Save room state for auto-rejoin after reconnect
+        savedRoomStateRef.current = {
+          roomId,
+          displayName,
+          avatarUrl,
+        };
+
         // State updated via event handler
         return response;
       } catch (error) {
@@ -487,6 +571,9 @@ export function useRoomConnection(
     }
 
     const roomId = currentRoomIdRef.current;
+
+    // Clear saved room state to prevent auto-rejoin
+    savedRoomStateRef.current = null;
 
     try {
       await clientRef.current.leaveRoom({ roomId });

@@ -13,6 +13,11 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import type { SignalingClient } from "@/lib/signaling/client";
 import type { PeerId, PeerSummary, PeerConnectionState } from "@/types/peer";
 import type { RoomId } from "@/types/room";
+import {
+  calculateReconnectionDelay,
+  shouldReconnect,
+  DEFAULT_RECONNECTION_OPTIONS,
+} from "@/lib/reconnection";
 
 /**
  * WebRTC connection info for a peer
@@ -28,6 +33,21 @@ export interface PeerConnection {
   remoteStream: MediaStream | null;
   /** Whether we initiated the connection */
   isInitiator: boolean;
+  /** Reconnection attempt count */
+  reconnectAttempts: number;
+  /** Timestamp when connection started */
+  connectionStartedAt: number;
+}
+
+/**
+ * Reconnection state for a peer
+ */
+export interface PeerReconnectionState {
+  peerId: PeerId;
+  attempt: number;
+  maxAttempts: number;
+  isReconnecting: boolean;
+  lastError?: string;
 }
 
 /**
@@ -93,6 +113,16 @@ export interface UseRoomPeersOptions {
     peerId: PeerId,
     state: PeerConnectionState,
   ) => void;
+  /** Called when peer reconnection starts */
+  onPeerReconnecting?: (peerId: PeerId, attempt: number) => void;
+  /** Called when peer reconnection fails after all attempts */
+  onPeerReconnectFailed?: (peerId: PeerId, error: string) => void;
+  /** Called when peer reconnection succeeds */
+  onPeerReconnected?: (peerId: PeerId) => void;
+  /** Maximum reconnection attempts per peer (default: 5) */
+  maxReconnectAttempts?: number;
+  /** Connection timeout in milliseconds (default: 20000) */
+  connectionTimeout?: number;
 }
 
 /**
@@ -148,6 +178,11 @@ export function useRoomPeers(
     rtcConfig = DEFAULT_RTC_CONFIG,
     onPeerAudioStream,
     onPeerConnectionStateChange,
+    onPeerReconnecting,
+    onPeerReconnectFailed,
+    onPeerReconnected,
+    maxReconnectAttempts = DEFAULT_RECONNECTION_OPTIONS.maxAttempts,
+    connectionTimeout = 20000,
   } = options;
 
   // Refs for connections and streams
@@ -156,6 +191,20 @@ export function useRoomPeers(
   const pendingCandidatesRef = useRef<Map<PeerId, RTCIceCandidateInit[]>>(
     new Map(),
   );
+  // Track reconnection state per peer
+  const reconnectionStateRef = useRef<Map<PeerId, PeerReconnectionState>>(
+    new Map(),
+  );
+  // Track reconnection timers to clean up
+  const reconnectionTimersRef = useRef<Map<PeerId, NodeJS.Timeout>>(new Map());
+  // Track connection timeout timers
+  const connectionTimeoutRef = useRef<Map<PeerId, NodeJS.Timeout>>(new Map());
+  // Ref for reconnectPeerInternal to break circular dependency
+  const reconnectPeerInternalRef = useRef<
+    ((peerId: PeerId, attempt: number) => void) | null
+  >(null);
+  // Track pending connections to prevent duplicate connection attempts (FEAT-420)
+  const pendingConnectionsRef = useRef<Set<PeerId>>(new Set());
 
   // Peer summaries state
   const [peerSummaries, setPeerSummaries] = useState<Map<PeerId, PeerSummary>>(
@@ -173,11 +222,114 @@ export function useRoomPeers(
   );
 
   /**
+   * Clear connection timeout for a peer
+   */
+  const clearConnectionTimeout = useCallback((peerId: PeerId) => {
+    const timer = connectionTimeoutRef.current.get(peerId);
+    if (timer) {
+      clearTimeout(timer);
+      connectionTimeoutRef.current.delete(peerId);
+    }
+  }, []);
+
+  /**
+   * Clear reconnection timer for a peer
+   */
+  const clearReconnectionTimer = useCallback((peerId: PeerId) => {
+    const timer = reconnectionTimersRef.current.get(peerId);
+    if (timer) {
+      clearTimeout(timer);
+      reconnectionTimersRef.current.delete(peerId);
+    }
+  }, []);
+
+  /**
+   * Schedule automatic reconnection for a peer with exponential backoff
+   */
+  const scheduleReconnection = useCallback(
+    (peerId: PeerId, attempt: number, error?: string) => {
+      // Check if peer is still in the room (hasn't left)
+      if (!peerSummaries.has(peerId)) {
+        console.log(
+          `[useRoomPeers] Peer ${peerId} left room, skipping reconnection`,
+        );
+        reconnectionStateRef.current.delete(peerId);
+        return;
+      }
+
+      // Check if we should reconnect
+      if (!shouldReconnect(attempt, maxReconnectAttempts, error)) {
+        console.error(
+          `[useRoomPeers] Max reconnection attempts (${maxReconnectAttempts}) reached for peer ${peerId}`,
+        );
+        onPeerReconnectFailed?.(
+          peerId,
+          error || "Max reconnection attempts reached",
+        );
+        reconnectionStateRef.current.delete(peerId);
+        return;
+      }
+
+      // Calculate delay with exponential backoff
+      const delay = calculateReconnectionDelay(attempt, {
+        maxAttempts: maxReconnectAttempts,
+      });
+
+      console.log(
+        `[useRoomPeers] Scheduling reconnection to peer ${peerId} (attempt ${attempt}/${maxReconnectAttempts}) in ${delay}ms`,
+      );
+
+      // Update reconnection state
+      reconnectionStateRef.current.set(peerId, {
+        peerId,
+        attempt,
+        maxAttempts: maxReconnectAttempts,
+        isReconnecting: true,
+        lastError: error,
+      });
+
+      // Notify about reconnection attempt
+      onPeerReconnecting?.(peerId, attempt);
+
+      // Clear any existing timer
+      clearReconnectionTimer(peerId);
+
+      // Schedule reconnection
+      const timer = setTimeout(() => {
+        reconnectionTimersRef.current.delete(peerId);
+
+        // Double-check peer is still in room before reconnecting
+        if (!peerSummaries.has(peerId)) {
+          reconnectionStateRef.current.delete(peerId);
+          return;
+        }
+
+        // Perform reconnection via ref
+        reconnectPeerInternalRef.current?.(peerId, attempt);
+      }, delay);
+
+      reconnectionTimersRef.current.set(peerId, timer);
+    },
+    [
+      peerSummaries,
+      maxReconnectAttempts,
+      onPeerReconnecting,
+      onPeerReconnectFailed,
+      clearReconnectionTimer,
+    ],
+  );
+
+  /**
    * Create RTCPeerConnection for a peer
    */
   const createPeerConnection = useCallback(
-    (peerId: PeerId, isInitiator: boolean): RTCPeerConnection => {
+    (
+      peerId: PeerId,
+      isInitiator: boolean,
+      reconnectAttempt: number = 0,
+    ): RTCPeerConnection => {
       const pc = new RTCPeerConnection(rtcConfig);
+      const connectionStartedAt = Date.now();
 
       // Track connection state
       pc.onconnectionstatechange = () => {
@@ -186,8 +338,56 @@ export function useRoomPeers(
         setConnectionStates((prev) => new Map(prev).set(peerId, state));
         onPeerConnectionStateChange?.(peerId, state);
 
-        // Clean up on failed/closed (remove from tracking only, connection already closed)
-        if (rawState === "failed" || rawState === "closed") {
+        // Clear connection timeout on successful connection
+        if (rawState === "connected") {
+          clearConnectionTimeout(peerId);
+
+          // Clear reconnection state on success
+          const wasReconnecting = reconnectionStateRef.current.has(peerId);
+          reconnectionStateRef.current.delete(peerId);
+
+          if (wasReconnecting) {
+            console.log(
+              `[useRoomPeers] Reconnection to peer ${peerId} successful`,
+            );
+            onPeerReconnected?.(peerId);
+          }
+        }
+
+        // Handle connection failure - trigger automatic reconnection
+        if (rawState === "failed") {
+          console.warn(
+            `[useRoomPeers] Connection to peer ${peerId} failed, attempting reconnection`,
+          );
+
+          // Clear connection timeout
+          clearConnectionTimeout(peerId);
+
+          // Close the failed connection
+          const peerConn = connectionsRef.current.get(peerId);
+          if (peerConn) {
+            peerConn.connection.close();
+            connectionsRef.current.delete(peerId);
+          }
+
+          // Get current attempt count
+          const currentAttempt =
+            peerConn?.reconnectAttempts ?? reconnectAttempt;
+
+          // Only auto-reconnect if we're the initiator (higher ID)
+          // This prevents both peers from reconnecting simultaneously
+          if (localPeerId && peerId > localPeerId) {
+            scheduleReconnection(
+              peerId,
+              currentAttempt + 1,
+              "Connection failed",
+            );
+          }
+        }
+
+        // Clean up on closed
+        if (rawState === "closed") {
+          clearConnectionTimeout(peerId);
           connectionsRef.current.delete(peerId);
         }
       };
@@ -224,28 +424,87 @@ export function useRoomPeers(
         });
       }
 
-      // Store connection
+      // Store connection with reconnection tracking
       connectionsRef.current.set(peerId, {
         peerId,
         connection: pc,
         connectionState: "new",
         remoteStream: null,
         isInitiator,
+        reconnectAttempts: reconnectAttempt,
+        connectionStartedAt,
       });
+
+      // Set up connection timeout
+      clearConnectionTimeout(peerId);
+      const timeoutTimer = setTimeout(() => {
+        const currentConn = connectionsRef.current.get(peerId);
+        if (
+          currentConn &&
+          currentConn.connection.connectionState !== "connected"
+        ) {
+          console.warn(
+            `[useRoomPeers] Connection to peer ${peerId} timed out after ${connectionTimeout}ms`,
+          );
+
+          // Close the timed-out connection
+          currentConn.connection.close();
+          connectionsRef.current.delete(peerId);
+
+          // Schedule reconnection if we're the initiator
+          if (localPeerId && peerId > localPeerId) {
+            scheduleReconnection(
+              peerId,
+              (currentConn.reconnectAttempts ?? 0) + 1,
+              "Connection timeout",
+            );
+          }
+        }
+      }, connectionTimeout);
+      connectionTimeoutRef.current.set(peerId, timeoutTimer);
 
       return pc;
     },
-    [client, rtcConfig, onPeerAudioStream, onPeerConnectionStateChange],
+    [
+      client,
+      rtcConfig,
+      localPeerId,
+      connectionTimeout,
+      onPeerAudioStream,
+      onPeerConnectionStateChange,
+      onPeerReconnected,
+      clearConnectionTimeout,
+      scheduleReconnection,
+    ],
   );
 
   /**
    * Initiate connection to peer (create offer)
    */
   const initiateConnection = useCallback(
-    async (peerId: PeerId) => {
+    async (peerId: PeerId, reconnectAttempt: number = 0) => {
       if (!client) return;
 
-      const pc = createPeerConnection(peerId, true);
+      // FEAT-420: Check for existing connection or pending connection
+      if (connectionsRef.current.has(peerId)) {
+        console.log(
+          `[useRoomPeers] Connection to ${peerId} already exists, skipping`,
+        );
+        return;
+      }
+
+      if (pendingConnectionsRef.current.has(peerId)) {
+        console.log(
+          `[useRoomPeers] Connection to ${peerId} already in progress, skipping`,
+        );
+        return;
+      }
+
+      // Mark connection as pending
+      pendingConnectionsRef.current.add(peerId);
+      console.log(`[useRoomPeers] Initiating connection to ${peerId}`);
+
+      const pc = createPeerConnection(peerId, true, reconnectAttempt);
 
       try {
         const offer = await pc.createOffer({
@@ -258,14 +517,64 @@ export function useRoomPeers(
           targetPeerId: peerId,
           sdp: offer,
         });
+
+        // Clear pending status after offer sent (connection now tracked in connectionsRef)
+        pendingConnectionsRef.current.delete(peerId);
       } catch (error) {
+        // Clear pending status on failure
+        pendingConnectionsRef.current.delete(peerId);
+
         console.error(
           `[useRoomPeers] Failed to create offer for ${peerId}:`,
           error,
         );
+
+        // Schedule reconnection on offer creation failure
+        if (localPeerId && peerId > localPeerId) {
+          scheduleReconnection(
+            peerId,
+            reconnectAttempt + 1,
+            error instanceof Error ? error.message : "Offer creation failed",
+          );
+        }
       }
     },
-    [client, createPeerConnection],
+    [client, localPeerId, createPeerConnection, scheduleReconnection],
+  );
+
+  /**
+   * Internal reconnection handler (used by scheduled reconnections)
+   */
+  const reconnectPeerInternal = useCallback(
+    (peerId: PeerId, attempt: number) => {
+      console.log(
+        `[useRoomPeers] Reconnecting to peer ${peerId} (attempt ${attempt})`,
+      );
+
+      // Close existing connection if any
+      const existing = connectionsRef.current.get(peerId);
+      if (existing) {
+        existing.connection.close();
+        connectionsRef.current.delete(peerId);
+      }
+
+      // Clear state
+      setConnectionStates((prev) => {
+        const next = new Map(prev);
+        next.delete(peerId);
+        return next;
+      });
+      setAudioStreams((prev) => {
+        const next = new Map(prev);
+        next.delete(peerId);
+        return next;
+      });
+      pendingCandidatesRef.current.delete(peerId);
+
+      // Re-initiate connection with attempt count
+      initiateConnection(peerId, attempt);
+    },
+    [initiateConnection],
   );
 
   /**
@@ -394,38 +703,49 @@ export function useRoomPeers(
   /**
    * Handle peer left
    */
-  const handlePeerLeft = useCallback((peerId: PeerId) => {
-    // Remove peer summary
-    setPeerSummaries((prev) => {
-      const next = new Map(prev);
-      next.delete(peerId);
-      return next;
-    });
+  const handlePeerLeft = useCallback(
+    (peerId: PeerId) => {
+      // Remove peer summary
+      setPeerSummaries((prev) => {
+        const next = new Map(prev);
+        next.delete(peerId);
+        return next;
+      });
 
-    // Close and remove connection
-    const peerConn = connectionsRef.current.get(peerId);
-    if (peerConn) {
-      peerConn.connection.close();
-      connectionsRef.current.delete(peerId);
-    }
+      // Close and remove connection
+      const peerConn = connectionsRef.current.get(peerId);
+      if (peerConn) {
+        peerConn.connection.close();
+        connectionsRef.current.delete(peerId);
+      }
 
-    // Remove connection state
-    setConnectionStates((prev) => {
-      const next = new Map(prev);
-      next.delete(peerId);
-      return next;
-    });
+      // Remove connection state
+      setConnectionStates((prev) => {
+        const next = new Map(prev);
+        next.delete(peerId);
+        return next;
+      });
 
-    // Remove audio stream
-    setAudioStreams((prev) => {
-      const next = new Map(prev);
-      next.delete(peerId);
-      return next;
-    });
+      // Remove audio stream
+      setAudioStreams((prev) => {
+        const next = new Map(prev);
+        next.delete(peerId);
+        return next;
+      });
 
-    // Clear pending candidates
-    pendingCandidatesRef.current.delete(peerId);
-  }, []);
+      // Clear pending candidates
+      pendingCandidatesRef.current.delete(peerId);
+
+      // Clean up reconnection state and timers when peer leaves
+      clearReconnectionTimer(peerId);
+      clearConnectionTimeout(peerId);
+      reconnectionStateRef.current.delete(peerId);
+
+      // Clear pending connection status (FEAT-420)
+      pendingConnectionsRef.current.delete(peerId);
+    },
+    [clearReconnectionTimer, clearConnectionTimeout],
+  );
 
   /**
    * Handle peer updated
@@ -526,6 +846,11 @@ export function useRoomPeers(
     [localPeerId, initiateConnection],
   );
 
+  // Assign reconnectPeerInternal to ref (breaks circular dependency)
+  useEffect(() => {
+    reconnectPeerInternalRef.current = reconnectPeerInternal;
+  }, [reconnectPeerInternal]);
+
   // Setup signaling event handlers
   useEffect(() => {
     if (!client) return;
@@ -585,6 +910,20 @@ export function useRoomPeers(
       });
       connectionsRef.current.clear();
       pendingCandidatesRef.current.clear();
+
+      // Clear all reconnection timers
+      reconnectionTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reconnectionTimersRef.current.clear();
+
+      // Clear all connection timeout timers
+      connectionTimeoutRef.current.forEach((timer) => clearTimeout(timer));
+      connectionTimeoutRef.current.clear();
+
+      // Clear reconnection state
+      reconnectionStateRef.current.clear();
+
+      // Clear pending connections (FEAT-420)
+      pendingConnectionsRef.current.clear();
     };
   }, [roomId]);
 

@@ -7,9 +7,9 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-104
  */
 
-import { Server as HttpServer } from 'http';
-import { Server as SocketIOServer, Socket } from 'socket.io';
-import { nanoid } from 'nanoid';
+import { Server as HttpServer } from "http";
+import { Server as SocketIOServer, Socket } from "socket.io";
+import { nanoid } from "nanoid";
 import type {
   JoinRoomPayload,
   LeaveRoomPayload,
@@ -17,20 +17,21 @@ import type {
   SignalAnswerPayload,
   SignalIcePayload,
   PresenceUpdatePayload,
+  UpdateDisplayNamePayload,
   RoomJoinedPayload,
   RoomLeftPayload,
   RoomErrorPayload,
   SocketConnectionState,
-} from '@/types/signaling';
-import type { Peer, PeerId, PeerSummary, PeerPresence } from '@/types/peer';
-import type { Room, RoomId } from '@/types/room';
+} from "@/types/signaling";
+import type { Peer, PeerId, PeerSummary, PeerPresence } from "@/types/peer";
+import type { Room, RoomId } from "@/types/room";
 import {
   getRoom,
   addParticipant,
   removeParticipant,
   roomExists,
-} from '@/server/store/rooms';
-import { DEFAULT_VOICE_SETTINGS } from '@/types/voice-mode';
+} from "@/server/store/rooms";
+import { DEFAULT_VOICE_SETTINGS } from "@/types/voice-mode";
 
 /**
  * Socket data stored per connection
@@ -48,27 +49,37 @@ interface SocketData {
 type AppSocket = Socket<
   // Client to server events
   {
-    'room:join': (payload: JoinRoomPayload, callback: (response: RoomJoinedPayload | RoomErrorPayload) => void) => void;
-    'room:leave': (payload: LeaveRoomPayload) => void;
-    'signal:offer': (payload: SignalOfferPayload) => void;
-    'signal:answer': (payload: SignalAnswerPayload) => void;
-    'signal:ice': (payload: SignalIcePayload) => void;
-    'presence:update': (payload: PresenceUpdatePayload) => void;
-    'presence:heartbeat': () => void;
+    "room:join": (
+      payload: JoinRoomPayload,
+      callback: (response: RoomJoinedPayload | RoomErrorPayload) => void,
+    ) => void;
+    "room:leave": (payload: LeaveRoomPayload) => void;
+    "signal:offer": (payload: SignalOfferPayload) => void;
+    "signal:answer": (payload: SignalAnswerPayload) => void;
+    "signal:ice": (payload: SignalIcePayload) => void;
+    "presence:update": (payload: PresenceUpdatePayload) => void;
+    "presence:heartbeat": () => void;
+    "peer:update_name": (payload: UpdateDisplayNamePayload) => void;
   },
   // Server to client events
   {
-    'room:joined': (payload: RoomJoinedPayload) => void;
-    'room:left': (payload: RoomLeftPayload) => void;
-    'room:error': (payload: RoomErrorPayload) => void;
-    'room:closed': (roomId: RoomId) => void;
-    'peer:joined': (peer: PeerSummary) => void;
-    'peer:left': (peerId: PeerId) => void;
-    'peer:updated': (peer: PeerSummary) => void;
-    'signal:offer': (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => void;
-    'signal:answer': (fromPeerId: PeerId, sdp: RTCSessionDescriptionInit) => void;
-    'signal:ice': (fromPeerId: PeerId, candidate: RTCIceCandidateInit) => void;
-    'presence:update': (peer: PeerSummary) => void;
+    "room:joined": (payload: RoomJoinedPayload) => void;
+    "room:left": (payload: RoomLeftPayload) => void;
+    "room:error": (payload: RoomErrorPayload) => void;
+    "room:closed": (roomId: RoomId) => void;
+    "peer:joined": (peer: PeerSummary) => void;
+    "peer:left": (peerId: PeerId) => void;
+    "peer:updated": (peer: PeerSummary) => void;
+    "signal:offer": (
+      fromPeerId: PeerId,
+      sdp: RTCSessionDescriptionInit,
+    ) => void;
+    "signal:answer": (
+      fromPeerId: PeerId,
+      sdp: RTCSessionDescriptionInit,
+    ) => void;
+    "signal:ice": (fromPeerId: PeerId, candidate: RTCIceCandidateInit) => void;
+    "presence:update": (peer: PeerSummary) => void;
   },
   // Inter-server events (unused)
   Record<string, never>,
@@ -91,7 +102,7 @@ const socketToPeer = new Map<string, { peerId: PeerId; roomId: RoomId }>();
  */
 function createDefaultPresence(): PeerPresence {
   return {
-    connectionState: 'connected',
+    connectionState: "connected",
     audio: {
       isMuted: false,
       isSpeaking: false,
@@ -139,13 +150,17 @@ export function getRoomPeerSummaries(roomId: RoomId): PeerSummary[] {
 export class SignalingServer {
   private io: SocketIOServer;
 
-  constructor(httpServer: HttpServer, options?: { cors?: { origin: string | string[] } }) {
+  constructor(
+    httpServer: HttpServer,
+    options?: { cors?: { origin: string | string[] } },
+  ) {
     this.io = new SocketIOServer(httpServer, {
       cors: options?.cors ?? {
-        origin: process.env.NODE_ENV === 'development'
-          ? ['http://localhost:3000', 'http://localhost:24680']
-          : [],
-        methods: ['GET', 'POST'],
+        origin:
+          process.env.NODE_ENV === "development"
+            ? ["http://localhost:3000", "http://localhost:24680"]
+            : [],
+        methods: ["GET", "POST"],
       },
       pingTimeout: 20000,
       pingInterval: 25000,
@@ -158,7 +173,7 @@ export class SignalingServer {
    * Setup socket event handlers
    */
   private setupHandlers(): void {
-    this.io.on('connection', (socket: AppSocket) => {
+    this.io.on("connection", (socket: AppSocket) => {
       console.log(`[Signaling] Client connected: ${socket.id}`);
 
       // Generate peer ID for this connection
@@ -166,39 +181,44 @@ export class SignalingServer {
       socket.data.peerId = peerId;
 
       // Handle room join
-      socket.on('room:join', (payload, callback) => {
+      socket.on("room:join", (payload, callback) => {
         this.handleRoomJoin(socket, payload, callback);
       });
 
       // Handle room leave
-      socket.on('room:leave', (payload) => {
+      socket.on("room:leave", (payload) => {
         this.handleRoomLeave(socket, payload);
       });
 
       // Handle WebRTC signaling
-      socket.on('signal:offer', (payload) => {
+      socket.on("signal:offer", (payload) => {
         this.handleSignalOffer(socket, payload);
       });
 
-      socket.on('signal:answer', (payload) => {
+      socket.on("signal:answer", (payload) => {
         this.handleSignalAnswer(socket, payload);
       });
 
-      socket.on('signal:ice', (payload) => {
+      socket.on("signal:ice", (payload) => {
         this.handleSignalIce(socket, payload);
       });
 
       // Handle presence updates
-      socket.on('presence:update', (payload) => {
+      socket.on("presence:update", (payload) => {
         this.handlePresenceUpdate(socket, payload);
       });
 
-      socket.on('presence:heartbeat', () => {
+      socket.on("presence:heartbeat", () => {
         this.handleHeartbeat(socket);
       });
 
+      // Handle display name update
+      socket.on("peer:update_name", (payload) => {
+        this.handleDisplayNameUpdate(socket, payload);
+      });
+
       // Handle disconnect
-      socket.on('disconnect', (reason) => {
+      socket.on("disconnect", (reason) => {
         this.handleDisconnect(socket, reason);
       });
     });
@@ -210,7 +230,7 @@ export class SignalingServer {
   private handleRoomJoin(
     socket: AppSocket,
     payload: JoinRoomPayload,
-    callback: (response: RoomJoinedPayload | RoomErrorPayload) => void
+    callback: (response: RoomJoinedPayload | RoomErrorPayload) => void,
   ): void {
     const { roomId, displayName, avatarUrl } = payload;
     const peerId = socket.data.peerId;
@@ -222,8 +242,8 @@ export class SignalingServer {
     if (!room) {
       const error: RoomErrorPayload = {
         roomId,
-        code: 'ROOM_NOT_FOUND',
-        message: 'Room not found',
+        code: "ROOM_NOT_FOUND",
+        message: "Room not found",
       };
       callback(error);
       return;
@@ -233,19 +253,19 @@ export class SignalingServer {
     if (room.participantCount >= room.maxParticipants) {
       const error: RoomErrorPayload = {
         roomId,
-        code: 'ROOM_FULL',
-        message: 'Room is full',
+        code: "ROOM_FULL",
+        message: "Room is full",
       };
       callback(error);
       return;
     }
 
     // Check room status
-    if (room.status === 'closed') {
+    if (room.status === "closed") {
       const error: RoomErrorPayload = {
         roomId,
-        code: 'ROOM_CLOSED',
-        message: 'Room is closed',
+        code: "ROOM_CLOSED",
+        message: "Room is closed",
       };
       callback(error);
       return;
@@ -256,7 +276,7 @@ export class SignalingServer {
       id: peerId,
       displayName,
       avatarUrl,
-      role: room.participantCount === 0 ? 'owner' : 'participant',
+      role: room.participantCount === 0 ? "owner" : "participant",
       roomId,
       presence: createDefaultPresence(),
       joinedAt: new Date(),
@@ -283,7 +303,9 @@ export class SignalingServer {
     socket.join(roomId);
 
     // Get current peers for response
-    const existingPeers = getRoomPeerSummaries(roomId).filter((p) => p.id !== peerId);
+    const existingPeers = getRoomPeerSummaries(roomId).filter(
+      (p) => p.id !== peerId,
+    );
 
     // Get updated room
     const updatedRoom = getRoom(roomId)!;
@@ -294,7 +316,7 @@ export class SignalingServer {
       localPeer: peer,
       peers: existingPeers,
       aiState: {
-        state: 'idle',
+        state: "idle",
         stateStartedAt: new Date(),
         queue: {
           queue: [],
@@ -309,9 +331,11 @@ export class SignalingServer {
     callback(response);
 
     // Broadcast peer:joined to others in room
-    socket.to(roomId).emit('peer:joined', toPeerSummary(peer));
+    socket.to(roomId).emit("peer:joined", toPeerSummary(peer));
 
-    console.log(`[Signaling] Peer ${peerId} joined room ${roomId}. Total: ${updatedRoom.participantCount}`);
+    console.log(
+      `[Signaling] Peer ${peerId} joined room ${roomId}. Total: ${updatedRoom.participantCount}`,
+    );
   }
 
   /**
@@ -321,7 +345,7 @@ export class SignalingServer {
     const { roomId } = payload;
     const peerId = socket.data.peerId;
 
-    this.removePeerFromRoom(socket, roomId, peerId, 'left');
+    this.removePeerFromRoom(socket, roomId, peerId, "left");
   }
 
   /**
@@ -331,9 +355,11 @@ export class SignalingServer {
     socket: AppSocket,
     roomId: RoomId,
     peerId: PeerId,
-    reason: 'left' | 'kicked' | 'room_closed'
+    reason: "left" | "kicked" | "room_closed",
   ): void {
-    console.log(`[Signaling] Peer ${peerId} leaving room ${roomId} (${reason})`);
+    console.log(
+      `[Signaling] Peer ${peerId} leaving room ${roomId} (${reason})`,
+    );
 
     // Remove from room peers tracking
     const peers = roomPeers.get(roomId);
@@ -357,16 +383,19 @@ export class SignalingServer {
     socket.data.roomId = undefined;
 
     // Emit left event to the peer
-    socket.emit('room:left', { roomId, reason });
+    socket.emit("room:left", { roomId, reason });
 
     // Broadcast peer:left to others
-    socket.to(roomId).emit('peer:left', peerId);
+    socket.to(roomId).emit("peer:left", peerId);
   }
 
   /**
    * Handle WebRTC offer relay
    */
-  private handleSignalOffer(socket: AppSocket, payload: SignalOfferPayload): void {
+  private handleSignalOffer(
+    socket: AppSocket,
+    payload: SignalOfferPayload,
+  ): void {
     const fromPeerId = socket.data.peerId;
     const { targetPeerId, sdp } = payload;
     const roomId = socket.data.roomId;
@@ -376,14 +405,17 @@ export class SignalingServer {
     // Find target socket
     const targetSocket = this.findSocketByPeerId(roomId, targetPeerId);
     if (targetSocket) {
-      targetSocket.emit('signal:offer', fromPeerId, sdp);
+      targetSocket.emit("signal:offer", fromPeerId, sdp);
     }
   }
 
   /**
    * Handle WebRTC answer relay
    */
-  private handleSignalAnswer(socket: AppSocket, payload: SignalAnswerPayload): void {
+  private handleSignalAnswer(
+    socket: AppSocket,
+    payload: SignalAnswerPayload,
+  ): void {
     const fromPeerId = socket.data.peerId;
     const { targetPeerId, sdp } = payload;
     const roomId = socket.data.roomId;
@@ -392,7 +424,7 @@ export class SignalingServer {
 
     const targetSocket = this.findSocketByPeerId(roomId, targetPeerId);
     if (targetSocket) {
-      targetSocket.emit('signal:answer', fromPeerId, sdp);
+      targetSocket.emit("signal:answer", fromPeerId, sdp);
     }
   }
 
@@ -408,14 +440,17 @@ export class SignalingServer {
 
     const targetSocket = this.findSocketByPeerId(roomId, targetPeerId);
     if (targetSocket) {
-      targetSocket.emit('signal:ice', fromPeerId, candidate);
+      targetSocket.emit("signal:ice", fromPeerId, candidate);
     }
   }
 
   /**
    * Handle presence update
    */
-  private handlePresenceUpdate(socket: AppSocket, payload: PresenceUpdatePayload): void {
+  private handlePresenceUpdate(
+    socket: AppSocket,
+    payload: PresenceUpdatePayload,
+  ): void {
     const peerId = socket.data.peerId;
     const roomId = socket.data.roomId;
 
@@ -441,7 +476,43 @@ export class SignalingServer {
     peer.presence.lastActiveAt = new Date();
 
     // Broadcast update to room
-    socket.to(roomId).emit('presence:update', toPeerSummary(peer));
+    socket.to(roomId).emit("presence:update", toPeerSummary(peer));
+  }
+
+  /**
+   * Handle display name update
+   */
+  private handleDisplayNameUpdate(
+    socket: AppSocket,
+    payload: UpdateDisplayNamePayload,
+  ): void {
+    const peerId = socket.data.peerId;
+    const roomId = socket.data.roomId;
+
+    if (!roomId) return;
+
+    const { displayName } = payload;
+    if (!displayName || typeof displayName !== "string") return;
+
+    // Update peer in room tracking
+    const peers = roomPeers.get(roomId);
+    const peer = peers?.get(peerId);
+    if (!peer) return;
+
+    // Update the peer's display name
+    peer.displayName = displayName;
+
+    // Update socket data
+    socket.data.displayName = displayName;
+
+    console.log(
+      `[Signaling] Peer ${peerId} updated display name to "${displayName}" in room ${roomId}`,
+    );
+
+    // Broadcast peer:updated to all peers in the room (including sender for confirmation)
+    const peerSummary = toPeerSummary(peer);
+    socket.emit("peer:updated", peerSummary);
+    socket.to(roomId).emit("peer:updated", peerSummary);
   }
 
   /**
@@ -469,20 +540,25 @@ export class SignalingServer {
 
     const mapping = socketToPeer.get(socket.id);
     if (mapping) {
-      this.removePeerFromRoom(socket, mapping.roomId, mapping.peerId, 'left');
+      this.removePeerFromRoom(socket, mapping.roomId, mapping.peerId, "left");
     }
   }
 
   /**
    * Find socket by peer ID in a room
    */
-  private findSocketByPeerId(roomId: RoomId, peerId: PeerId): AppSocket | undefined {
+  private findSocketByPeerId(
+    roomId: RoomId,
+    peerId: PeerId,
+  ): AppSocket | undefined {
     const roomSockets = this.io.sockets.adapter.rooms.get(roomId);
     if (!roomSockets) return undefined;
 
     const socketIds = Array.from(roomSockets);
     for (const socketId of socketIds) {
-      const socket = this.io.sockets.sockets.get(socketId) as AppSocket | undefined;
+      const socket = this.io.sockets.sockets.get(socketId) as
+        | AppSocket
+        | undefined;
       if (socket?.data.peerId === peerId) {
         return socket;
       }
@@ -494,7 +570,7 @@ export class SignalingServer {
    * Broadcast room closed event
    */
   public broadcastRoomClosed(roomId: RoomId): void {
-    this.io.to(roomId).emit('room:closed', roomId);
+    this.io.to(roomId).emit("room:closed", roomId);
 
     // Remove all peers from tracking
     const peers = roomPeers.get(roomId);
@@ -533,7 +609,7 @@ export class SignalingServer {
  */
 export function createSignalingServer(
   httpServer: HttpServer,
-  options?: { cors?: { origin: string | string[] } }
+  options?: { cors?: { origin: string | string[] } },
 ): SignalingServer {
   return new SignalingServer(httpServer, options);
 }
