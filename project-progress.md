@@ -14,9 +14,9 @@
 | Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
-| Phase 6: Transcript System   | In Progress  | 5/14     | 36%    |
+| Phase 6: Transcript System   | In Progress  | 6/14     | 43%    |
 
-**Latest:** FEAT-504 (Summarization Service) - Periodic conversation summarization using gpt-4o-mini with entry/time thresholds.
+**Latest:** FEAT-505 (Transcript Socket.io Events) - Real-time transcript broadcasting and history request handling.
 
 ---
 
@@ -3011,3 +3011,79 @@ interface SummarizationServiceCallbacks {
 
 **Test Results:**
 ✅ 33 tests passing (service initialization, room monitoring, entry tracking, monitor state, summary generation, configuration options, prompt format)
+
+---
+
+### FEAT-505: Transcript Socket.io Events
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/signaling/transcript-events.test.ts`
+
+Implemented real-time Socket.io events for transcript broadcasting and history retrieval.
+
+**Files Created:**
+
+- `src/server/signaling/transcript-events.ts` - Socket.io event handlers
+
+**Files Modified:**
+
+- `src/types/signaling.ts` - Added transcript event types and handlers
+
+**Key Features:**
+
+1. **Event Types:**
+   - Client-to-Server: `transcript:request-history`
+   - Server-to-Client: `transcript:entry`, `transcript:summary`, `transcript:history`
+
+2. **TranscriptEventsHandler Class:**
+   - `registerSocketHandlers(socket)` - Register event handlers for a socket
+   - `broadcastEntry(roomId, entry)` - Broadcast new entry to room
+   - `broadcastSummary(roomId, summary)` - Broadcast new summary to room
+   - `sendHistoryToSocket(socket, roomId, limit)` - Send history to late joiner
+
+3. **History Request Handling:**
+   - Validates socket is in the requested room
+   - Supports pagination with `limit` and `beforeId`
+   - Optional summary inclusion via `includeSummaries` flag
+   - Supports both callback and emit-based responses
+
+4. **SignalingEventHandlers Extensions:**
+   - `onTranscriptEntry(payload)` - Handle new entry events
+   - `onTranscriptSummary(payload)` - Handle new summary events
+   - `onTranscriptHistory(payload)` - Handle history response
+
+5. **SignalingClient Extensions:**
+   - `requestTranscriptHistory(payload)` - Request transcript history
+
+**Usage Example:**
+
+```typescript
+// Server-side setup
+const transcriptEvents = new TranscriptEventsHandler({
+  io: socketIOServer,
+  contextManager: contextManager,
+});
+
+io.on("connection", (socket) => {
+  transcriptEvents.registerSocketHandlers(socket);
+});
+
+// Broadcast entry when ContextManager emits
+contextManager.on("onTranscriptEntry", (roomId, entry) => {
+  transcriptEvents.broadcastEntry(roomId, entry);
+});
+
+// Client-side usage
+socket.on("transcript:entry", ({ entry }) => {
+  addEntry(entry);
+});
+
+socket.emit("transcript:request-history", {
+  roomId: "room-123",
+  limit: 50,
+  includeSummaries: true,
+});
+```
+
+**Test Results:**
+✅ 16 tests passing (handler initialization, socket registration, history requests, broadcasting, late joiner history)

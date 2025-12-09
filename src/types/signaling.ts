@@ -14,6 +14,12 @@ import type {
 } from "./peer";
 import type { Room, RoomId, RoomEvent, RoomSummary } from "./room";
 import type { AIStateEvent, RoomAIState, TurnRequest } from "./voice-mode";
+import type {
+  TranscriptHistoryRequest,
+  TranscriptHistoryResponse,
+  TranscriptEntryEvent,
+  TranscriptSummaryEvent,
+} from "./transcript";
 
 /**
  * Socket connection state
@@ -51,7 +57,9 @@ export type ClientEventType =
   | "ai:cancel_turn"
   | "ai:interrupt"
   | "ai:ptt_start"
-  | "ai:ptt_end";
+  | "ai:ptt_end"
+  // Transcript events
+  | "transcript:request-history";
 
 /**
  * Server-to-client event types
@@ -82,7 +90,11 @@ export type ServerEventType =
   | "ai:turn_denied"
   | "ai:queue_update"
   // Audio level events (high frequency)
-  | "audio:levels";
+  | "audio:levels"
+  // Transcript events
+  | "transcript:entry"
+  | "transcript:summary"
+  | "transcript:history";
 
 // ============================================
 // Client-to-Server Event Payloads
@@ -291,6 +303,11 @@ export interface SignalingEventHandlers {
   onTurnGranted?: (payload: TurnGrantedPayload) => void;
   onTurnDenied?: (payload: TurnDeniedPayload) => void;
   onQueueUpdate?: (payload: QueueUpdatePayload) => void;
+
+  // Transcript
+  onTranscriptEntry?: (payload: TranscriptEntryEvent) => void;
+  onTranscriptSummary?: (payload: TranscriptSummaryEvent) => void;
+  onTranscriptHistory?: (payload: TranscriptHistoryResponse) => void;
 }
 
 /**
@@ -326,6 +343,9 @@ export interface SignalingClient {
   interrupt(roomId: RoomId): void;
   startPTT(payload: PTTPayload): void;
   endPTT(payload: PTTPayload): void;
+
+  // Transcript
+  requestTranscriptHistory(payload: TranscriptHistoryRequest): void;
 
   // Event handlers
   on<K extends keyof SignalingEventHandlers>(
