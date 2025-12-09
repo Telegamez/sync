@@ -1400,7 +1400,7 @@
       ],
       "testFile": "tests/unit/pages/room-transcript-integration.test.tsx",
       "dependencies": ["FEAT-508", "FEAT-119"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-513",

@@ -2694,7 +2694,7 @@ Implement dual-track unified transcript with AI context awareness, enabling:
 10. `FEAT-509` - TranscriptEntry component ✅
 11. `FEAT-510` - SummaryCard component ✅
 12. `FEAT-511` - TranscriptDownloadModal component ✅
-13. `FEAT-512` - Room page transcript integration
+13. `FEAT-512` - Room page transcript integration ✅
 14. `FEAT-513` - CreateRoomForm transcript settings
 
 ---
@@ -3519,3 +3519,86 @@ interface DownloadOptions {
 
 **Test Results:**
 ✅ 27 tests passing (rendering, format selection, include options, download flow, error handling, modal interactions, accessibility)
+
+---
+
+### FEAT-512: Room Page Transcript Integration
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/pages/room-transcript-integration.test.tsx`
+
+Integrated TranscriptPanel into the room page with responsive layout and controls.
+
+**Files Modified:**
+
+- `src/app/rooms/[roomId]/page.tsx` - Room page with transcript integration
+- `src/components/room/index.ts` - Added transcript component exports
+
+**Key Features:**
+
+1. **Transcript Toggle Button:**
+   - Header button to show/hide transcript
+   - Entry count display when entries exist
+   - Visual state indicator (pressed/unpressed)
+   - aria-pressed for accessibility
+
+2. **Recording Indicator:**
+   - Red pulsing "REC" badge in header
+   - Shows when transcript has entries
+   - Tooltip explaining recording status
+
+3. **Desktop Panel Layout:**
+   - Fixed sidebar on right (320px / 384px)
+   - Slide-in with content adjustment
+   - Full height within header/footer bounds
+   - Backdrop blur effect
+
+4. **Mobile Sheet Layout:**
+   - Bottom sheet with rounded top corners
+   - Max 70vh height
+   - Collapsible for space efficiency
+   - Touch-friendly controls
+
+5. **Hook Integration:**
+   - useTranscript hook initialization
+   - Passes all state and callbacks to panel
+   - Automatic history request on mount
+   - Real-time updates via Socket.io
+
+6. **State Management:**
+   - showTranscript visibility toggle
+   - transcriptCollapsed panel state
+   - Synchronized with panel controls
+
+**Integration Points:**
+
+```typescript
+// Hook initialization
+const transcript = useTranscript({
+  roomId,
+  client: getClient(),
+});
+
+// Panel props
+<TranscriptPanel
+  entries={transcript.entries}
+  summaries={transcript.summaries}
+  isLoading={transcript.isLoading}
+  isLoadingMore={transcript.isLoadingMore}
+  error={transcript.error}
+  hasMore={transcript.hasMore}
+  autoScroll={transcript.autoScroll}
+  totalEntries={transcript.totalEntries}
+  onLoadMore={transcript.loadMore}
+  onToggleAutoScroll={transcript.toggleAutoScroll}
+  onDownloadTxt={transcript.downloadAsTxt}
+  onDownloadMd={transcript.downloadAsMd}
+  onCopy={transcript.copyToClipboard}
+  onClearError={transcript.clearError}
+  isCollapsed={transcriptCollapsed}
+  onCollapseChange={setTranscriptCollapsed}
+/>
+```
+
+**Test Results:**
+✅ 17 tests passing (toggle button, recording indicator, panel integration, panel actions, responsive behavior, error handling)

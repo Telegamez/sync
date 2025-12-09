@@ -23,12 +23,16 @@ import {
   Copy,
   Check,
   MicOff,
+  FileText,
+  X,
+  Mic,
 } from "lucide-react";
 import {
   ParticipantList,
   RoomControls,
   UsernameModal,
   ParticipantModal,
+  TranscriptPanel,
 } from "@/components/room";
 import type { ParticipantInfo } from "@/components/room";
 import type { Room } from "@/types/room";
@@ -37,6 +41,7 @@ import { useRoomPeers } from "@/hooks/useRoomPeers";
 import { useRoomAudio } from "@/hooks/useRoomAudio";
 import { usePresence } from "@/hooks/usePresence";
 import { useSharedAI } from "@/hooks/useSharedAI";
+import { useTranscript } from "@/hooks/useTranscript";
 import type { AIResponseState } from "@/types/voice-mode";
 
 /**
@@ -146,6 +151,10 @@ export default function RoomPage() {
 
   // Track local mute state - start UNMUTED by default (matches server and audio track state)
   const [localIsMuted, setLocalIsMuted] = useState(false);
+
+  // Transcript panel state
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
 
   // Local media stream ref
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -265,6 +274,12 @@ export default function RoomPage() {
       },
     },
   );
+
+  // Transcript hook - manages transcript state and real-time updates
+  const transcript = useTranscript({
+    roomId,
+    client: getClient(),
+  });
 
   // Determine if AI is actually speaking
   // Use isPlaying as primary indicator - server state may go idle before audio buffer finishes
@@ -918,9 +933,21 @@ export default function RoomPage() {
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
               <div className="text-center">
-                <h1 className="text-lg font-semibold text-foreground truncate max-w-[200px] sm:max-w-[300px]">
-                  {room?.name || "Room"}
-                </h1>
+                <div className="flex items-center gap-2 justify-center">
+                  <h1 className="text-lg font-semibold text-foreground truncate max-w-[200px] sm:max-w-[300px]">
+                    {room?.name || "Room"}
+                  </h1>
+                  {/* Recording indicator - shows when transcript is active */}
+                  {transcript.entries.length > 0 && (
+                    <span
+                      className="flex items-center gap-1 text-xs text-red-400"
+                      title="Recording transcript"
+                    >
+                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      <span className="hidden sm:inline">REC</span>
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {participants.length}/{room?.maxParticipants || 4}{" "}
                   participants
@@ -928,24 +955,48 @@ export default function RoomPage() {
               </div>
             </div>
 
-            {/* Share button */}
-            <button
-              onClick={handleCopyLink}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-              aria-label={copied ? "Link copied" : "Copy room link"}
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-green-500" />
-                  <span className="hidden sm:inline">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span className="hidden sm:inline">Share</span>
-                </>
-              )}
-            </button>
+            {/* Header right actions */}
+            <div className="flex items-center gap-2">
+              {/* Transcript toggle button */}
+              <button
+                onClick={() => setShowTranscript(!showTranscript)}
+                className={`flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg transition-colors ${
+                  showTranscript
+                    ? "bg-primary/10 text-primary border-primary/50"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+                aria-label={
+                  showTranscript ? "Hide transcript" : "Show transcript"
+                }
+                aria-pressed={showTranscript}
+              >
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {transcript.entries.length > 0
+                    ? `Transcript (${transcript.entries.length})`
+                    : "Transcript"}
+                </span>
+              </button>
+
+              {/* Share button */}
+              <button
+                onClick={handleCopyLink}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+                aria-label={copied ? "Link copied" : "Copy room link"}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 text-green-500" />
+                    <span className="hidden sm:inline">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span className="hidden sm:inline">Share</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Dynamic status row */}
@@ -1000,9 +1051,13 @@ export default function RoomPage() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex overflow-hidden">
         {/* Participants area - fills available space, no scroll */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden">
+        <div
+          className={`flex-1 flex flex-col items-center justify-center p-4 overflow-hidden transition-all duration-300 ${
+            showTranscript ? "lg:mr-80 xl:mr-96" : ""
+          }`}
+        >
           <div className="w-full max-w-4xl">
             {/* Participant list */}
             <ParticipantList
@@ -1036,6 +1091,58 @@ export default function RoomPage() {
             )}
           </div>
         </div>
+
+        {/* Desktop transcript panel - side panel */}
+        {showTranscript && (
+          <aside className="hidden lg:flex flex-col fixed right-0 top-[calc(theme(spacing.16)+3rem)] bottom-[calc(theme(spacing.16)+1rem)] w-80 xl:w-96 border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <TranscriptPanel
+              entries={transcript.entries}
+              summaries={transcript.summaries}
+              isLoading={transcript.isLoading}
+              isLoadingMore={transcript.isLoadingMore}
+              error={transcript.error}
+              hasMore={transcript.hasMore}
+              autoScroll={transcript.autoScroll}
+              totalEntries={transcript.totalEntries}
+              onLoadMore={transcript.loadMore}
+              onToggleAutoScroll={transcript.toggleAutoScroll}
+              onDownloadTxt={transcript.downloadAsTxt}
+              onDownloadMd={transcript.downloadAsMd}
+              onCopy={transcript.copyToClipboard}
+              onClearError={transcript.clearError}
+              isCollapsed={transcriptCollapsed}
+              onCollapseChange={setTranscriptCollapsed}
+              title="Transcript"
+              className="h-full"
+            />
+          </aside>
+        )}
+
+        {/* Mobile transcript panel - bottom sheet */}
+        {showTranscript && (
+          <div className="lg:hidden">
+            <TranscriptPanel
+              entries={transcript.entries}
+              summaries={transcript.summaries}
+              isLoading={transcript.isLoading}
+              isLoadingMore={transcript.isLoadingMore}
+              error={transcript.error}
+              hasMore={transcript.hasMore}
+              autoScroll={transcript.autoScroll}
+              totalEntries={transcript.totalEntries}
+              onLoadMore={transcript.loadMore}
+              onToggleAutoScroll={transcript.toggleAutoScroll}
+              onDownloadTxt={transcript.downloadAsTxt}
+              onDownloadMd={transcript.downloadAsMd}
+              onCopy={transcript.copyToClipboard}
+              onClearError={transcript.clearError}
+              isCollapsed={transcriptCollapsed}
+              onCollapseChange={setTranscriptCollapsed}
+              title="Transcript"
+              mobileSheet
+            />
+          </div>
+        )}
       </main>
 
       {/* Controls footer */}
