@@ -2692,7 +2692,7 @@ Implement dual-track unified transcript with AI context awareness, enabling:
 8. `FEAT-507` - useTranscript hook ✅
 9. `FEAT-508` - TranscriptPanel component ✅
 10. `FEAT-509` - TranscriptEntry component ✅
-11. `FEAT-510` - SummaryCard component
+11. `FEAT-510` - SummaryCard component ✅
 12. `FEAT-511` - TranscriptDownloadModal component
 13. `FEAT-512` - Room page transcript integration
 14. `FEAT-513` - CreateRoomForm transcript settings
@@ -3373,3 +3373,71 @@ interface TranscriptEntryProps {
 
 **Test Results:**
 ✅ 26 tests passing (ambient entries, PTT entries, AI response entries, system entries, timestamps, own entry indicator, partial entries, click handling, keyboard accessibility, compact variant)
+
+---
+
+### FEAT-510: SummaryCard Component
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/components/SummaryCard.test.tsx`
+
+Implemented collapsible summary card component for displaying AI-generated conversation summaries.
+
+**Files Created:**
+
+- `src/components/room/SummaryCard.tsx` - Collapsible summary card component
+
+**Key Features:**
+
+1. **Collapsible Header:**
+   - Toggle icon (chevron right/down)
+   - Summary icon and title
+   - Entries count badge
+   - Timestamp display
+
+2. **Expandable Content:**
+   - Main summary content paragraph
+   - Bullet points list with "Key Points" header
+   - Coverage period (start - end time)
+   - Token count display
+
+3. **Animation:**
+   - Smooth expand/collapse transitions
+   - CSS max-height animation with opacity
+   - 200ms duration for responsive feel
+
+4. **State Management:**
+   - Supports uncontrolled mode (defaultExpanded)
+   - Supports controlled mode (expanded + onExpandChange)
+   - Internal state for uncontrolled usage
+
+5. **Accessibility:**
+   - aria-expanded attribute on toggle button
+   - aria-controls linking button to content
+   - Keyboard accessible toggle
+
+6. **Variants:**
+   - SummaryCard: Full collapsible card
+   - SummaryCardCompact: Inline display with truncated content
+   - SummaryCardSkeleton: Loading placeholder
+
+7. **Visual Styling:**
+   - Amber color scheme for distinction from entries
+   - Rounded corners and border styling
+   - Hover state on header
+
+**Props Interface:**
+
+```typescript
+interface SummaryCardProps {
+  summary: TranscriptSummary;
+  defaultExpanded?: boolean;
+  expanded?: boolean;
+  onExpandChange?: (expanded: boolean) => void;
+  relativeTime?: boolean;
+  className?: string;
+}
+```
+
+**Test Results:**
+✅ 26 tests passing (header rendering, collapse behavior, content display, accessibility, styling, timestamp display, compact variant, skeleton)

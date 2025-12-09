@@ -1364,7 +1364,7 @@
       ],
       "testFile": "tests/unit/components/SummaryCard.test.tsx",
       "dependencies": ["FEAT-500"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-511",
@@ -1449,7 +1449,7 @@
     "phase4": 11,
     "phase5": 18,
     "phase6": 14,
-    "passed": 71,
-    "pending": 4
+    "passed": 72,
+    "pending": 3
   }
 }
