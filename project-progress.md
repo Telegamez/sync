@@ -14,9 +14,9 @@
 | Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
-| Phase 6: Transcript System   | In Progress  | 2/14     | 14%    |
+| Phase 6: Transcript System   | In Progress  | 3/14     | 21%    |
 
-**Latest:** FEAT-501 (PTT Context Injection) - AI can now reference prior conversation context on each PTT turn.
+**Latest:** FEAT-502 (Transcription Service) - WebSocket client for real-time ambient audio transcription.
 
 ---
 
@@ -2683,8 +2683,8 @@ Implement dual-track unified transcript with AI context awareness, enabling:
 ### Planned Features:
 
 1. `FEAT-500` - Transcript types and data models ✅
-2. `FEAT-501` - PTT context injection
-3. `FEAT-502` - Transcription service integration
+2. `FEAT-501` - PTT context injection ✅
+3. `FEAT-502` - Transcription service integration ✅
 4. `FEAT-503` - ContextManager transcript extensions
 5. `FEAT-504` - Summarization service
 6. `FEAT-505` - Transcript Socket.io events
@@ -2798,3 +2798,69 @@ Here is what was discussed recently in this room. Use this context to provide mo
 
 **Test Results:**
 ✅ 20 tests passing (context storage, retrieval, formatting, callbacks, OpenAI client methods)
+
+---
+
+### FEAT-502: Transcription Service
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/ai/transcription-service.test.ts`
+
+Created WebSocket client for OpenAI's `gpt-4o-mini-transcribe` model to enable real-time ambient audio transcription.
+
+**Files Created:**
+
+- `src/server/signaling/transcription-service.ts` - Complete transcription service
+
+**Key Components:**
+
+1. **TranscriptionService Class:**
+   - `createSession(roomId)` - Establishes WebSocket connection to OpenAI transcription endpoint
+   - `destroySession(roomId)` - Cleans up session and WebSocket
+   - `setActiveSpeaker(roomId, peerId, displayName)` - Sets speaker for attribution
+   - `clearActiveSpeaker(roomId)` - Clears speaker after utterance
+   - `streamAudio(roomId, audioBase64)` - Streams PCM16 audio chunks
+   - `commitAudio(roomId)` - Triggers transcription of buffered audio
+   - `clearAudio(roomId)` - Discards audio buffer
+
+2. **TranscriptionResult Interface:**
+   - `roomId` - Room the transcription belongs to
+   - `speakerId` / `speakerName` - Speaker attribution
+   - `text` - Transcribed text content
+   - `isFinal` - Whether this is a final or partial result
+   - `type` - Always "ambient" for room transcription
+   - `timestamp` - When transcription was received
+   - `durationMs` - Optional duration estimate
+
+3. **Configuration Options:**
+   - `apiKey` - OpenAI API key
+   - `language` - Transcription language (default: "en")
+   - `sampleRate` - Audio sample rate (default: 24000)
+   - `audioFormat` - Audio encoding (pcm16, g711_ulaw, g711_alaw)
+
+4. **WebSocket Features:**
+   - Automatic reconnection with exponential backoff (2s, 4s, 8s)
+   - Server-side VAD configuration (threshold: 0.5, silence: 500ms)
+   - Partial transcription support for real-time UI updates
+   - Speaker attribution for correct transcript entries
+
+**Session Configuration:**
+
+```typescript
+{
+  input_audio_format: "pcm16",
+  input_audio_transcription: {
+    model: "gpt-4o-mini-transcribe",
+    language: "en",
+  },
+  turn_detection: {
+    type: "server_vad",
+    threshold: 0.5,
+    prefix_padding_ms: 300,
+    silence_duration_ms: 500,
+  },
+}
+```
+
+**Test Results:**
+✅ 22 tests passing (service initialization, session management, speaker attribution, audio streaming, configuration options)
