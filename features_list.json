@@ -1292,7 +1292,7 @@
       ],
       "testFile": "tests/unit/api/transcript.test.ts",
       "dependencies": ["FEAT-503", "FEAT-103"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-507",
@@ -1449,7 +1449,7 @@
     "phase4": 11,
     "phase5": 18,
     "phase6": 14,
-    "passed": 67,
-    "pending": 8
+    "passed": 68,
+    "pending": 7
   }
 }

@@ -14,9 +14,9 @@
 | Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
-| Phase 6: Transcript System   | In Progress  | 6/14     | 43%    |
+| Phase 6: Transcript System   | In Progress  | 7/14     | 50%    |
 
-**Latest:** FEAT-505 (Transcript Socket.io Events) - Real-time transcript broadcasting and history request handling.
+**Latest:** FEAT-506 (Transcript REST Endpoints) - REST API for transcript retrieval in JSON, text, and markdown formats.
 
 ---
 
@@ -3087,3 +3087,66 @@ socket.emit("transcript:request-history", {
 
 **Test Results:**
 ✅ 16 tests passing (handler initialization, socket registration, history requests, broadcasting, late joiner history)
+
+---
+
+### FEAT-506: Transcript REST Endpoints
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/api/transcript.test.ts`
+
+Implemented REST API endpoints for transcript retrieval supporting multiple output formats.
+
+**Files Created:**
+
+- `src/app/api/rooms/[roomId]/transcript/route.ts` - REST API endpoint
+
+**Key Features:**
+
+1. **Format Support:**
+   - JSON (default) - `TranscriptApiResponse` structure
+   - Plain text (`?format=txt`) - Human-readable format
+   - Markdown (`?format=md`) - Rich formatting with badges
+
+2. **Query Parameters:**
+   - `format`: 'json' | 'txt' | 'md' (default: 'json')
+   - `limit`: Max entries to return (default: 100, max: 1000)
+   - `offset`: Pagination offset (default: 0)
+   - `download`: 'true' to trigger file download
+
+3. **Download Support:**
+   - Content-Disposition header for file downloads
+   - Auto-generated filename: `{roomName}_transcript_{date}.{ext}`
+   - Room name sanitization for safe filenames
+
+4. **Text Format Features:**
+   - Header with room name, date, and start time
+   - Entry format: `[HH:MM AM/PM] Speaker [Badge]: Content`
+   - Summary sections with bullet points
+   - Chronologically merged entries and summaries
+
+5. **Markdown Format Features:**
+   - Header with room name, participants, and timestamps
+   - Entry badges: 🎤 (PTT), 🤖 (AI)
+   - Summary sections with bullet point lists
+   - System events rendered as italics
+
+**API Response Structure:**
+
+```typescript
+interface TranscriptApiResponse {
+  roomId: string;
+  roomName: string;
+  startTime: Date;
+  endTime: Date | null;
+  participants: string[];
+  entries: TranscriptEntry[];
+  summaries: TranscriptSummary[];
+  totalEntries: number;
+  offset: number;
+  limit: number;
+}
+```
+
+**Test Results:**
+✅ 17 tests passing (format handling, pagination, download headers, filename generation, 404 handling, response structure)
