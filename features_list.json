@@ -1310,7 +1310,7 @@
       ],
       "testFile": "tests/unit/hooks/useTranscript.test.ts",
       "dependencies": ["FEAT-505", "FEAT-108"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-508",
@@ -1449,7 +1449,7 @@
     "phase4": 11,
     "phase5": 18,
     "phase6": 14,
-    "passed": 68,
-    "pending": 7
+    "passed": 69,
+    "pending": 6
   }
 }

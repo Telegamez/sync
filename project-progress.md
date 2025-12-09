@@ -14,9 +14,9 @@
 | Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
-| Phase 6: Transcript System   | In Progress  | 7/14     | 50%    |
+| Phase 6: Transcript System   | In Progress  | 8/14     | 57%    |
 
-**Latest:** FEAT-506 (Transcript REST Endpoints) - REST API for transcript retrieval in JSON, text, and markdown formats.
+**Latest:** FEAT-507 (useTranscript Hook) - React hook for managing real-time transcript state with pagination and download support.
 
 ---
 
@@ -3150,3 +3150,78 @@ interface TranscriptApiResponse {
 
 **Test Results:**
 ✅ 17 tests passing (format handling, pagination, download headers, filename generation, 404 handling, response structure)
+
+---
+
+### FEAT-507: useTranscript Hook
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/hooks/useTranscript.test.ts`
+
+Implemented React hook for managing transcript state with real-time updates, pagination, and download functionality.
+
+**Files Created:**
+
+- `src/hooks/useTranscript.ts` - React hook for transcript management
+
+**Files Modified:**
+
+- `src/lib/signaling/client.ts` - Added transcript event handlers and requestTranscriptHistory method
+
+**Key Features:**
+
+1. **State Management:**
+   - Entries array with chronological ordering
+   - Summaries array with deduplication
+   - Loading states for initial load and pagination
+   - Error state with clear method
+   - Auto-scroll tracking
+
+2. **Real-time Updates:**
+   - Subscribe to `transcript:entry` events
+   - Subscribe to `transcript:summary` events
+   - Deduplicate incoming entries/summaries
+   - Update totalEntries count
+
+3. **Pagination Support:**
+   - `loadMore()` method for fetching older history
+   - Prepends older entries to maintain chronological order
+   - Tracks `hasMore` state
+   - Uses `beforeId` for cursor-based pagination
+
+4. **Download Functionality:**
+   - `downloadAsTxt()` - Download as plain text
+   - `downloadAsMd()` - Download as markdown
+   - `copyToClipboard()` - Copy to system clipboard
+   - Generates properly formatted content with timestamps
+
+5. **Signaling Client Extensions:**
+   - Added `requestTranscriptHistory(payload, callback?)` method
+   - Added event handlers for transcript events
+   - Supports both callback and emit-based responses
+
+**Usage Example:**
+
+```typescript
+const {
+  entries,
+  summaries,
+  isLoading,
+  hasMore,
+  autoScroll,
+  loadMore,
+  toggleAutoScroll,
+  downloadAsTxt,
+  downloadAsMd,
+  copyToClipboard,
+  refresh,
+} = useTranscript({
+  roomId: "room-123",
+  client: signalingClient,
+  initialLimit: 50,
+  paginationLimit: 30,
+});
+```
+
+**Test Results:**
+✅ 24 tests passing (initialization, history handling, real-time updates, pagination, auto-scroll, local entry addition, error handling, refresh, cleanup)

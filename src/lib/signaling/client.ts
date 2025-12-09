@@ -20,6 +20,12 @@ import type {
   SocketConnectionState,
   SignalingEventHandlers,
 } from "@/types/signaling";
+import type {
+  TranscriptHistoryRequest,
+  TranscriptHistoryResponse,
+  TranscriptEntryEvent,
+  TranscriptSummaryEvent,
+} from "@/types/transcript";
 import type { PeerId, PeerSummary } from "@/types/peer";
 import type { RoomId, Room } from "@/types/room";
 import type { RoomAIState } from "@/types/voice-mode";
@@ -204,6 +210,22 @@ export class SignalingClient {
     this.socket.on("presence:update", (peer: PeerSummary) => {
       this.handlers.onPresenceUpdate?.(peer);
     });
+
+    // Transcript events
+    this.socket.on("transcript:entry", (payload: TranscriptEntryEvent) => {
+      this.handlers.onTranscriptEntry?.(payload);
+    });
+
+    this.socket.on("transcript:summary", (payload: TranscriptSummaryEvent) => {
+      this.handlers.onTranscriptSummary?.(payload);
+    });
+
+    this.socket.on(
+      "transcript:history",
+      (payload: TranscriptHistoryResponse) => {
+        this.handlers.onTranscriptHistory?.(payload);
+      },
+    );
   }
 
   /**
@@ -388,6 +410,21 @@ export class SignalingClient {
   public endPTT(roomId: string): void {
     if (!this.socket?.connected) return;
     this.socket.emit("ai:ptt_end", { roomId });
+  }
+
+  /**
+   * Request transcript history for a room
+   */
+  public requestTranscriptHistory(
+    payload: TranscriptHistoryRequest,
+    callback?: (response: TranscriptHistoryResponse) => void,
+  ): void {
+    if (!this.socket?.connected) return;
+    if (callback) {
+      this.socket.emit("transcript:request-history", payload, callback);
+    } else {
+      this.socket.emit("transcript:request-history", payload);
+    }
   }
 
   /**
