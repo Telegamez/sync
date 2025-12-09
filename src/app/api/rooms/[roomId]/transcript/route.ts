@@ -295,7 +295,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       roomId,
       roomName: room.name,
       startTime,
-      endTime: room.closedAt || null,
+      endTime: room.status === "closed" ? room.lastActivityAt : null,
       participants,
       entries: mockEntries.slice(offset, offset + limit),
       summaries: mockSummaries,

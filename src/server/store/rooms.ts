@@ -17,6 +17,7 @@ import type {
 } from "@/types/room";
 import type { Peer, PeerId } from "@/types/peer";
 import { DEFAULT_VOICE_SETTINGS } from "@/types/voice-mode";
+import { DEFAULT_TRANSCRIPT_SETTINGS } from "@/types/transcript";
 
 /**
  * In-memory room storage
@@ -62,6 +63,10 @@ export function createRoom(request: CreateRoomRequest, ownerId: PeerId): Room {
     voiceSettings: {
       ...DEFAULT_VOICE_SETTINGS,
       ...request.voiceSettings,
+    },
+    transcriptSettings: {
+      ...DEFAULT_TRANSCRIPT_SETTINGS,
+      ...request.transcriptSettings,
     },
     ownerId,
     participants: [],
