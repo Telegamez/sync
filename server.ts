@@ -297,9 +297,13 @@ import {
   ContextManager,
   type ConversationMessage,
 } from "./src/server/signaling/context-manager";
+import type { TranscriptEntry } from "./src/types/transcript";
 
 /** Room context managers for conversation history */
 const roomContextManagers = new Map<string, ContextManager>();
+
+/** Module-level io reference for transcript broadcasting */
+let socketIO: SocketIOServer | null = null;
 
 /**
  * Get or create a context manager for a room
@@ -329,6 +333,15 @@ function getOrCreateContextManager(roomId: string): ContextManager {
           console.log(
             `[ContextManager] Room ${rid}: Near token limit (${tokenCount} tokens)`,
           );
+        },
+        // FEAT-505: Broadcast transcript entries to clients via Socket.io
+        onTranscriptEntry: (rid: string, entry: TranscriptEntry) => {
+          if (socketIO) {
+            socketIO.to(rid).emit("transcript:entry", { entry });
+            console.log(
+              `[Transcript] Broadcast entry to room ${rid}: ${entry.speaker} (${entry.type})`,
+            );
+          }
         },
       },
     );
@@ -882,6 +895,9 @@ app
       pingInterval: 25000,
       transports: ["websocket", "polling"],
     });
+
+    // Set module-level reference for transcript broadcasting
+    socketIO = io;
 
     console.log("[Socket.io] Server initialized");
 
