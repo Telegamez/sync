@@ -14,9 +14,9 @@
 | Phase 3: Multi-Peer Audio    | **Complete** | 14/14    | 100%   |
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
-| Phase 6: Transcript System   | In Progress  | 4/14     | 29%    |
+| Phase 6: Transcript System   | In Progress  | 5/14     | 36%    |
 
-**Latest:** FEAT-503 (ContextManager Transcript Extensions) - Extended ContextManager with transcript types, retrieval methods, and callbacks.
+**Latest:** FEAT-504 (Summarization Service) - Periodic conversation summarization using gpt-4o-mini with entry/time thresholds.
 
 ---
 
@@ -2927,3 +2927,87 @@ Extended ContextManager with transcript entry types, retrieval methods, and real
 
 **Test Results:**
 ✅ 34 tests passing (entry types, retrieval methods, callbacks, formatting, backwards compatibility)
+
+---
+
+### FEAT-504: Summarization Service
+
+**Date:** 2024-12-09
+**Test:** `tests/unit/ai/summarization-service.test.ts`
+
+Implemented periodic conversation summarization service using gpt-4o-mini for cost-efficient summaries.
+
+**Files Created:**
+
+- `src/server/signaling/summarization-service.ts` - Core summarization service
+
+**Key Features:**
+
+1. **Automatic Summarization Triggers:**
+   - Time threshold: 5 minutes since last summary
+   - Entry threshold: 20 transcript segments
+   - Both require at least one entry to summarize
+   - Configurable thresholds via constructor options
+
+2. **Per-Room Monitoring:**
+   - `startMonitoring(roomId, contextManager)` - Begin monitoring a room
+   - `stopMonitoring(roomId)` - Stop monitoring and cleanup
+   - `isMonitoring(roomId)` - Check if room is being monitored
+   - Periodic check interval (30 seconds)
+
+3. **Summary Generation:**
+   - `summarizeNow(roomId)` - Trigger immediate summary
+   - Uses gpt-4o-mini for cost efficiency
+   - JSON response format with structured output
+   - Temperature: 0.3 for consistent summaries
+
+4. **Entry Tracking:**
+   - `incrementEntryCount(roomId)` - Track new entries
+   - `getMonitorState(roomId)` - Get current state (entry count, time elapsed, needs summary)
+   - Resets counters after summary generation
+
+5. **Summary Output Structure:**
+
+```typescript
+{
+  id: "summary-{roomId}-{timestamp}",
+  roomId: string,
+  timestamp: Date,
+  content: string,  // 2-3 sentence overview
+  bulletPoints: string[],  // 3-5 key points
+  entriesSummarized: number,
+  tokenCount: number,
+  coverageStart: Date,
+  coverageEnd: Date,
+}
+```
+
+6. **Summarization Prompt:**
+   - Identifies main topics discussed
+   - Notes decisions made
+   - Highlights action items and next steps
+   - Includes key points from each speaker
+
+**Configuration Options:**
+
+```typescript
+interface SummarizationServiceConfig {
+  apiKey: string;
+  timeThresholdMs?: number; // default: 5 minutes
+  entryThreshold?: number; // default: 20 entries
+  maxSummaryTokens?: number; // default: 500
+  temperature?: number; // default: 0.3
+}
+```
+
+**Callbacks:**
+
+```typescript
+interface SummarizationServiceCallbacks {
+  onSummary?: (roomId: RoomId, summary: TranscriptSummary) => void;
+  onError?: (roomId: RoomId, error: string) => void;
+}
+```
+
+**Test Results:**
+✅ 33 tests passing (service initialization, room monitoring, entry tracking, monitor state, summary generation, configuration options, prompt format)

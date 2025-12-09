@@ -1254,9 +1254,9 @@
         "Store summaries in ContextManager",
         "Broadcast summary events to room clients"
       ],
-      "testFile": "tests/unit/transcript/summarization-service.test.ts",
+      "testFile": "tests/unit/ai/summarization-service.test.ts",
       "dependencies": ["FEAT-503"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-505",
@@ -1449,7 +1449,7 @@
     "phase4": 11,
     "phase5": 18,
     "phase6": 14,
-    "passed": 65,
-    "pending": 10
+    "passed": 66,
+    "pending": 9
   }
 }
