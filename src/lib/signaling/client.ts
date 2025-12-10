@@ -428,6 +428,44 @@ export class SignalingClient {
   }
 
   /**
+   * Request manual summary generation for a room
+   */
+  public requestSummaryGeneration(
+    roomId: string,
+    callback?: (response: { success: boolean; error?: string }) => void,
+  ): void {
+    if (!this.socket?.connected) return;
+    if (callback) {
+      this.socket.emit("transcript:generate-summary", { roomId }, callback);
+    } else {
+      this.socket.emit("transcript:generate-summary", { roomId });
+    }
+  }
+
+  /**
+   * Send ambient transcript to server (from client-side speech recognition)
+   */
+  public sendAmbientTranscript(payload: {
+    roomId: string;
+    peerId: string;
+    displayName: string;
+    transcript: string;
+    isFinal: boolean;
+    timestamp: string;
+  }): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit("transcript:ambient", payload);
+  }
+
+  /**
+   * Generic emit method for custom events
+   */
+  public emit(event: string, payload: unknown): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit(event, payload);
+  }
+
+  /**
    * Register event handler
    */
   public on<K extends keyof SignalingEventHandlers>(

@@ -42,6 +42,7 @@ import { useRoomAudio } from "@/hooks/useRoomAudio";
 import { usePresence } from "@/hooks/usePresence";
 import { useSharedAI } from "@/hooks/useSharedAI";
 import { useTranscript } from "@/hooks/useTranscript";
+import { useAmbientTranscription } from "@/hooks/useAmbientTranscription";
 import type { AIResponseState } from "@/types/voice-mode";
 
 /**
@@ -276,10 +277,36 @@ export default function RoomPage() {
   );
 
   // Transcript hook - manages transcript state and real-time updates
+  // Only pass client when isInRoom to ensure socket has joined room before requesting history
   const transcript = useTranscript({
     roomId,
-    client: getClient(),
+    client: isInRoom ? getClient() : null,
   });
+
+  // Ambient transcription hook - captures non-PTT speech for transcript and AI context
+  // Uses browser's Web Speech API (zero cost) and pauses during PTT
+  const ambientTranscription = useAmbientTranscription({
+    roomId,
+    peerId: localPeer?.id ?? null,
+    displayName: localPeer?.displayName ?? "Unknown",
+    client: isInRoom ? getClient() : null,
+    enabled: isInRoom && !localIsMuted, // Only transcribe when in room and unmuted
+    isPTTActive: isAddressingAI, // Pause during PTT to avoid duplicate transcription
+  });
+
+  // Auto-start ambient transcription when joining room (if unmuted)
+  useEffect(() => {
+    if (
+      isInRoom &&
+      !localIsMuted &&
+      ambientTranscription.isSupported &&
+      !ambientTranscription.isActive
+    ) {
+      ambientTranscription.start();
+    } else if ((!isInRoom || localIsMuted) && ambientTranscription.isActive) {
+      ambientTranscription.stop();
+    }
+  }, [isInRoom, localIsMuted, ambientTranscription]);
 
   // Determine if AI is actually speaking
   // Use isPlaying as primary indicator - server state may go idle before audio buffer finishes

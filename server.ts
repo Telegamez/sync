@@ -297,13 +297,172 @@ import {
   ContextManager,
   type ConversationMessage,
 } from "./src/server/signaling/context-manager";
-import type { TranscriptEntry } from "./src/types/transcript";
+import type {
+  TranscriptEntry,
+  TranscriptSummary,
+} from "./src/types/transcript";
+import OpenAI from "openai";
+
+// Initialize OpenAI client for text completions (summaries)
+const openaiClient = OPENAI_API_KEY
+  ? new OpenAI({ apiKey: OPENAI_API_KEY })
+  : null;
 
 /** Room context managers for conversation history */
 const roomContextManagers = new Map<string, ContextManager>();
 
 /** Module-level io reference for transcript broadcasting */
 let socketIO: SocketIOServer | null = null;
+
+/** Track last summary time per room for time-based triggering */
+const lastSummaryTime = new Map<string, Date>();
+
+/** Summary configuration */
+const SUMMARY_CONFIG = {
+  /** Minimum entries before generating a summary */
+  minEntriesForSummary: 6,
+  /** Minimum time between summaries (5 minutes) */
+  minTimeBetweenSummaries: 5 * 60 * 1000,
+  /** Maximum entries before forcing a summary */
+  maxEntriesBeforeSummary: 20,
+  /** Model to use for summary generation */
+  summaryModel: "gpt-4o-mini" as const,
+};
+
+/**
+ * Generate AI-powered summary using OpenAI Responses API
+ *
+ * Using the newer Responses API (released March 2025) instead of Chat Completions
+ * for a more streamlined interface and future-proofing.
+ */
+async function generateAISummary(
+  roomId: string,
+  messages: ConversationMessage[],
+): Promise<string> {
+  if (!openaiClient) {
+    console.log(
+      `[Summary] No OpenAI client - using fallback summary for room ${roomId}`,
+    );
+    return generateFallbackSummary(messages);
+  }
+
+  try {
+    // Format messages for the summary prompt
+    const conversationText = messages
+      .map((msg) => {
+        const speaker =
+          msg.speakerName || (msg.role === "assistant" ? "AI" : "System");
+        const time = msg.timestamp.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+        return `[${time}] ${speaker}: ${msg.content}`;
+      })
+      .join("\n");
+
+    // Use OpenAI Responses API (newer, streamlined API)
+    const response = await openaiClient.responses.create({
+      model: SUMMARY_CONFIG.summaryModel,
+      instructions: `You are a meeting summarizer. Create a concise summary of the conversation that captures:
+1. Main topics discussed
+2. Key decisions or conclusions reached
+3. Action items or next steps mentioned
+4. Important questions raised
+
+Format the summary as a brief paragraph (2-4 sentences) followed by 3-5 bullet points for key takeaways.
+Keep the total summary under 200 words. Be factual and neutral.`,
+      input: `Summarize this conversation:\n\n${conversationText}`,
+      max_output_tokens: 500,
+      temperature: 0.3,
+    });
+
+    const summary = response.output_text;
+    if (!summary) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    console.log(
+      `[Summary] Generated AI summary for room ${roomId}: ${summary.length} chars`,
+    );
+    return summary;
+  } catch (error) {
+    console.error(
+      `[Summary] Failed to generate AI summary for room ${roomId}:`,
+      error,
+    );
+    // Fall back to simple summary on error
+    return generateFallbackSummary(messages);
+  }
+}
+
+/**
+ * Generate fallback summary without AI
+ */
+function generateFallbackSummary(messages: ConversationMessage[]): string {
+  const speakers = new Set<string>();
+  const topics: string[] = [];
+
+  for (const message of messages) {
+    if (message.speakerName) {
+      speakers.add(message.speakerName);
+    }
+    // Extract first sentence as topic hint
+    const firstSentence = message.content.split(/[.!?]/)[0];
+    if (firstSentence && firstSentence.length > 10) {
+      topics.push(firstSentence.substring(0, 50));
+    }
+  }
+
+  const speakerList = Array.from(speakers).join(", ");
+  const aiResponses = messages.filter((m) => m.role === "assistant").length;
+  const userMessages = messages.filter((m) => m.role === "user").length;
+
+  let summary = `Conversation with ${speakers.size} participant${speakers.size !== 1 ? "s" : ""} (${speakerList || "participants"}).`;
+  summary += ` ${userMessages} user message${userMessages !== 1 ? "s" : ""} and ${aiResponses} AI response${aiResponses !== 1 ? "s" : ""}.`;
+
+  if (topics.length > 0) {
+    summary += `\n\nKey points discussed:\n`;
+    summary += topics
+      .slice(0, 5)
+      .map((t) => `• ${t}...`)
+      .join("\n");
+  }
+
+  return summary;
+}
+
+/**
+ * Check if a summary should be generated based on time and entry count
+ */
+function shouldGenerateSummary(roomId: string, messageCount: number): boolean {
+  const lastTime = lastSummaryTime.get(roomId);
+  const now = new Date();
+
+  // Force summary if max entries exceeded
+  if (messageCount >= SUMMARY_CONFIG.maxEntriesBeforeSummary) {
+    console.log(
+      `[Summary] Room ${roomId}: Max entries reached (${messageCount}), forcing summary`,
+    );
+    return true;
+  }
+
+  // Check minimum entries
+  if (messageCount < SUMMARY_CONFIG.minEntriesForSummary) {
+    return false;
+  }
+
+  // Check minimum time between summaries
+  if (lastTime) {
+    const timeSinceLastSummary = now.getTime() - lastTime.getTime();
+    if (timeSinceLastSummary < SUMMARY_CONFIG.minTimeBetweenSummaries) {
+      return false;
+    }
+  }
+
+  // Generate summary if we have enough entries and enough time has passed
+  return true;
+}
 
 /**
  * Get or create a context manager for a room
@@ -323,6 +482,24 @@ function getOrCreateContextManager(roomId: string): ContextManager {
           console.log(
             `[ContextManager] Room ${rid}: Added ${message.role} message from ${message.speakerName || "AI"}`,
           );
+
+          // Check if we should trigger a summary based on entry count and time
+          const currentCm = roomContextManagers.get(rid);
+          if (currentCm) {
+            const messageCount = currentCm.getEntryCount(rid);
+            if (shouldGenerateSummary(rid, messageCount)) {
+              console.log(
+                `[Summary] Room ${rid}: Triggering summary (${messageCount} messages)`,
+              );
+              // Trigger async summarization
+              currentCm.summarize(rid).catch((error) => {
+                console.error(
+                  `[Summary] Failed to generate summary for room ${rid}:`,
+                  error,
+                );
+              });
+            }
+          }
         },
         onContextSummarized: (rid, summary) => {
           console.log(
@@ -334,12 +511,33 @@ function getOrCreateContextManager(roomId: string): ContextManager {
             `[ContextManager] Room ${rid}: Near token limit (${tokenCount} tokens)`,
           );
         },
+        // AI-powered summary generation
+        onSummaryNeeded: async (
+          rid: string,
+          messages: ConversationMessage[],
+        ) => {
+          console.log(
+            `[Summary] Generating AI summary for room ${rid} (${messages.length} messages)`,
+          );
+          const summary = await generateAISummary(rid, messages);
+          lastSummaryTime.set(rid, new Date());
+          return summary;
+        },
         // FEAT-505: Broadcast transcript entries to clients via Socket.io
         onTranscriptEntry: (rid: string, entry: TranscriptEntry) => {
           if (socketIO) {
             socketIO.to(rid).emit("transcript:entry", { entry });
             console.log(
               `[Transcript] Broadcast entry to room ${rid}: ${entry.speaker} (${entry.type})`,
+            );
+          }
+        },
+        // FEAT-505: Broadcast transcript summaries to clients via Socket.io
+        onTranscriptSummary: (rid: string, summary: TranscriptSummary) => {
+          if (socketIO) {
+            socketIO.to(rid).emit("transcript:summary", { summary });
+            console.log(
+              `[Transcript] Broadcast summary to room ${rid}: ${summary.entriesSummarized} entries summarized`,
             );
           }
         },
@@ -360,6 +558,7 @@ function cleanupContextManager(roomId: string): void {
   if (cm) {
     cm.removeRoom(roomId);
     roomContextManagers.delete(roomId);
+    lastSummaryTime.delete(roomId);
     console.log(
       `[ContextManager] Cleaned up context manager for room ${roomId}`,
     );
@@ -1564,6 +1763,216 @@ app
             }
             console.log(`[Socket.io] Broadcast AI state: idle (simulated)`);
           }, 2000);
+        }
+      });
+
+      // ============================================================
+      // TRANSCRIPT EVENTS
+      // ============================================================
+
+      // Handle transcript history request
+      socket.on("transcript:request-history", (payload, callback) => {
+        const {
+          roomId,
+          limit = 50,
+          beforeId,
+          includeSummaries = true,
+        } = payload;
+        const socketRoomId = (socket as any).roomId;
+
+        console.log(
+          `[Transcript] History request for room ${roomId} from socket in room ${socketRoomId}`,
+        );
+
+        // Verify socket is in the room
+        if (socketRoomId !== roomId) {
+          console.log(
+            `[Transcript] History request denied - socket not in room ${roomId}`,
+          );
+          const emptyResponse = {
+            entries: [],
+            summaries: [],
+            hasMore: false,
+            totalEntries: 0,
+          };
+          if (callback) {
+            callback(emptyResponse);
+          } else {
+            socket.emit("transcript:history", emptyResponse);
+          }
+          return;
+        }
+
+        // Get context manager for this room
+        const cm = roomContextManagers.get(roomId);
+        if (!cm) {
+          console.log(`[Transcript] No context manager for room ${roomId}`);
+          const emptyResponse = {
+            entries: [],
+            summaries: [],
+            hasMore: false,
+            totalEntries: 0,
+          };
+          if (callback) {
+            callback(emptyResponse);
+          } else {
+            socket.emit("transcript:history", emptyResponse);
+          }
+          return;
+        }
+
+        // Get transcript entries from context manager
+        const { entries, hasMore, total } = cm.getTranscriptEntries(
+          roomId,
+          limit,
+          0,
+          beforeId,
+        );
+
+        // Get summaries if requested
+        const summaries = includeSummaries
+          ? cm.getTranscriptSummaries(roomId)
+          : [];
+
+        const response = {
+          entries,
+          summaries,
+          hasMore,
+          totalEntries: total,
+        };
+
+        console.log(
+          `[Transcript] Sending history for room ${roomId}: ${entries.length} entries, ${summaries.length} summaries`,
+        );
+
+        // Send response via callback or event
+        if (callback) {
+          callback(response);
+        } else {
+          socket.emit("transcript:history", response);
+        }
+      });
+
+      // Handle ambient transcript from client-side speech recognition
+      // This enables participant-to-participant conversations to be:
+      // 1. Stored in transcript panel for users to see
+      // 2. Added to ContextManager so voice AI has awareness of room conversations
+      socket.on("transcript:ambient", (payload) => {
+        const { roomId, peerId, displayName, transcript, isFinal } = payload;
+        const socketRoomId = (socket as any).roomId;
+
+        // Only process final transcripts (not partials)
+        if (!isFinal) return;
+
+        // Verify socket is in the room
+        if (socketRoomId !== roomId) {
+          console.log(
+            `[Transcript] Ambient transcript denied - socket not in room ${roomId}`,
+          );
+          return;
+        }
+
+        // Skip empty transcripts
+        if (!transcript || !transcript.trim()) return;
+
+        // Get or create context manager for this room
+        const cm = getOrCreateContextManager(roomId);
+
+        // Initialize room if not already initialized (required for addAmbientMessage to work)
+        cm.initRoom(roomId);
+
+        // Add participant if not already registered (uses addParticipant, not registerParticipant)
+        if (peerId && displayName) {
+          cm.addParticipant(roomId, peerId, displayName);
+        }
+
+        // Add ambient message to context manager
+        // This does two things:
+        // 1. Stores in messages array for buildContextInjection() → AI context
+        // 2. Triggers onTranscriptEntry callback → broadcasts to transcript panel
+        cm.addAmbientMessage(roomId, transcript.trim(), peerId);
+
+        console.log(
+          `[Transcript] Ambient transcript from ${displayName} in room ${roomId}: "${transcript.substring(0, 50)}${transcript.length > 50 ? "..." : ""}"`,
+        );
+      });
+
+      // Handle manual summary generation request
+      socket.on("transcript:generate-summary", async (payload, callback) => {
+        const { roomId } = payload;
+        const socketRoomId = (socket as any).roomId;
+
+        console.log(`[Summary] Manual summary request for room ${roomId}`);
+
+        // Verify socket is in the room
+        if (socketRoomId !== roomId) {
+          console.log(
+            `[Summary] Request denied - socket not in room ${roomId}`,
+          );
+          if (callback) {
+            callback({ success: false, error: "Not in room" });
+          }
+          return;
+        }
+
+        // Get context manager for this room
+        const cm = roomContextManagers.get(roomId);
+        if (!cm) {
+          console.log(`[Summary] No context manager for room ${roomId}`);
+          if (callback) {
+            callback({ success: false, error: "No transcript data" });
+          }
+          return;
+        }
+
+        // Check if there are enough messages to summarize
+        const messageCount = cm.getEntryCount(roomId);
+        if (messageCount < 2) {
+          console.log(
+            `[Summary] Not enough messages to summarize (${messageCount})`,
+          );
+          if (callback) {
+            callback({
+              success: false,
+              error: "Not enough messages to summarize",
+            });
+          }
+          return;
+        }
+
+        try {
+          // Trigger summarization (will broadcast via onTranscriptSummary callback)
+          const result = await cm.summarize(roomId);
+          if (result) {
+            lastSummaryTime.set(roomId, new Date());
+            console.log(
+              `[Summary] Manual summary generated for room ${roomId}`,
+            );
+            if (callback) {
+              callback({ success: true });
+            }
+          } else {
+            if (callback) {
+              callback({
+                success: false,
+                error: "Summary generation returned null",
+              });
+            }
+          }
+        } catch (error) {
+          console.error(
+            `[Summary] Manual summary failed for room ${roomId}:`,
+            error,
+          );
+          if (callback) {
+            callback({
+              success: false,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Summary generation failed",
+            });
+          }
         }
       });
 

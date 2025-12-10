@@ -62,6 +62,10 @@ export interface UseTranscriptReturn extends TranscriptState {
   clearError: () => void;
   /** Refresh transcript (re-fetch history) */
   refresh: () => void;
+  /** Generate summary manually */
+  generateSummary: () => Promise<boolean>;
+  /** Whether summary generation is in progress */
+  isGeneratingSummary: boolean;
 }
 
 /**
@@ -249,6 +253,7 @@ export function useTranscript(
   const [summaries, setSummaries] = useState<TranscriptSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [autoScroll, setAutoScrollState] = useState(autoScrollDefault);
@@ -292,6 +297,13 @@ export function useTranscript(
    */
   const handleTranscriptHistory = useCallback(
     (payload: TranscriptHistoryResponse) => {
+      console.log("[useTranscript] Received transcript history", {
+        entriesCount: payload.entries.length,
+        summariesCount: payload.summaries.length,
+        totalEntries: payload.totalEntries,
+        initialLoadDone: initialLoadDone.current,
+      });
+
       if (!initialLoadDone.current) {
         // Initial load - replace entries
         setEntries(payload.entries);
@@ -342,8 +354,18 @@ export function useTranscript(
    * Request initial history on mount
    */
   useEffect(() => {
+    console.log("[useTranscript] History effect triggered", {
+      hasClient: !!client,
+      roomId,
+      initialLoadDone: initialLoadDone.current,
+    });
+
     if (!client || !roomId || initialLoadDone.current) return;
 
+    console.log(
+      "[useTranscript] Requesting transcript history for room",
+      roomId,
+    );
     setIsLoading(true);
     client.requestTranscriptHistory({
       roomId,
@@ -478,12 +500,42 @@ export function useTranscript(
     });
   }, [client, roomId, initialLimit]);
 
+  /**
+   * Generate summary manually
+   */
+  const generateSummary = useCallback(async (): Promise<boolean> => {
+    if (!client || !roomId || isGeneratingSummary) {
+      return false;
+    }
+
+    setIsGeneratingSummary(true);
+
+    return new Promise((resolve) => {
+      client.requestSummaryGeneration(roomId, (response) => {
+        setIsGeneratingSummary(false);
+        if (response.success) {
+          resolve(true);
+        } else {
+          setError(response.error || "Summary generation failed");
+          resolve(false);
+        }
+      });
+
+      // Timeout after 30 seconds
+      setTimeout(() => {
+        setIsGeneratingSummary(false);
+        resolve(false);
+      }, 30000);
+    });
+  }, [client, roomId, isGeneratingSummary]);
+
   return {
     // State
     entries,
     summaries,
     isLoading,
     isLoadingMore,
+    isGeneratingSummary,
     error,
     hasMore,
     autoScroll,
@@ -499,6 +551,7 @@ export function useTranscript(
     copyToClipboard,
     clearError,
     refresh,
+    generateSummary,
   };
 }
 

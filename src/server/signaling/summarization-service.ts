@@ -1,8 +1,11 @@
 /**
  * Summarization Service
  *
- * Periodic conversation summarization using gpt-4o-mini.
+ * Periodic conversation summarization using gpt-4o-mini via OpenAI Responses API.
  * Monitors transcript entry count and time to trigger summaries.
+ *
+ * Uses the newer Responses API (released March 2025) instead of Chat Completions
+ * for a more streamlined interface and future-proofing.
  *
  * Part of the Long-Horizon Engineering Protocol - FEAT-504
  */
@@ -292,26 +295,20 @@ export class SummarizationService {
       // Format transcript for summarization
       const transcriptText = this.formatTranscript(entries);
 
-      // Call OpenAI
-      const response = await this.openai.chat.completions.create({
+      // Call OpenAI Responses API (newer, streamlined API)
+      const response = await this.openai.responses.create({
         model: SUMMARIZATION_MODEL,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a meeting note summarizer. Always respond with valid JSON.",
-          },
-          {
-            role: "user",
-            content: SUMMARIZATION_PROMPT + transcriptText,
-          },
-        ],
+        instructions:
+          "You are a meeting note summarizer. Always respond with valid JSON matching the requested format exactly.",
+        input: SUMMARIZATION_PROMPT + transcriptText,
         temperature: this.config.temperature ?? 0.3,
-        max_tokens: this.config.maxSummaryTokens ?? 500,
-        response_format: { type: "json_object" },
+        max_output_tokens: this.config.maxSummaryTokens ?? 500,
+        text: {
+          format: { type: "json_object" },
+        },
       });
 
-      const content = response.choices[0]?.message?.content;
+      const content = response.output_text;
       if (!content) {
         throw new Error("Empty response from OpenAI");
       }
