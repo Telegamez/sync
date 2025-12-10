@@ -144,6 +144,9 @@ export interface TranscriptState {
   /** Loading state for pagination */
   isLoadingMore: boolean;
 
+  /** Loading state for summary generation */
+  isGeneratingSummary?: boolean;
+
   /** Error state */
   error: string | null;
 

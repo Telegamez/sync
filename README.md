@@ -205,3 +205,22 @@ Participant C ◄─────────────────────
 ```
 
 All participants in a room hear the same AI response simultaneously.
+
+Current Architecture
+
+1. Client-Side WebRTC (Single User) - useSwensyncRealtime hook
+   Uses native WebRTC (RTCPeerConnection) directly with OpenAI Realtime API
+   Gets ephemeral token from /api/swensync-realtime-token
+   Direct browser ↔ OpenAI connection
+   Used for single-user Swensync overlay experience
+2. Server-Side WebSocket (Multi-User Rooms) - OpenAIRealtimeClient
+   Uses WebSocket (wss://api.openai.com/v1/realtime) from the server
+   Server acts as intermediary for multiple room participants
+   Audio is relayed: Participants → Server → OpenAI → Server → Participants
+   Used for shared AI rooms with PTT (Push-to-Talk)
+   API Summary
+   Component Transport API Model Purpose
+   Client Swensync WebRTC Realtime API gpt-4o-realtime-preview Single-user voice agent
+   Room AI (server) WebSocket Realtime API gpt-4o-realtime-preview Multi-user shared AI
+   Transcription WebSocket Realtime API gpt-4o-mini-transcribe Real-time STT
+   Summaries HTTP Responses API gpt-4o-mini Text generation

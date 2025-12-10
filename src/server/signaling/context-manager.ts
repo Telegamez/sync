@@ -642,6 +642,16 @@ export class ContextManager {
 
       this.callbacks.onContextSummarized?.(roomId, summary);
 
+      // FEAT-505: Broadcast transcript summary to clients
+      if (this.callbacks.onTranscriptSummary) {
+        const transcriptSummary = this.contextSummaryToTranscriptSummary(
+          summary,
+          roomId,
+          context.summaries.length - 1,
+        );
+        this.callbacks.onTranscriptSummary(roomId, transcriptSummary);
+      }
+
       return summary;
     } catch (error) {
       const message =
