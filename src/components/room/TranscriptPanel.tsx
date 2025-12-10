@@ -38,7 +38,7 @@ import { formatRelativeTime, formatEntryTimestamp } from "@/types/transcript";
  * TranscriptPanel props
  */
 export interface TranscriptPanelProps {
-  /** Transcript entries (newest last) */
+  /** Transcript entries */
   entries: TranscriptEntry[];
   /** Transcript summaries */
   summaries: TranscriptSummary[];
@@ -256,7 +256,7 @@ export function TranscriptPanel({
   const [isDownloading, setIsDownloading] = useState(false);
   const prevEntriesLength = useRef(entries.length);
 
-  // Merge entries and summaries chronologically
+  // Merge entries and summaries reverse-chronologically (newest first)
   const chronologicalItems = useMemo(() => {
     const items: Array<
       | { type: "entry"; data: TranscriptEntry; timestamp: Date }
@@ -273,22 +273,23 @@ export function TranscriptPanel({
         timestamp: new Date(s.timestamp),
       })),
     ];
-    return items.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    // Sort newest first (descending order)
+    return items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [entries, summaries]);
 
-  // Handle scroll to detect pause
+  // Handle scroll to detect pause (newest at top, so check if at top)
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    const { scrollTop } = scrollRef.current;
+    const isAtTop = scrollTop < 50;
 
-    if (isAtBottom && showNewMessages) {
+    if (isAtTop && showNewMessages) {
       setShowNewMessages(false);
     }
   }, [showNewMessages]);
 
-  // Auto-scroll to bottom on new entries
+  // Auto-scroll to top on new entries (newest at top)
   useEffect(() => {
     if (!scrollRef.current) return;
 
@@ -297,29 +298,30 @@ export function TranscriptPanel({
 
     if (hasNewEntries) {
       if (autoScroll) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        // Scroll to top where newest entries are
+        scrollRef.current.scrollTop = 0;
       } else {
-        // Show new messages indicator if not at bottom
-        const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-        const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-        if (!isAtBottom) {
+        // Show new messages indicator if not at top
+        const { scrollTop } = scrollRef.current;
+        const isAtTop = scrollTop < 50;
+        if (!isAtTop) {
           setShowNewMessages(true);
         }
       }
     }
   }, [entries, autoScroll]);
 
-  // Scroll to bottom on initial load
+  // Scroll to top on initial load (newest at top)
   useEffect(() => {
     if (!isLoading && scrollRef.current && autoScroll) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTop = 0;
     }
   }, [isLoading, autoScroll]);
 
-  // Handle scroll to bottom button click
-  const handleScrollToBottom = useCallback(() => {
+  // Handle scroll to top button click (for new messages)
+  const handleScrollToTop = useCallback(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTop = 0;
       setShowNewMessages(false);
     }
   }, []);
@@ -448,26 +450,6 @@ export function TranscriptPanel({
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto min-h-0"
       >
-        {/* Load more button */}
-        {hasMore && !isLoading && (
-          <div className="p-2 text-center">
-            <button
-              onClick={onLoadMore}
-              disabled={isLoadingMore}
-              className="text-xs text-blue-400 hover:text-blue-300 disabled:text-gray-500 flex items-center justify-center gap-1 mx-auto"
-            >
-              {isLoadingMore ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Load older messages"
-              )}
-            </button>
-          </div>
-        )}
-
         {/* Loading state */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
@@ -494,15 +476,35 @@ export function TranscriptPanel({
             )}
           </div>
         )}
+
+        {/* Load older messages button (at bottom since oldest is at bottom) */}
+        {hasMore && !isLoading && (
+          <div className="p-2 text-center border-t border-gray-700/30">
+            <button
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="text-xs text-blue-400 hover:text-blue-300 disabled:text-gray-500 flex items-center justify-center gap-1 mx-auto"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Load older messages"
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* New messages indicator */}
+      {/* New messages indicator (scroll to top) */}
       {showNewMessages && (
         <button
-          onClick={handleScrollToBottom}
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-full shadow-lg flex items-center gap-1 hover:bg-blue-600 transition-colors"
+          onClick={handleScrollToTop}
+          className="absolute top-16 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-full shadow-lg flex items-center gap-1 hover:bg-blue-600 transition-colors z-10"
         >
-          <ArrowDown className="w-3 h-3" />
+          <ArrowDown className="w-3 h-3 rotate-180" />
           New messages
         </button>
       )}
