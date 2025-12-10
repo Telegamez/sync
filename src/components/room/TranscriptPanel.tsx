@@ -26,6 +26,8 @@ import {
   ArrowDown,
   X,
   FileText,
+  Pause,
+  Play,
 } from "lucide-react";
 import type {
   TranscriptEntry,
@@ -66,10 +68,12 @@ export interface TranscriptPanelProps {
   onCopy: () => Promise<boolean>;
   /** Callback to clear error */
   onClearError: () => void;
-  /** Whether panel is collapsed */
-  isCollapsed?: boolean;
-  /** Callback when collapse state changes */
-  onCollapseChange?: (collapsed: boolean) => void;
+  /** Callback to close the panel */
+  onClose?: () => void;
+  /** Whether transcription is currently active */
+  isTranscribing?: boolean;
+  /** Callback to toggle transcription on/off */
+  onToggleTranscription?: () => void;
   /** Panel title */
   title?: string;
   /** Show as mobile bottom sheet */
@@ -241,8 +245,9 @@ export function TranscriptPanel({
   onDownloadMd,
   onCopy,
   onClearError,
-  isCollapsed = false,
-  onCollapseChange,
+  onClose,
+  isTranscribing = true,
+  onToggleTranscription,
   title = "Transcript",
   mobileSheet = false,
   className = "",
@@ -365,35 +370,10 @@ export function TranscriptPanel({
     });
   }, []);
 
-  // Handle collapse toggle
-  const handleCollapseToggle = useCallback(() => {
-    onCollapseChange?.(!isCollapsed);
-  }, [isCollapsed, onCollapseChange]);
-
-  // Mobile sheet styles
+  // Mobile sheet styles - bottom-24 keeps panel above the footer controls
   const containerClasses = mobileSheet
-    ? "fixed inset-x-0 bottom-0 z-50 bg-gray-900 rounded-t-2xl shadow-2xl border-t border-gray-700 max-h-[70vh] flex flex-col"
+    ? "fixed inset-x-0 bottom-24 z-50 bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 mx-2 max-h-[60vh] flex flex-col"
     : `bg-gray-900/80 backdrop-blur-sm rounded-lg border border-gray-700/50 flex flex-col ${className}`;
-
-  if (isCollapsed) {
-    return (
-      <div className={containerClasses}>
-        <button
-          onClick={handleCollapseToggle}
-          className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-300">{title}</span>
-            <span className="text-xs text-gray-500">
-              ({totalEntries} entries)
-            </span>
-          </div>
-          <ChevronUp className="w-4 h-4 text-gray-400" />
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className={containerClasses}>
@@ -407,6 +387,32 @@ export function TranscriptPanel({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Transcription toggle */}
+          {onToggleTranscription && (
+            <button
+              onClick={onToggleTranscription}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                isTranscribing
+                  ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                  : "bg-gray-700/50 text-gray-400 hover:bg-gray-700"
+              }`}
+              title={
+                isTranscribing ? "Pause transcription" : "Resume transcription"
+              }
+            >
+              {isTranscribing ? (
+                <>
+                  <Pause className="w-3 h-3" />
+                  <span className="hidden sm:inline">Recording</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3" />
+                  <span className="hidden sm:inline">Paused</span>
+                </>
+              )}
+            </button>
+          )}
           {/* Auto-scroll toggle */}
           <button
             onClick={onToggleAutoScroll}
@@ -419,13 +425,13 @@ export function TranscriptPanel({
           >
             {autoScroll ? "Auto" : "Manual"}
           </button>
-          {onCollapseChange && (
+          {onClose && (
             <button
-              onClick={handleCollapseToggle}
+              onClick={onClose}
               className="p-1 hover:bg-gray-700/50 rounded transition-colors"
-              title="Collapse panel"
+              title="Close panel"
             >
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+              <X className="w-4 h-4 text-gray-400" />
             </button>
           )}
         </div>

@@ -40,6 +40,7 @@ function validateCreateRequest(body: unknown): {
     aiTopic,
     customInstructions,
     voiceSettings,
+    transcriptSettings,
   } = body as CreateRoomRequest;
 
   // Validate name
@@ -110,6 +111,14 @@ function validateCreateRequest(body: unknown): {
     return { valid: false, error: "voiceSettings must be an object" };
   }
 
+  // Validate transcriptSettings (optional, basic validation)
+  if (
+    transcriptSettings !== undefined &&
+    typeof transcriptSettings !== "object"
+  ) {
+    return { valid: false, error: "transcriptSettings must be an object" };
+  }
+
   return {
     valid: true,
     data: {
@@ -120,6 +129,7 @@ function validateCreateRequest(body: unknown): {
       aiTopic: aiTopic?.trim(),
       customInstructions: customInstructions?.trim(),
       voiceSettings,
+      transcriptSettings,
     },
   };
 }

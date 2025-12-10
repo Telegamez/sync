@@ -55,7 +55,7 @@ describe("FEAT-508: TranscriptPanel Component", () => {
   const mockOnDownloadMd = vi.fn().mockResolvedValue(undefined);
   const mockOnCopy = vi.fn().mockResolvedValue(true);
   const mockOnClearError = vi.fn();
-  const mockOnCollapseChange = vi.fn();
+  const mockOnClose = vi.fn();
 
   const defaultProps: TranscriptPanelProps = {
     entries: [],
@@ -166,67 +166,22 @@ describe("FEAT-508: TranscriptPanel Component", () => {
       expect(mockOnToggleAutoScroll).toHaveBeenCalled();
     });
 
-    it("should show collapse button when onCollapseChange provided", () => {
-      render(
-        <TranscriptPanel
-          {...defaultProps}
-          onCollapseChange={mockOnCollapseChange}
-        />,
-      );
+    it("should show close button when onClose provided", () => {
+      render(<TranscriptPanel {...defaultProps} onClose={mockOnClose} />);
 
-      // Collapse button should be present
-      const buttons = screen.getAllByRole("button");
-      expect(buttons.length).toBeGreaterThan(1);
+      // Close button should be present
+      const closeButton = screen.getByTitle("Close panel");
+      expect(closeButton).toBeInTheDocument();
     });
 
-    it("should call onCollapseChange when collapse clicked", () => {
-      render(
-        <TranscriptPanel
-          {...defaultProps}
-          onCollapseChange={mockOnCollapseChange}
-          isCollapsed={false}
-        />,
-      );
+    it("should call onClose when close clicked", () => {
+      render(<TranscriptPanel {...defaultProps} onClose={mockOnClose} />);
 
-      // Find and click collapse button (has ChevronDown icon)
-      const collapseButton = screen.getByTitle("Collapse panel");
-      fireEvent.click(collapseButton);
+      // Find and click close button
+      const closeButton = screen.getByTitle("Close panel");
+      fireEvent.click(closeButton);
 
-      expect(mockOnCollapseChange).toHaveBeenCalledWith(true);
-    });
-  });
-
-  describe("Collapsed state", () => {
-    it("should render collapsed view", () => {
-      render(
-        <TranscriptPanel
-          {...defaultProps}
-          isCollapsed={true}
-          onCollapseChange={mockOnCollapseChange}
-          totalEntries={10}
-        />,
-      );
-
-      expect(screen.getByText("Transcript")).toBeInTheDocument();
-      expect(screen.getByText("(10 entries)")).toBeInTheDocument();
-    });
-
-    it("should expand when collapsed header clicked", () => {
-      render(
-        <TranscriptPanel
-          {...defaultProps}
-          isCollapsed={true}
-          onCollapseChange={mockOnCollapseChange}
-        />,
-      );
-
-      const header =
-        screen.getByText("Transcript").parentElement?.parentElement;
-      if (header) {
-        fireEvent.click(header);
-      }
-
-      expect(mockOnCollapseChange).toHaveBeenCalledWith(false);
+      expect(mockOnClose).toHaveBeenCalled();
     });
   });
 

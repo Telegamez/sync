@@ -60,6 +60,25 @@ type AIPersonality =
   | "brainstorm"
   | "custom";
 
+/** Transcript retention type */
+type TranscriptRetention = "session" | "7days" | "30days";
+
+/** Room transcript settings */
+interface RoomTranscriptSettings {
+  enabled: boolean;
+  summariesEnabled: boolean;
+  retention: TranscriptRetention;
+  allowDownload: boolean;
+}
+
+/** Default transcript settings */
+const DEFAULT_TRANSCRIPT_SETTINGS: RoomTranscriptSettings = {
+  enabled: true,
+  summariesEnabled: true,
+  retention: "session",
+  allowDownload: true,
+};
+
 interface Room {
   id: string;
   name: string;
@@ -70,6 +89,7 @@ interface Room {
   aiPersonality: AIPersonality;
   aiTopic?: string;
   customInstructions?: string;
+  transcriptSettings: RoomTranscriptSettings;
 }
 
 // ============================================================
@@ -96,6 +116,11 @@ interface RoomAISession {
   isInterrupted: boolean;
   // Track which response we're expecting audio from (to ignore stale responses)
   expectedResponseId: string | null;
+  // FEAT-502: Track last speaker for deferred input transcription
+  // OpenAI's input_audio_transcription.completed often arrives AFTER response.done
+  // We preserve speaker info here so long PTT audio can still be attributed correctly
+  lastSpeakerId: string | null;
+  lastSpeakerName: string | null;
 }
 
 /** OpenAI Realtime WebSocket endpoint */
@@ -683,6 +708,7 @@ function createRoom(
   aiPersonality: AIPersonality = "assistant",
   aiTopic?: string,
   customInstructions?: string,
+  transcriptSettings?: Partial<RoomTranscriptSettings>,
 ): Room {
   const room: Room = {
     id: roomId,
@@ -694,6 +720,10 @@ function createRoom(
     aiPersonality,
     aiTopic,
     customInstructions,
+    transcriptSettings: {
+      ...DEFAULT_TRANSCRIPT_SETTINGS,
+      ...transcriptSettings,
+    },
   };
   rooms.set(roomId, room);
   return room;
@@ -738,6 +768,8 @@ function getOrCreateAISession(
     customInstructions,
     isInterrupted: false,
     expectedResponseId: null,
+    lastSpeakerId: null,
+    lastSpeakerName: null,
   };
 
   roomAISessions.set(roomId, session);
@@ -865,10 +897,42 @@ function handleOpenAIMessage(
       "response.created",
       "response.done",
       "response.audio.done",
+      "conversation.item.input_audio_transcription.completed",
+      "conversation.item.input_audio_transcription.failed",
     ];
 
     if (importantEvents.includes(event.type)) {
       console.log(`[OpenAI] Room ${session.roomId}: ${event.type}`);
+    }
+
+    // Also log any unhandled events for debugging
+    const handledEvents = [
+      "session.created",
+      "session.updated",
+      "response.created",
+      "response.audio.delta",
+      "response.audio.done",
+      "response.audio_transcript.done",
+      "conversation.item.input_audio_transcription.completed",
+      "conversation.item.input_audio_transcription.failed",
+      "response.done",
+      "error",
+      "input_audio_buffer.speech_started",
+      "input_audio_buffer.speech_stopped",
+      "input_audio_buffer.committed",
+      "input_audio_buffer.cleared",
+      "conversation.item.created",
+      "response.output_item.added",
+      "response.output_item.done",
+      "response.content_part.added",
+      "response.content_part.done",
+      "response.audio_transcript.delta",
+      "rate_limits.updated",
+    ];
+    if (!handledEvents.includes(event.type)) {
+      console.log(
+        `[OpenAI] Room ${session.roomId}: UNHANDLED event type: ${event.type}`,
+      );
     }
 
     switch (event.type) {
@@ -948,24 +1012,39 @@ function handleOpenAIMessage(
         break;
 
       // FEAT-501: Capture user speech transcript from input transcription
+      // FEAT-502: Handle deferred transcription (arrives after response.done for long audio)
       case "conversation.item.input_audio_transcription.completed":
         if (event.transcript) {
+          // Use activeSpeakerId if available, otherwise fall back to lastSpeakerId
+          // This handles the case where transcription arrives after response.done clears activeSpeakerId
+          const speakerId = session.activeSpeakerId || session.lastSpeakerId;
+          const speakerName =
+            session.activeSpeakerName || session.lastSpeakerName || "unknown";
+
           console.log(
-            `[OpenAI] Room ${session.roomId}: User transcript complete from ${session.activeSpeakerName || "unknown"} (${event.transcript.length} chars)`,
+            `[OpenAI] Room ${session.roomId}: User transcript complete from ${speakerName} (${event.transcript.length} chars)`,
           );
           // Store user message in context manager
           const userCm = roomContextManagers.get(session.roomId);
-          if (userCm && session.activeSpeakerId) {
-            userCm.addUserMessage(
-              session.roomId,
-              event.transcript,
-              session.activeSpeakerId,
-            );
+          if (userCm && speakerId) {
+            userCm.addUserMessage(session.roomId, event.transcript, speakerId);
             console.log(
-              `[ContextManager] Room ${session.roomId}: Stored user message from ${session.activeSpeakerName}`,
+              `[ContextManager] Room ${session.roomId}: Stored user message from ${speakerName}`,
+            );
+          } else {
+            console.warn(
+              `[OpenAI] Room ${session.roomId}: Cannot store transcript - no speaker ID available`,
             );
           }
         }
+        break;
+
+      // Handle transcription failures (might happen for very long audio)
+      case "conversation.item.input_audio_transcription.failed":
+        console.error(
+          `[OpenAI] Room ${session.roomId}: Input audio transcription FAILED`,
+          event.error || "Unknown error",
+        );
         break;
 
       case "response.done":
@@ -1137,9 +1216,10 @@ app
                 apiRoom.aiPersonality || "assistant",
                 apiRoom.aiTopic,
                 apiRoom.customInstructions,
+                apiRoom.transcriptSettings,
               );
               console.log(
-                `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, topic: ${apiRoom.aiTopic || "none"}`,
+                `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, topic: ${apiRoom.aiTopic || "none"}, transcript: ${apiRoom.transcriptSettings?.enabled ?? true}`,
               );
             } else {
               // API room not found, auto-create with defaults
@@ -1544,6 +1624,10 @@ app
         session.state = "listening";
         session.activeSpeakerId = peerId;
         session.activeSpeakerName = displayName;
+        // FEAT-502: Save speaker info for deferred transcription
+        // input_audio_transcription.completed often arrives AFTER response.done
+        session.lastSpeakerId = peerId;
+        session.lastSpeakerName = displayName;
 
         // Broadcast AI state: listening
         broadcastAIState(io, session);

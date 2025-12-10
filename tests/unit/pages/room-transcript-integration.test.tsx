@@ -35,7 +35,16 @@ const mockSignalingClient = {
 // Mock room connection hook
 const mockRoomConnection = {
   connectionState: "connected",
-  room: { name: "Test Room", maxParticipants: 4 },
+  room: {
+    name: "Test Room",
+    maxParticipants: 4,
+    transcriptSettings: {
+      enabled: true,
+      summariesEnabled: true,
+      retention: "session",
+      allowDownload: true,
+    },
+  },
   localPeer: {
     id: "local-peer-1",
     displayName: "Test User",
@@ -540,8 +549,11 @@ describe("FEAT-512: Room Page Transcript Integration", () => {
 
       // Check for mobile sheet (has mobileSheet prop)
       // The mobile version should have the fixed positioning classes
+      // Note: bottom-24 keeps panel above the footer controls
       await waitFor(() => {
-        const mobileSheet = document.querySelector(".fixed.inset-x-0.bottom-0");
+        const mobileSheet = document.querySelector(
+          ".fixed.inset-x-0.bottom-24",
+        );
         expect(mobileSheet).toBeInTheDocument();
       });
     });

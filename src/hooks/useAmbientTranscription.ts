@@ -43,6 +43,8 @@ export interface UseAmbientTranscriptionOptions {
   minConfidence?: number;
   /** Whether PTT is currently active (pause ambient during PTT) */
   isPTTActive?: boolean;
+  /** Whether AI is currently speaking (pause ambient to avoid echo feedback) */
+  isAISpeaking?: boolean;
 }
 
 /**
@@ -175,6 +177,7 @@ export function useAmbientTranscription(
     language = "en-US",
     minConfidence = 0.7,
     isPTTActive = false,
+    isAISpeaking = false,
   } = options;
 
   // State
@@ -189,6 +192,13 @@ export function useAmbientTranscription(
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Track actual running state to prevent race conditions
   const isRunningRef = useRef(false);
+  // Refs for pause state to avoid stale closures in callbacks
+  const isPTTActiveRef = useRef(isPTTActive);
+  const isAISpeakingRef = useRef(isAISpeaking);
+
+  // Keep refs in sync with props
+  isPTTActiveRef.current = isPTTActive;
+  isAISpeakingRef.current = isAISpeaking;
 
   /**
    * Send transcript to server
@@ -256,25 +266,32 @@ export function useAmbientTranscription(
    * Handle speech recognition error
    */
   const handleError = useCallback((event: SpeechRecognitionErrorEvent) => {
-    console.error("[AmbientTranscription] Error:", event.error, event.message);
-
     switch (event.error) {
       case "no-speech":
         // Normal - no speech detected, will restart automatically
+        // Don't log this as it's expected when user isn't speaking
+        break;
+      case "aborted":
+        // User or system stopped recognition - expected during PTT
         break;
       case "audio-capture":
+        console.warn("[AmbientTranscription] Microphone not available");
         setError("Microphone not available");
         break;
       case "not-allowed":
+        console.warn("[AmbientTranscription] Microphone permission denied");
         setError("Microphone permission denied");
         break;
       case "network":
+        console.warn("[AmbientTranscription] Network error");
         setError("Network error - check connection");
         break;
-      case "aborted":
-        // User or system stopped recognition
-        break;
       default:
+        console.error(
+          "[AmbientTranscription] Error:",
+          event.error,
+          event.message,
+        );
         setError(`Speech recognition error: ${event.error}`);
     }
   }, []);
@@ -286,27 +303,37 @@ export function useAmbientTranscription(
     isRunningRef.current = false;
     setIsActive(false);
 
-    // Auto-restart if should be active and not PTT
-    if (shouldBeActiveRef.current && !isPTTActive && enabled) {
+    // Auto-restart if should be active, not PTT, and AI not speaking
+    // Use refs to get current values and avoid stale closures
+    const shouldPause =
+      isPTTActiveRef.current || isAISpeakingRef.current || !enabled;
+
+    if (shouldBeActiveRef.current && !shouldPause) {
       // Small delay before restart to avoid rapid restart loops
       restartTimeoutRef.current = setTimeout(() => {
+        // Re-check conditions using refs for fresh values
+        const stillShouldPause =
+          isPTTActiveRef.current || isAISpeakingRef.current;
+
         if (
           recognitionRef.current &&
           shouldBeActiveRef.current &&
-          !isRunningRef.current
+          !isRunningRef.current &&
+          !stillShouldPause
         ) {
           try {
             recognitionRef.current.start();
             isRunningRef.current = true;
             setIsActive(true);
+            console.log("[AmbientTranscription] Auto-restarted after end");
           } catch (err) {
             isRunningRef.current = false;
             // Ignore - may already be started
           }
         }
-      }, 250); // Increased delay to prevent rapid restarts
+      }, 500); // Increased delay to prevent rapid restarts
     }
-  }, [isPTTActive, enabled]);
+  }, [enabled]); // Only depend on enabled - use refs for PTT/AI state
 
   /**
    * Initialize speech recognition
@@ -345,44 +372,67 @@ export function useAmbientTranscription(
   }, [isSupported, language, handleResult, handleError, handleEnd]);
 
   /**
-   * Pause during PTT
+   * Pause during PTT or AI speaking
+   * This prevents the Web Speech API from picking up:
+   * 1. PTT audio being sent to AI (would create duplicates)
+   * 2. AI audio playback through speakers (acoustic echo feedback)
    */
   useEffect(() => {
     if (!recognitionRef.current) return;
 
-    if (isPTTActive && isRunningRef.current) {
-      // Pause ambient transcription during PTT
+    const shouldPause = isPTTActive || isAISpeaking;
+
+    if (shouldPause && isRunningRef.current) {
+      // Clear any pending restart timeouts
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
+
+      // Pause ambient transcription during PTT or AI speaking
       try {
         recognitionRef.current.stop();
         isRunningRef.current = false;
         setIsActive(false);
+        console.log(
+          `[AmbientTranscription] Paused - ${isPTTActive ? "PTT active" : "AI speaking"}`,
+        );
       } catch {
         // Ignore
       }
     } else if (
-      !isPTTActive &&
+      !shouldPause &&
       shouldBeActiveRef.current &&
       !isRunningRef.current
     ) {
-      // Resume after PTT ends (with delay to avoid race)
-      setTimeout(() => {
+      // Clear any pending restart timeouts first
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
+
+      // Resume after PTT ends and AI stops speaking (with delay to avoid race)
+      restartTimeoutRef.current = setTimeout(() => {
+        // Use refs for fresh values
         if (
           recognitionRef.current &&
           shouldBeActiveRef.current &&
           !isRunningRef.current &&
-          !isPTTActive
+          !isPTTActiveRef.current &&
+          !isAISpeakingRef.current
         ) {
           try {
             recognitionRef.current.start();
             isRunningRef.current = true;
             setIsActive(true);
+            console.log("[AmbientTranscription] Resumed after pause");
           } catch {
             isRunningRef.current = false;
           }
         }
-      }, 300);
+      }, 500); // Longer delay to let audio buffers drain
     }
-  }, [isPTTActive]);
+  }, [isPTTActive, isAISpeaking]);
 
   /**
    * Start transcription
@@ -391,8 +441,20 @@ export function useAmbientTranscription(
     if (!isSupported || !recognitionRef.current || !enabled) return;
     if (isRunningRef.current) return; // Already running
 
+    // Don't start if PTT or AI is speaking - set the flag and let the effect handle resume
+    const shouldPause = isPTTActiveRef.current || isAISpeakingRef.current;
+
     shouldBeActiveRef.current = true;
     setError(null);
+
+    if (shouldPause) {
+      // Don't actually start, just mark that we want to be active
+      // The pause/resume effect will start us when conditions allow
+      console.log(
+        "[AmbientTranscription] Start requested but paused (PTT/AI speaking)",
+      );
+      return;
+    }
 
     try {
       recognitionRef.current.start();
@@ -401,8 +463,7 @@ export function useAmbientTranscription(
       console.log("[AmbientTranscription] Started");
     } catch (err) {
       isRunningRef.current = false;
-      // May already be started
-      console.warn("[AmbientTranscription] Start error:", err);
+      // May already be started - don't spam console
     }
   }, [isSupported, enabled]);
 

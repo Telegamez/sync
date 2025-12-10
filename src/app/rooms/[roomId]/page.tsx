@@ -155,7 +155,7 @@ export default function RoomPage() {
 
   // Transcript panel state
   const [showTranscript, setShowTranscript] = useState(false);
-  const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
+  const [transcriptionPaused, setTranscriptionPaused] = useState(false);
 
   // Local media stream ref
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -283,36 +283,65 @@ export default function RoomPage() {
     client: isInRoom ? getClient() : null,
   });
 
+  // Check if transcript is enabled for this room
+  const isTranscriptEnabled = room?.transcriptSettings?.enabled ?? false;
+
+  // Determine if AI is actually speaking
+  // Use isPlaying as primary indicator - server state may go idle before audio buffer finishes
+  // Also show as speaking if server says speaking (even if audio hasn't started yet)
+  // NOTE: This must be defined before useAmbientTranscription which depends on it
+  const isAIActuallySpeaking =
+    aiPlayback.isPlaying || aiState.aiState === "speaking";
+
   // Ambient transcription hook - captures non-PTT speech for transcript and AI context
-  // Uses browser's Web Speech API (zero cost) and pauses during PTT
+  // Uses browser's Web Speech API (zero cost) and pauses during PTT and AI speaking
   const ambientTranscription = useAmbientTranscription({
     roomId,
     peerId: localPeer?.id ?? null,
     displayName: localPeer?.displayName ?? "Unknown",
     client: isInRoom ? getClient() : null,
-    enabled: isInRoom && !localIsMuted, // Only transcribe when in room and unmuted
+    enabled:
+      isInRoom && !localIsMuted && !transcriptionPaused && isTranscriptEnabled, // Only transcribe when in room, unmuted, not paused, and room has transcript enabled
     isPTTActive: isAddressingAI, // Pause during PTT to avoid duplicate transcription
+    isAISpeaking: isAIActuallySpeaking, // Pause during AI playback to avoid echo feedback
   });
 
-  // Auto-start ambient transcription when joining room (if unmuted)
+  // Auto-start ambient transcription when joining room (if unmuted, not paused, and room has transcript enabled)
+  // NOTE: Do NOT auto-start when AI is speaking or PTT is active - the hook handles pause/resume internally
   useEffect(() => {
-    if (
+    const shouldBeEnabled =
       isInRoom &&
       !localIsMuted &&
+      !transcriptionPaused &&
+      isTranscriptEnabled &&
+      !isAIActuallySpeaking && // Don't start during AI playback
+      !isAddressingAI; // Don't start during PTT
+
+    if (
+      shouldBeEnabled &&
       ambientTranscription.isSupported &&
       !ambientTranscription.isActive
     ) {
       ambientTranscription.start();
-    } else if ((!isInRoom || localIsMuted) && ambientTranscription.isActive) {
+    } else if (
+      (!isInRoom ||
+        localIsMuted ||
+        transcriptionPaused ||
+        !isTranscriptEnabled) &&
+      ambientTranscription.isActive
+    ) {
+      // Only stop for actual disable conditions, not for AI speaking/PTT (hook handles those)
       ambientTranscription.stop();
     }
-  }, [isInRoom, localIsMuted, ambientTranscription]);
-
-  // Determine if AI is actually speaking
-  // Use isPlaying as primary indicator - server state may go idle before audio buffer finishes
-  // Also show as speaking if server says speaking (even if audio hasn't started yet)
-  const isAIActuallySpeaking =
-    aiPlayback.isPlaying || aiState.aiState === "speaking";
+  }, [
+    isInRoom,
+    localIsMuted,
+    transcriptionPaused,
+    isTranscriptEnabled,
+    isAIActuallySpeaking,
+    isAddressingAI,
+    ambientTranscription,
+  ]);
 
   // Convert signaling peers to ParticipantInfo format
   // Use local mute state for accurate UI and WebRTC peer states for remote peers
@@ -964,8 +993,8 @@ export default function RoomPage() {
                   <h1 className="text-lg font-semibold text-foreground truncate max-w-[200px] sm:max-w-[300px]">
                     {room?.name || "Room"}
                   </h1>
-                  {/* Recording indicator - shows when transcript is active */}
-                  {transcript.entries.length > 0 && (
+                  {/* Recording indicator - shows when transcript is enabled and has entries */}
+                  {isTranscriptEnabled && transcript.entries.length > 0 && (
                     <span
                       className="flex items-center gap-1 text-xs text-red-400"
                       title="Recording transcript"
@@ -984,26 +1013,28 @@ export default function RoomPage() {
 
             {/* Header right actions */}
             <div className="flex items-center gap-2">
-              {/* Transcript toggle button */}
-              <button
-                onClick={() => setShowTranscript(!showTranscript)}
-                className={`flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg transition-colors ${
-                  showTranscript
-                    ? "bg-primary/10 text-primary border-primary/50"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-                aria-label={
-                  showTranscript ? "Hide transcript" : "Show transcript"
-                }
-                aria-pressed={showTranscript}
-              >
-                <FileText className="w-4 h-4" />
-                <span className="hidden sm:inline">
-                  {transcript.entries.length > 0
-                    ? `Transcript (${transcript.entries.length})`
-                    : "Transcript"}
-                </span>
-              </button>
+              {/* Transcript toggle button - only show if transcript is enabled for room */}
+              {isTranscriptEnabled && (
+                <button
+                  onClick={() => setShowTranscript(!showTranscript)}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg transition-colors ${
+                    showTranscript
+                      ? "bg-primary/10 text-primary border-primary/50"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                  aria-label={
+                    showTranscript ? "Hide transcript" : "Show transcript"
+                  }
+                  aria-pressed={showTranscript}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    {transcript.entries.length > 0
+                      ? `Transcript (${transcript.entries.length})`
+                      : "Transcript"}
+                  </span>
+                </button>
+              )}
 
               {/* Share button */}
               <button
@@ -1120,8 +1151,8 @@ export default function RoomPage() {
         </div>
 
         {/* Desktop transcript panel - side panel */}
-        {showTranscript && (
-          <aside className="hidden lg:flex flex-col fixed right-0 top-[calc(theme(spacing.16)+3rem)] bottom-[calc(theme(spacing.16)+1rem)] w-80 xl:w-96 border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        {isTranscriptEnabled && showTranscript && (
+          <aside className="hidden lg:flex flex-col fixed right-0 top-[calc(theme(spacing.16)+3rem)] bottom-40 w-80 xl:w-96 border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <TranscriptPanel
               entries={transcript.entries}
               summaries={transcript.summaries}
@@ -1137,8 +1168,11 @@ export default function RoomPage() {
               onDownloadMd={transcript.downloadAsMd}
               onCopy={transcript.copyToClipboard}
               onClearError={transcript.clearError}
-              isCollapsed={transcriptCollapsed}
-              onCollapseChange={setTranscriptCollapsed}
+              onClose={() => setShowTranscript(false)}
+              isTranscribing={!transcriptionPaused}
+              onToggleTranscription={() =>
+                setTranscriptionPaused(!transcriptionPaused)
+              }
               title="Transcript"
               className="h-full"
             />
@@ -1146,7 +1180,7 @@ export default function RoomPage() {
         )}
 
         {/* Mobile transcript panel - bottom sheet */}
-        {showTranscript && (
+        {isTranscriptEnabled && showTranscript && (
           <div className="lg:hidden">
             <TranscriptPanel
               entries={transcript.entries}
@@ -1163,8 +1197,11 @@ export default function RoomPage() {
               onDownloadMd={transcript.downloadAsMd}
               onCopy={transcript.copyToClipboard}
               onClearError={transcript.clearError}
-              isCollapsed={transcriptCollapsed}
-              onCollapseChange={setTranscriptCollapsed}
+              onClose={() => setShowTranscript(false)}
+              isTranscribing={!transcriptionPaused}
+              onToggleTranscription={() =>
+                setTranscriptionPaused(!transcriptionPaused)
+              }
               title="Transcript"
               mobileSheet
             />

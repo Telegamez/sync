@@ -1174,4 +1174,14 @@ server.ts                                         # Socket handlers, summarizati
 - Zero API cost - browser handles speech recognition locally
 - Only final text sent to server via `transcript:ambient` Socket.io event
 - Pauses during PTT to avoid duplicate transcription
+- **Pauses during AI speaking to prevent acoustic echo feedback** (mic picking up speaker audio)
 - Flows through ContextManager → `buildContextInjection()` → AI context
+
+**Echo Prevention (2024-12-10 Fix):**
+
+The ambient transcription hook includes `isAISpeaking` prop to pause recognition when AI audio is playing through speakers. Without this, the Web Speech API would pick up the AI's voice through the microphone and incorrectly attribute those words to the local user. The pause/resume cycle is:
+
+1. User speaks → Web Speech API transcribes → Entry attributed to user
+2. PTT starts → Ambient pauses (avoids duplicate with PTT transcription)
+3. AI responds → Ambient pauses (prevents echo feedback)
+4. AI finishes → Ambient resumes (300ms delay for audio buffer drain)
