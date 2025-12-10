@@ -141,83 +141,25 @@ const PERSONALITY_INSTRUCTIONS: Record<
   { instructions: string; voice: string; temperature: number }
 > = {
   facilitator: {
-    instructions: `You are a skilled discussion facilitator in a multi-person voice conversation.
-
-Your role:
-- Guide the conversation to stay productive and on-topic
-- Summarize key points when discussions get lengthy
-- Ensure all participants have a chance to contribute
-- Ask clarifying questions to deepen understanding
-- Gently redirect off-topic tangents
-- Identify areas of agreement and disagreement
-- Synthesize different viewpoints into actionable insights
-
-Communication style:
-- Speak clearly and concisely
-- Use inclusive language ("we", "let's", "together")
-- Acknowledge each speaker's contributions
-- Be neutral and fair to all perspectives
-- Keep energy positive and constructive`,
+    instructions: `Skilled discussion facilitator. Keep group on track. Summarize when needed. Be brief.`,
     voice: "marin",
     temperature: 0.7,
   },
 
   assistant: {
-    instructions: `You are a helpful voice assistant participating in a group conversation.
-
-Your role:
-- Answer questions accurately and helpfully
-- Provide information when asked
-- Help with tasks, planning, and problem-solving
-- Be friendly and approachable
-- Support the flow of conversation
-
-Communication style:
-- Be conversational but professional
-- Give concise answers, elaborating only when asked
-- Admit when you don't know something
-- Be responsive to the group's needs`,
+    instructions: `Helpful voice assistant. Answer questions directly. Short and clear. No fluff.`,
     voice: "marin",
     temperature: 0.8,
   },
 
   expert: {
-    instructions: `You are a knowledgeable domain expert in a technical discussion.
-
-Your role:
-- Provide in-depth, accurate technical information
-- Explain complex concepts clearly
-- Share best practices and industry standards
-- Point out potential issues or considerations
-- Suggest resources for further learning
-
-Communication style:
-- Be precise with technical terminology
-- Provide context for your recommendations
-- Use examples to illustrate points
-- Be thorough but not overwhelming
-- Acknowledge uncertainty when appropriate`,
+    instructions: `Domain expert. Give precise, technical answers. Be accurate but brief. Skip the filler.`,
     voice: "marin",
     temperature: 0.7,
   },
 
   brainstorm: {
-    instructions: `You are an enthusiastic creative partner in a brainstorming session.
-
-Your role:
-- Generate diverse and creative ideas
-- Build on others' suggestions ("Yes, and...")
-- Challenge assumptions constructively
-- Explore unconventional approaches
-- Keep energy high and momentum going
-- Capture and organize ideas as they emerge
-
-Communication style:
-- Be enthusiastic and encouraging
-- No idea is too wild - embrace creativity
-- Make connections between different concepts
-- Ask "what if" questions
-- Celebrate bold thinking`,
+    instructions: `Creative partner. Throw out ideas quickly. Build on others. Keep momentum. Short bursts.`,
     voice: "marin",
     temperature: 1.0,
   },
@@ -241,14 +183,32 @@ You ARE Swensync. That's your only identity.
 
 ## CORE MISSION
 You are an AI facilitator in a shared voice room where multiple participants can hear you simultaneously.
-When someone addresses you via Push-to-Talk (PTT), listen carefully and respond concisely.
+When someone addresses you via Push-to-Talk (PTT), listen carefully and respond with EXTREME brevity.
 Your responses are broadcast to everyone in the room.
 
-## STYLE
-- Conversational, concise, warm
-- Brief responses optimized for voice (2-3 sentences typically)
-- IMPORTANT: Always address the current speaker by name in your response
-- Be helpful to the entire group`;
+## STYLE (CRITICAL - FOLLOW STRICTLY)
+**BE CURT. BE PITHY. NO FLUFF.**
+
+HARD RULES:
+- Maximum 1-2 sentences per response. NEVER exceed 3 sentences.
+- Get to the point IMMEDIATELY. No preambles, no "Great question!", no filler.
+- No rambling. No over-explaining. No unnecessary context.
+- If you can say it in 5 words, don't use 20.
+- Address the speaker by name ONCE, briefly.
+- Answer the question, then STOP. Don't add extra thoughts.
+
+FORBIDDEN:
+- "That's a great question..."
+- "I'd be happy to help with that..."
+- "Let me explain..."
+- Long lists or bullet points
+- Restating what was asked
+- Adding caveats or disclaimers unless critical
+
+GOOD: "Matt, the answer is X. Try Y next."
+BAD: "Great question, Matt! So, let me break this down for you. There are several things to consider here..."
+
+Remember: This is VOICE. People are listening, not reading. Respect their time.`;
 
 /**
  * Generate full instructions based on personality, topic, and current speaker
@@ -342,14 +302,17 @@ let socketIO: SocketIOServer | null = null;
 /** Track last summary time per room for time-based triggering */
 const lastSummaryTime = new Map<string, Date>();
 
+/** Track rooms currently generating summaries to prevent concurrent summarizations */
+const summaryInProgress = new Set<string>();
+
 /** Summary configuration */
 const SUMMARY_CONFIG = {
   /** Minimum entries before generating a summary */
-  minEntriesForSummary: 6,
-  /** Minimum time between summaries (5 minutes) */
-  minTimeBetweenSummaries: 5 * 60 * 1000,
+  minEntriesForSummary: 10,
+  /** Minimum time between summaries (10 minutes) */
+  minTimeBetweenSummaries: 10 * 60 * 1000,
   /** Maximum entries before forcing a summary */
-  maxEntriesBeforeSummary: 20,
+  maxEntriesBeforeSummary: 30,
   /** Model to use for summary generation */
   summaryModel: "gpt-4o-mini" as const,
 };
@@ -458,9 +421,17 @@ function generateFallbackSummary(messages: ConversationMessage[]): string {
 }
 
 /**
- * Check if a summary should be generated based on time and entry count
+ * Check if a summary should be generated based on time, entry count, and in-progress status
  */
 function shouldGenerateSummary(roomId: string, messageCount: number): boolean {
+  // Prevent concurrent summarizations for the same room
+  if (summaryInProgress.has(roomId)) {
+    console.log(
+      `[Summary] Room ${roomId}: Summary already in progress, skipping`,
+    );
+    return false;
+  }
+
   const lastTime = lastSummaryTime.get(roomId);
   const now = new Date();
 
@@ -500,7 +471,9 @@ function getOrCreateContextManager(roomId: string): ContextManager {
         maxTokensBeforeSummary: 8000,
         targetTokensAfterSummary: 3000,
         maxMessages: 100,
-        enableAutoSummary: true,
+        // Disable ContextManager's internal auto-summary - we handle it at server level
+        // via onMessageAdded callback with time-based throttling to prevent duplicates
+        enableAutoSummary: false,
       },
       {
         onMessageAdded: (rid, message) => {
@@ -516,13 +489,21 @@ function getOrCreateContextManager(roomId: string): ContextManager {
               console.log(
                 `[Summary] Room ${rid}: Triggering summary (${messageCount} messages)`,
               );
+              // Mark summary as in progress to prevent concurrent summarizations
+              summaryInProgress.add(rid);
               // Trigger async summarization
-              currentCm.summarize(rid).catch((error) => {
-                console.error(
-                  `[Summary] Failed to generate summary for room ${rid}:`,
-                  error,
-                );
-              });
+              currentCm
+                .summarize(rid)
+                .catch((error) => {
+                  console.error(
+                    `[Summary] Failed to generate summary for room ${rid}:`,
+                    error,
+                  );
+                })
+                .finally(() => {
+                  // Clear in-progress flag when done (success or failure)
+                  summaryInProgress.delete(rid);
+                });
             }
           }
         },
@@ -1015,19 +996,32 @@ function handleOpenAIMessage(
       // FEAT-502: Handle deferred transcription (arrives after response.done for long audio)
       case "conversation.item.input_audio_transcription.completed":
         if (event.transcript) {
+          const transcript = event.transcript.trim();
+
           // Use activeSpeakerId if available, otherwise fall back to lastSpeakerId
           // This handles the case where transcription arrives after response.done clears activeSpeakerId
           const speakerId = session.activeSpeakerId || session.lastSpeakerId;
           const speakerName =
             session.activeSpeakerName || session.lastSpeakerName || "unknown";
 
+          // Log full transcript for debugging
           console.log(
-            `[OpenAI] Room ${session.roomId}: User transcript complete from ${speakerName} (${event.transcript.length} chars)`,
+            `[OpenAI] Room ${session.roomId}: User transcript from ${speakerName}: "${transcript}" (${transcript.length} chars)`,
           );
+
+          // Skip very short transcripts that are likely noise/errors (e.g., "You", "Uh", "Um")
+          // Minimum 5 characters to be meaningful speech
+          if (transcript.length < 5) {
+            console.log(
+              `[OpenAI] Room ${session.roomId}: Skipping short transcript (${transcript.length} chars): "${transcript}"`,
+            );
+            break;
+          }
+
           // Store user message in context manager
           const userCm = roomContextManagers.get(session.roomId);
           if (userCm && speakerId) {
-            userCm.addUserMessage(session.roomId, event.transcript, speakerId);
+            userCm.addUserMessage(session.roomId, transcript, speakerId);
             console.log(
               `[ContextManager] Room ${session.roomId}: Stored user message from ${speakerName}`,
             );
@@ -2024,7 +2018,23 @@ app
           return;
         }
 
+        // Check if summary is already in progress
+        if (summaryInProgress.has(roomId)) {
+          console.log(
+            `[Summary] Summary already in progress for room ${roomId}`,
+          );
+          if (callback) {
+            callback({
+              success: false,
+              error: "Summary already in progress",
+            });
+          }
+          return;
+        }
+
         try {
+          // Mark as in progress
+          summaryInProgress.add(roomId);
           // Trigger summarization (will broadcast via onTranscriptSummary callback)
           const result = await cm.summarize(roomId);
           if (result) {
@@ -2057,6 +2067,9 @@ app
                   : "Summary generation failed",
             });
           }
+        } finally {
+          // Clear in-progress flag
+          summaryInProgress.delete(roomId);
         }
       });
 
