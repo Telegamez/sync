@@ -98,7 +98,7 @@ export interface UsePushToTalkReturn {
     disabled: boolean;
   };
   /** Ref for the target element to attach global keyboard events */
-  targetRef: React.RefObject<HTMLElement>;
+  targetRef: React.RefObject<HTMLElement | null>;
 }
 
 /**

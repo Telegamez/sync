@@ -157,8 +157,9 @@ export default function RoomPage() {
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptionPaused, setTranscriptionPaused] = useState(false);
 
-  // Local media stream ref
+  // Local media stream ref and state (state triggers re-renders for hooks)
   const localStreamRef = useRef<MediaStream | null>(null);
+  const [localStream, setLocalStreamState] = useState<MediaStream | null>(null);
 
   // Audio capture refs for PTT streaming (using AudioWorklet)
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -294,12 +295,14 @@ export default function RoomPage() {
     aiPlayback.isPlaying || aiState.aiState === "speaking";
 
   // Ambient transcription hook - captures non-PTT speech for transcript and AI context
-  // Uses browser's Web Speech API (zero cost) and pauses during PTT and AI speaking
+  // Uses Silero VAD to gate Web Speech API - only activates recognition when voice is detected
+  // No more restart loops - VAD monitors continuously and triggers recognition on-demand
   const ambientTranscription = useAmbientTranscription({
     roomId,
     peerId: localPeer?.id ?? null,
     displayName: localPeer?.displayName ?? "Unknown",
     client: isInRoom ? getClient() : null,
+    localStream, // Pass local audio stream for VAD monitoring
     enabled:
       isInRoom && !localIsMuted && !transcriptionPaused && isTranscriptEnabled, // Only transcribe when in room, unmuted, not paused, and room has transcript enabled
     isPTTActive: isAddressingAI, // Pause during PTT to avoid duplicate transcription
@@ -430,6 +433,7 @@ export default function RoomPage() {
         });
         console.log("[Room] Microphone access granted");
         localStreamRef.current = stream;
+        setLocalStreamState(stream); // Update state for hooks that depend on stream
         setMicError(null);
         return stream;
       } catch (err) {
@@ -450,6 +454,7 @@ export default function RoomPage() {
         track.stop();
       });
       localStreamRef.current = null;
+      setLocalStreamState(null); // Clear state for hooks that depend on stream
     }
   }, []);
 
@@ -1036,6 +1041,33 @@ export default function RoomPage() {
                 </button>
               )}
 
+              {/* Recording/Pause toggle - only show if transcript is enabled for room */}
+              {isTranscriptEnabled && (
+                <button
+                  onClick={() => setTranscriptionPaused(!transcriptionPaused)}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg transition-colors ${
+                    !transcriptionPaused
+                      ? "bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                  aria-label={
+                    transcriptionPaused
+                      ? "Resume transcription"
+                      : "Pause transcription"
+                  }
+                  aria-pressed={!transcriptionPaused}
+                >
+                  {!transcriptionPaused ? (
+                    <Mic className="w-4 h-4" />
+                  ) : (
+                    <MicOff className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {!transcriptionPaused ? "Recording" : "Paused"}
+                  </span>
+                </button>
+              )}
+
               {/* Share button */}
               <button
                 onClick={handleCopyLink}
@@ -1170,8 +1202,8 @@ export default function RoomPage() {
               onClearError={transcript.clearError}
               onClose={() => setShowTranscript(false)}
               isTranscribing={!transcriptionPaused}
-              onToggleTranscription={() =>
-                setTranscriptionPaused(!transcriptionPaused)
+              ambientTranscriptionState={
+                ambientTranscription.transcriptionState
               }
               title="Transcript"
               className="h-full"
@@ -1199,8 +1231,8 @@ export default function RoomPage() {
               onClearError={transcript.clearError}
               onClose={() => setShowTranscript(false)}
               isTranscribing={!transcriptionPaused}
-              onToggleTranscription={() =>
-                setTranscriptionPaused(!transcriptionPaused)
+              ambientTranscriptionState={
+                ambientTranscription.transcriptionState
               }
               title="Transcript"
               mobileSheet

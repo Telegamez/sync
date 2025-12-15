@@ -26,8 +26,7 @@ import {
   ArrowDown,
   X,
   FileText,
-  Pause,
-  Play,
+  Mic,
 } from "lucide-react";
 import type {
   TranscriptEntry,
@@ -35,6 +34,7 @@ import type {
   TranscriptEntryType,
 } from "@/types/transcript";
 import { formatRelativeTime, formatEntryTimestamp } from "@/types/transcript";
+import type { TranscriptionState } from "@/hooks/useAmbientTranscription";
 
 /**
  * TranscriptPanel props
@@ -70,16 +70,55 @@ export interface TranscriptPanelProps {
   onClearError: () => void;
   /** Callback to close the panel */
   onClose?: () => void;
-  /** Whether transcription is currently active */
+  /** Whether transcription is currently active (user toggle) */
   isTranscribing?: boolean;
   /** Callback to toggle transcription on/off */
   onToggleTranscription?: () => void;
+  /** Current ambient transcription state (VAD-gated) */
+  ambientTranscriptionState?: TranscriptionState;
   /** Panel title */
   title?: string;
   /** Show as mobile bottom sheet */
   mobileSheet?: boolean;
   /** Custom class name */
   className?: string;
+}
+
+/**
+ * Get ambient transcription state indicator
+ */
+function getAmbientStateIndicator(state: TranscriptionState): {
+  label: string;
+  color: string;
+  pulse: boolean;
+} {
+  switch (state) {
+    case "transcribing":
+      return {
+        label: "Transcribing",
+        color: "text-green-400",
+        pulse: true,
+      };
+    case "listening":
+      return {
+        label: "Listening",
+        color: "text-blue-400",
+        pulse: false,
+      };
+    case "paused":
+      return {
+        label: "Paused",
+        color: "text-yellow-400",
+        pulse: false,
+      };
+    case "idle":
+    default:
+      return {
+        label: "Off",
+        color: "text-gray-500",
+        pulse: false,
+      };
+  }
 }
 
 /**
@@ -248,6 +287,7 @@ export function TranscriptPanel({
   onClose,
   isTranscribing = true,
   onToggleTranscription,
+  ambientTranscriptionState = "idle",
   title = "Transcript",
   mobileSheet = false,
   className = "",
@@ -385,34 +425,28 @@ export function TranscriptPanel({
           <span className="text-xs text-gray-500">
             ({totalEntries} entries)
           </span>
+          {/* Ambient transcription state indicator */}
+          {isTranscribing && (
+            <div
+              className="flex items-center gap-1 text-xs"
+              title={`Ambient: ${getAmbientStateIndicator(ambientTranscriptionState).label}`}
+            >
+              <Mic
+                className={`w-3 h-3 ${getAmbientStateIndicator(ambientTranscriptionState).color} ${
+                  getAmbientStateIndicator(ambientTranscriptionState).pulse
+                    ? "animate-pulse"
+                    : ""
+                }`}
+              />
+              <span
+                className={`hidden sm:inline ${getAmbientStateIndicator(ambientTranscriptionState).color}`}
+              >
+                {getAmbientStateIndicator(ambientTranscriptionState).label}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Transcription toggle */}
-          {onToggleTranscription && (
-            <button
-              onClick={onToggleTranscription}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
-                isTranscribing
-                  ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                  : "bg-gray-700/50 text-gray-400 hover:bg-gray-700"
-              }`}
-              title={
-                isTranscribing ? "Pause transcription" : "Resume transcription"
-              }
-            >
-              {isTranscribing ? (
-                <>
-                  <Pause className="w-3 h-3" />
-                  <span className="hidden sm:inline">Recording</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3 h-3" />
-                  <span className="hidden sm:inline">Paused</span>
-                </>
-              )}
-            </button>
-          )}
           {/* Auto-scroll toggle */}
           <button
             onClick={onToggleAutoScroll}

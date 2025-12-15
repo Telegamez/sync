@@ -1419,6 +1419,24 @@
       "testFile": "tests/unit/components/CreateRoomForm-transcript.test.tsx",
       "dependencies": ["FEAT-500", "FEAT-113"],
       "passes": true
+    },
+    {
+      "id": "FEAT-514",
+      "phase": 6,
+      "category": "transcript",
+      "description": "VAD-gated ambient transcription - Fix restart loop with Silero VAD",
+      "priority": "critical",
+      "steps": [
+        "Extract Silero VAD from useSwensyncRealtime into reusable useSileroVAD hook",
+        "Refactor useAmbientTranscription to use VAD-gated recognition (no auto-restart)",
+        "Add localStream prop to useAmbientTranscription for VAD monitoring",
+        "Update room page to pass local audio stream to ambient transcription",
+        "Add transcription state indicator to TranscriptPanel (Listening/Transcribing/Paused)",
+        "Remove exponential backoff and restart loop logic from useAmbientTranscription"
+      ],
+      "testFile": "tests/unit/hooks/useAmbientTranscription-vad.test.ts",
+      "dependencies": ["FEAT-502"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1443,13 +1461,13 @@
     "transcript": "Live transcript and AI context system"
   },
   "statistics": {
-    "total": 75,
+    "total": 76,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
     "phase5": 18,
-    "phase6": 14,
-    "passed": 73,
+    "phase6": 15,
+    "passed": 74,
     "pending": 2
   }
 }

@@ -2,9 +2,10 @@
  * useAmbientTranscription Hook
  *
  * Client-side speech recognition for ambient (non-PTT) conversations.
- * Uses Web Speech API for real-time transcription and sends results to server.
+ * Uses Silero VAD to gate Web Speech API - only starts recognition when voice detected.
+ * Sends results to server for storage in the transcript.
  *
- * Part of the Long-Horizon Engineering Protocol - FEAT-502
+ * Part of the Long-Horizon Engineering Protocol - FEAT-502, FEAT-514
  */
 
 "use client";
@@ -13,15 +14,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SignalingClient } from "@/lib/signaling/client";
 import type { RoomId } from "@/types/room";
 import type { PeerId } from "@/types/peer";
+import { useSileroVAD } from "./useSileroVAD";
 
 /**
- * Speech recognition result
+ * Transcription state for UI indicators
  */
-interface SpeechResult {
-  transcript: string;
-  isFinal: boolean;
-  confidence: number;
-}
+export type TranscriptionState =
+  | "idle"
+  | "listening"
+  | "transcribing"
+  | "paused";
 
 /**
  * Hook options
@@ -35,6 +37,8 @@ export interface UseAmbientTranscriptionOptions {
   displayName: string;
   /** Signaling client instance */
   client: SignalingClient | null;
+  /** Local audio stream for VAD monitoring */
+  localStream: MediaStream | null;
   /** Whether transcription is enabled */
   enabled?: boolean;
   /** Language for recognition (default: en-US) */
@@ -51,15 +55,19 @@ export interface UseAmbientTranscriptionOptions {
  * Hook return type
  */
 export interface UseAmbientTranscriptionReturn {
-  /** Whether transcription is active */
+  /** Whether transcription is active (recognition running) */
   isActive: boolean;
   /** Whether speech recognition is supported */
   isSupported: boolean;
+  /** Current transcription state for UI */
+  transcriptionState: TranscriptionState;
+  /** Whether VAD is ready */
+  isVADReady: boolean;
   /** Current partial transcript */
   partialTranscript: string;
   /** Error message if any */
   error: string | null;
-  /** Start transcription */
+  /** Start transcription (enables VAD monitoring) */
   start: () => void;
   /** Stop transcription */
   stop: () => void;
@@ -69,7 +77,6 @@ export interface UseAmbientTranscriptionReturn {
 
 /**
  * Web Speech API type declarations
- * These are available in modern browsers but not in TypeScript's default lib
  */
 interface SpeechRecognitionEvent extends Event {
   resultIndex: number;
@@ -116,9 +123,6 @@ interface SpeechRecognitionConstructor {
   new (): SpeechRecognition;
 }
 
-/**
- * Window augmentation for Speech Recognition API
- */
 interface WindowWithSpeechRecognition extends Window {
   SpeechRecognition?: SpeechRecognitionConstructor;
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
@@ -145,14 +149,16 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | null {
 /**
  * useAmbientTranscription hook
  *
- * Provides client-side speech recognition for ambient conversations.
- * Results are sent to the server for storage in the transcript.
+ * VAD-gated speech recognition for ambient conversations.
+ * Uses Silero VAD to detect when user starts speaking, then activates Web Speech API.
+ * Recognition ends naturally when user stops speaking - no restart loops.
  *
  * @example
  * ```tsx
  * const {
  *   isActive,
  *   isSupported,
+ *   transcriptionState,
  *   partialTranscript,
  *   start,
  *   stop,
@@ -161,6 +167,7 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | null {
  *   peerId: "peer-456",
  *   displayName: "Alice",
  *   client: signalingClient,
+ *   localStream: audioStream,
  *   enabled: true,
  * });
  * ```
@@ -173,6 +180,7 @@ export function useAmbientTranscription(
     peerId,
     displayName,
     client,
+    localStream,
     enabled = true,
     language = "en-US",
     minConfidence = 0.7,
@@ -189,16 +197,55 @@ export function useAmbientTranscription(
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isSupported = isSpeechRecognitionSupported();
   const shouldBeActiveRef = useRef(false);
-  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Track actual running state to prevent race conditions
-  const isRunningRef = useRef(false);
-  // Refs for pause state to avoid stale closures in callbacks
-  const isPTTActiveRef = useRef(isPTTActive);
-  const isAISpeakingRef = useRef(isAISpeaking);
+  const isRecognizingRef = useRef(false);
 
-  // Keep refs in sync with props
-  isPTTActiveRef.current = isPTTActive;
-  isAISpeakingRef.current = isAISpeaking;
+  // Determine if we should pause (PTT or AI speaking)
+  const shouldPause = isPTTActive || isAISpeaking;
+
+  // VAD should be enabled when:
+  // 1. User wants transcription active (shouldBeActiveRef)
+  // 2. Transcription is enabled
+  // 3. We have a stream
+  // 4. Not paused for PTT/AI
+  const vadEnabled = enabled && !shouldPause && shouldBeActiveRef.current;
+
+  /**
+   * Handle VAD speech start - begin recognition
+   */
+  const handleVADSpeechStart = useCallback(() => {
+    if (!recognitionRef.current || !shouldBeActiveRef.current) return;
+    if (isRecognizingRef.current) return; // Already recognizing
+
+    try {
+      recognitionRef.current.start();
+      isRecognizingRef.current = true;
+      setIsActive(true);
+      console.log("[AmbientTranscription] VAD triggered - recognition started");
+    } catch (err) {
+      // May already be started - ignore
+      console.warn("[AmbientTranscription] Failed to start recognition:", err);
+    }
+  }, []);
+
+  /**
+   * Handle VAD speech end - let recognition end naturally
+   * We don't force stop here because Web Speech API may still be processing
+   */
+  const handleVADSpeechEnd = useCallback((durationMs: number) => {
+    console.log(`[AmbientTranscription] VAD speech ended (${durationMs}ms)`);
+    // Recognition will end naturally via onend - no action needed
+  }, []);
+
+  // Initialize Silero VAD
+  const vad = useSileroVAD({
+    stream: localStream,
+    enabled: vadEnabled,
+    // Use longer redemptionMs than useSwensyncRealtime since we don't need fast commit signals
+    redemptionMs: 800, // 800ms silence before triggering end
+    minSpeechMs: 200, // Minimum 200ms of speech
+    onSpeechStart: handleVADSpeechStart,
+    onSpeechEnd: handleVADSpeechEnd,
+  });
 
   /**
    * Send transcript to server
@@ -218,7 +265,7 @@ export function useAmbientTranscription(
 
       if (isFinal) {
         console.log(
-          `[AmbientTranscription] Sent final transcript: "${transcript.substring(0, 50)}..."`,
+          `[AmbientTranscription] Sent: "${transcript.substring(0, 50)}${transcript.length > 50 ? "..." : ""}"`,
         );
       }
     },
@@ -240,9 +287,8 @@ export function useAmbientTranscription(
         const confidence = result[0].confidence;
 
         if (result.isFinal) {
-          // Only send if confidence meets threshold
+          // Only send if confidence meets threshold (0 means not available)
           if (confidence >= minConfidence || confidence === 0) {
-            // confidence 0 means not available
             finalTranscript += transcript;
           }
         } else {
@@ -250,10 +296,8 @@ export function useAmbientTranscription(
         }
       }
 
-      // Update partial transcript display
       setPartialTranscript(interimTranscript);
 
-      // Send final transcript to server
       if (finalTranscript) {
         sendTranscript(finalTranscript, true);
         setPartialTranscript("");
@@ -268,8 +312,7 @@ export function useAmbientTranscription(
   const handleError = useCallback((event: SpeechRecognitionErrorEvent) => {
     switch (event.error) {
       case "no-speech":
-        // Normal - no speech detected, will restart automatically
-        // Don't log this as it's expected when user isn't speaking
+        // Normal - no speech detected, VAD will trigger next recognition
         break;
       case "aborted":
         // User or system stopped recognition - expected during PTT
@@ -298,42 +341,14 @@ export function useAmbientTranscription(
 
   /**
    * Handle speech recognition end
+   * VAD-gated: No auto-restart - VAD will trigger next recognition when voice detected
    */
   const handleEnd = useCallback(() => {
-    isRunningRef.current = false;
+    isRecognizingRef.current = false;
     setIsActive(false);
-
-    // Auto-restart if should be active, not PTT, and AI not speaking
-    // Use refs to get current values and avoid stale closures
-    const shouldPause =
-      isPTTActiveRef.current || isAISpeakingRef.current || !enabled;
-
-    if (shouldBeActiveRef.current && !shouldPause) {
-      // Small delay before restart to avoid rapid restart loops
-      restartTimeoutRef.current = setTimeout(() => {
-        // Re-check conditions using refs for fresh values
-        const stillShouldPause =
-          isPTTActiveRef.current || isAISpeakingRef.current;
-
-        if (
-          recognitionRef.current &&
-          shouldBeActiveRef.current &&
-          !isRunningRef.current &&
-          !stillShouldPause
-        ) {
-          try {
-            recognitionRef.current.start();
-            isRunningRef.current = true;
-            setIsActive(true);
-            console.log("[AmbientTranscription] Auto-restarted after end");
-          } catch (err) {
-            isRunningRef.current = false;
-            // Ignore - may already be started
-          }
-        }
-      }, 500); // Increased delay to prevent rapid restarts
-    }
-  }, [enabled]); // Only depend on enabled - use refs for PTT/AI state
+    console.log("[AmbientTranscription] Recognition ended, waiting for VAD");
+    // No restart logic - VAD will call handleVADSpeechStart when voice is detected again
+  }, []);
 
   /**
    * Initialize speech recognition
@@ -357,9 +372,6 @@ export function useAmbientTranscription(
     recognitionRef.current = recognition;
 
     return () => {
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -372,27 +384,13 @@ export function useAmbientTranscription(
   }, [isSupported, language, handleResult, handleError, handleEnd]);
 
   /**
-   * Pause during PTT or AI speaking
-   * This prevents the Web Speech API from picking up:
-   * 1. PTT audio being sent to AI (would create duplicates)
-   * 2. AI audio playback through speakers (acoustic echo feedback)
+   * Stop recognition when paused (PTT or AI speaking)
    */
   useEffect(() => {
-    if (!recognitionRef.current) return;
-
-    const shouldPause = isPTTActive || isAISpeaking;
-
-    if (shouldPause && isRunningRef.current) {
-      // Clear any pending restart timeouts
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-        restartTimeoutRef.current = null;
-      }
-
-      // Pause ambient transcription during PTT or AI speaking
+    if (shouldPause && isRecognizingRef.current && recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-        isRunningRef.current = false;
+        isRecognizingRef.current = false;
         setIsActive(false);
         console.log(
           `[AmbientTranscription] Paused - ${isPTTActive ? "PTT active" : "AI speaking"}`,
@@ -400,71 +398,20 @@ export function useAmbientTranscription(
       } catch {
         // Ignore
       }
-    } else if (
-      !shouldPause &&
-      shouldBeActiveRef.current &&
-      !isRunningRef.current
-    ) {
-      // Clear any pending restart timeouts first
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-        restartTimeoutRef.current = null;
-      }
-
-      // Resume after PTT ends and AI stops speaking (with delay to avoid race)
-      restartTimeoutRef.current = setTimeout(() => {
-        // Use refs for fresh values
-        if (
-          recognitionRef.current &&
-          shouldBeActiveRef.current &&
-          !isRunningRef.current &&
-          !isPTTActiveRef.current &&
-          !isAISpeakingRef.current
-        ) {
-          try {
-            recognitionRef.current.start();
-            isRunningRef.current = true;
-            setIsActive(true);
-            console.log("[AmbientTranscription] Resumed after pause");
-          } catch {
-            isRunningRef.current = false;
-          }
-        }
-      }, 500); // Longer delay to let audio buffers drain
     }
-  }, [isPTTActive, isAISpeaking]);
+  }, [shouldPause, isPTTActive]);
 
   /**
-   * Start transcription
+   * Start transcription (enables VAD monitoring)
    */
   const start = useCallback(() => {
-    if (!isSupported || !recognitionRef.current || !enabled) return;
-    if (isRunningRef.current) return; // Already running
-
-    // Don't start if PTT or AI is speaking - set the flag and let the effect handle resume
-    const shouldPause = isPTTActiveRef.current || isAISpeakingRef.current;
+    if (!isSupported || !enabled) return;
 
     shouldBeActiveRef.current = true;
     setError(null);
-
-    if (shouldPause) {
-      // Don't actually start, just mark that we want to be active
-      // The pause/resume effect will start us when conditions allow
-      console.log(
-        "[AmbientTranscription] Start requested but paused (PTT/AI speaking)",
-      );
-      return;
-    }
-
-    try {
-      recognitionRef.current.start();
-      isRunningRef.current = true;
-      setIsActive(true);
-      console.log("[AmbientTranscription] Started");
-    } catch (err) {
-      isRunningRef.current = false;
-      // May already be started - don't spam console
-    }
+    console.log(
+      "[AmbientTranscription] Enabled - VAD will trigger recognition on voice",
+    );
   }, [isSupported, enabled]);
 
   /**
@@ -473,21 +420,16 @@ export function useAmbientTranscription(
   const stop = useCallback(() => {
     shouldBeActiveRef.current = false;
 
-    if (restartTimeoutRef.current) {
-      clearTimeout(restartTimeoutRef.current);
-      restartTimeoutRef.current = null;
-    }
-
-    if (!recognitionRef.current) return;
-
-    try {
-      recognitionRef.current.stop();
-      isRunningRef.current = false;
-      setIsActive(false);
-      setPartialTranscript("");
-      console.log("[AmbientTranscription] Stopped");
-    } catch {
-      isRunningRef.current = false;
+    if (recognitionRef.current && isRecognizingRef.current) {
+      try {
+        recognitionRef.current.stop();
+        isRecognizingRef.current = false;
+        setIsActive(false);
+        setPartialTranscript("");
+        console.log("[AmbientTranscription] Stopped");
+      } catch {
+        isRecognizingRef.current = false;
+      }
     }
   }, []);
 
@@ -495,18 +437,31 @@ export function useAmbientTranscription(
    * Toggle transcription
    */
   const toggle = useCallback(() => {
-    if (isActive) {
+    if (shouldBeActiveRef.current) {
       stop();
     } else {
       start();
     }
-  }, [isActive, start, stop]);
+  }, [start, stop]);
+
+  /**
+   * Compute transcription state for UI
+   */
+  const transcriptionState: TranscriptionState = (() => {
+    if (!shouldBeActiveRef.current || !enabled) return "idle";
+    if (shouldPause) return "paused";
+    if (isActive) return "transcribing";
+    if (vad.isReady) return "listening";
+    return "idle";
+  })();
 
   return {
     isActive,
     isSupported,
+    transcriptionState,
+    isVADReady: vad.isReady,
     partialTranscript,
-    error,
+    error: error || vad.error,
     start,
     stop,
     toggle,
