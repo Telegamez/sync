@@ -33,15 +33,15 @@ export interface UserProfile {
  * Authentication state
  */
 export type AuthState =
-  | 'loading'
-  | 'authenticated'
-  | 'unauthenticated'
-  | 'error';
+  | "loading"
+  | "authenticated"
+  | "unauthenticated"
+  | "error";
 
 /**
  * Sign-in methods supported
  */
-export type SignInMethod = 'email' | 'google' | 'github' | 'magic_link';
+export type SignInMethod = "email" | "google" | "apple" | "magic_link";
 
 /**
  * Sign-up request
@@ -80,7 +80,7 @@ export interface MagicLinkRequest {
  */
 export interface OAuthSignInRequest {
   /** OAuth provider */
-  provider: 'google' | 'github';
+  provider: "google" | "apple";
   /** Redirect URL after sign-in */
   redirectTo?: string;
 }
@@ -154,7 +154,9 @@ export interface AuthContextValue {
   /** Update password */
   updatePassword: (request: PasswordUpdateRequest) => Promise<AuthResult>;
   /** Update user profile */
-  updateProfile: (updates: Partial<Pick<UserProfile, 'displayName' | 'avatarUrl'>>) => Promise<AuthResult>;
+  updateProfile: (
+    updates: Partial<Pick<UserProfile, "displayName" | "avatarUrl">>,
+  ) => Promise<AuthResult>;
   /** Refresh the session */
   refreshSession: () => Promise<void>;
 }
@@ -163,32 +165,33 @@ export interface AuthContextValue {
  * Auth error codes
  */
 export type AuthErrorCode =
-  | 'invalid_credentials'
-  | 'email_not_confirmed'
-  | 'user_not_found'
-  | 'email_taken'
-  | 'weak_password'
-  | 'invalid_email'
-  | 'rate_limited'
-  | 'network_error'
-  | 'session_expired'
-  | 'unknown_error';
+  | "invalid_credentials"
+  | "email_not_confirmed"
+  | "user_not_found"
+  | "email_taken"
+  | "weak_password"
+  | "invalid_email"
+  | "rate_limited"
+  | "network_error"
+  | "session_expired"
+  | "unknown_error";
 
 /**
  * Map Supabase error codes to our error codes
  */
 export function mapAuthErrorCode(supabaseError: string): AuthErrorCode {
   const errorMap: Record<string, AuthErrorCode> = {
-    'Invalid login credentials': 'invalid_credentials',
-    'Email not confirmed': 'email_not_confirmed',
-    'User not found': 'user_not_found',
-    'User already registered': 'email_taken',
-    'Password should be at least 6 characters': 'weak_password',
-    'Unable to validate email address: invalid format': 'invalid_email',
-    'For security purposes, you can only request this once every 60 seconds': 'rate_limited',
+    "Invalid login credentials": "invalid_credentials",
+    "Email not confirmed": "email_not_confirmed",
+    "User not found": "user_not_found",
+    "User already registered": "email_taken",
+    "Password should be at least 6 characters": "weak_password",
+    "Unable to validate email address: invalid format": "invalid_email",
+    "For security purposes, you can only request this once every 60 seconds":
+      "rate_limited",
   };
 
-  return errorMap[supabaseError] || 'unknown_error';
+  return errorMap[supabaseError] || "unknown_error";
 }
 
 /**
@@ -196,16 +199,16 @@ export function mapAuthErrorCode(supabaseError: string): AuthErrorCode {
  */
 export function getAuthErrorMessage(code: AuthErrorCode): string {
   const messages: Record<AuthErrorCode, string> = {
-    invalid_credentials: 'Invalid email or password',
-    email_not_confirmed: 'Please check your email to confirm your account',
-    user_not_found: 'No account found with this email',
-    email_taken: 'An account with this email already exists',
-    weak_password: 'Password must be at least 6 characters',
-    invalid_email: 'Please enter a valid email address',
-    rate_limited: 'Too many attempts. Please try again later',
-    network_error: 'Network error. Please check your connection',
-    session_expired: 'Your session has expired. Please sign in again',
-    unknown_error: 'An unexpected error occurred',
+    invalid_credentials: "Invalid email or password",
+    email_not_confirmed: "Please check your email to confirm your account",
+    user_not_found: "No account found with this email",
+    email_taken: "An account with this email already exists",
+    weak_password: "Password must be at least 6 characters",
+    invalid_email: "Please enter a valid email address",
+    rate_limited: "Too many attempts. Please try again later",
+    network_error: "Network error. Please check your connection",
+    session_expired: "Your session has expired. Please sign in again",
+    unknown_error: "An unexpected error occurred",
   };
 
   return messages[code];
@@ -227,31 +230,31 @@ export interface ProtectedRouteConfig {
  * Default protected routes
  */
 export const DEFAULT_PROTECTED_ROUTES: ProtectedRouteConfig[] = [
-  { pattern: '/rooms', requireAuth: true, redirectTo: '/auth/signin' },
-  { pattern: '/rooms/*', requireAuth: true, redirectTo: '/auth/signin' },
-  { pattern: '/profile', requireAuth: true, redirectTo: '/auth/signin' },
-  { pattern: '/settings', requireAuth: true, redirectTo: '/auth/signin' },
+  { pattern: "/rooms", requireAuth: true, redirectTo: "/auth/signin" },
+  { pattern: "/rooms/*", requireAuth: true, redirectTo: "/auth/signin" },
+  { pattern: "/profile", requireAuth: true, redirectTo: "/auth/signin" },
+  { pattern: "/settings", requireAuth: true, redirectTo: "/auth/signin" },
 ];
 
 /**
  * Public routes that don't require auth
  */
 export const PUBLIC_ROUTES = [
-  '/',
-  '/auth/signin',
-  '/auth/signup',
-  '/auth/reset-password',
-  '/auth/callback',
-  '/api/health',
+  "/",
+  "/auth/signin",
+  "/auth/signup",
+  "/auth/reset-password",
+  "/auth/callback",
+  "/api/health",
 ];
 
 /**
  * Check if a path matches a pattern
  */
 export function matchesPattern(path: string, pattern: string): boolean {
-  if (pattern.endsWith('/*')) {
+  if (pattern.endsWith("/*")) {
     const base = pattern.slice(0, -2);
-    return path === base || path.startsWith(base + '/');
+    return path === base || path.startsWith(base + "/");
   }
   return path === pattern;
 }
@@ -259,9 +262,12 @@ export function matchesPattern(path: string, pattern: string): boolean {
 /**
  * Check if a path requires authentication
  */
-export function requiresAuth(path: string, routes: ProtectedRouteConfig[] = DEFAULT_PROTECTED_ROUTES): boolean {
+export function requiresAuth(
+  path: string,
+  routes: ProtectedRouteConfig[] = DEFAULT_PROTECTED_ROUTES,
+): boolean {
   // Check if it's a public route first
-  if (PUBLIC_ROUTES.some(route => matchesPattern(path, route))) {
+  if (PUBLIC_ROUTES.some((route) => matchesPattern(path, route))) {
     return false;
   }
 
@@ -278,11 +284,14 @@ export function requiresAuth(path: string, routes: ProtectedRouteConfig[] = DEFA
 /**
  * Get redirect URL for unauthenticated access
  */
-export function getAuthRedirect(path: string, routes: ProtectedRouteConfig[] = DEFAULT_PROTECTED_ROUTES): string {
+export function getAuthRedirect(
+  path: string,
+  routes: ProtectedRouteConfig[] = DEFAULT_PROTECTED_ROUTES,
+): string {
   for (const route of routes) {
     if (matchesPattern(path, route.pattern) && route.requireAuth) {
-      return route.redirectTo || '/auth/signin';
+      return route.redirectTo || "/auth/signin";
     }
   }
-  return '/auth/signin';
+  return "/auth/signin";
 }

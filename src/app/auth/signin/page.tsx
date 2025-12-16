@@ -6,13 +6,13 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-400
  */
 
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, ArrowRight, Github, Loader2 } from 'lucide-react';
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 
 /**
  * Sign In Form Component (needs Suspense boundary for useSearchParams)
@@ -22,17 +22,19 @@ function SignInForm() {
   const searchParams = useSearchParams();
   const { signIn, signInWithOAuth, state } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(
+    null,
+  );
 
-  const returnUrl = searchParams.get('returnUrl') || '/rooms';
+  const returnUrl = searchParams.get("returnUrl") || "/rooms";
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (state === 'authenticated') {
+    if (state === "authenticated") {
       router.push(returnUrl);
     }
   }, [state, router, returnUrl]);
@@ -50,24 +52,24 @@ function SignInForm() {
         const result = await signIn({ email, password });
 
         if (!result.success) {
-          setError(result.error || 'Sign in failed');
+          setError(result.error || "Sign in failed");
         } else {
           router.push(returnUrl);
         }
       } catch {
-        setError('An unexpected error occurred');
+        setError("An unexpected error occurred");
       } finally {
         setIsLoading(false);
       }
     },
-    [email, password, signIn, router, returnUrl]
+    [email, password, signIn, router, returnUrl],
   );
 
   /**
    * Handle OAuth sign in
    */
   const handleOAuthSignIn = useCallback(
-    async (provider: 'google' | 'github') => {
+    async (provider: "google" | "apple") => {
       setError(null);
       setOauthLoading(provider);
 
@@ -78,19 +80,19 @@ function SignInForm() {
         });
 
         if (!result.success) {
-          setError(result.error || 'OAuth sign in failed');
+          setError(result.error || "OAuth sign in failed");
           setOauthLoading(null);
         }
         // If successful, the browser will redirect to OAuth provider
       } catch {
-        setError('An unexpected error occurred');
+        setError("An unexpected error occurred");
         setOauthLoading(null);
       }
     },
-    [signInWithOAuth, returnUrl]
+    [signInWithOAuth, returnUrl],
   );
 
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -117,11 +119,11 @@ function SignInForm() {
           <div className="space-y-3 mb-6">
             <button
               type="button"
-              onClick={() => handleOAuthSignIn('google')}
+              onClick={() => handleOAuthSignIn("google")}
               disabled={!!oauthLoading}
               className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-3 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {oauthLoading === 'google' ? (
+              {oauthLoading === "google" ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -148,16 +150,22 @@ function SignInForm() {
 
             <button
               type="button"
-              onClick={() => handleOAuthSignIn('github')}
+              onClick={() => handleOAuthSignIn("apple")}
               disabled={!!oauthLoading}
-              className="w-full flex items-center justify-center gap-3 bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-3 font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-3 bg-black text-white border border-gray-700 rounded-lg px-4 py-3 font-medium hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {oauthLoading === 'github' ? (
+              {oauthLoading === "apple" ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <Github className="w-5 h-5" />
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                </svg>
               )}
-              Continue with GitHub
+              Continue with Apple
             </button>
           </div>
 
@@ -182,7 +190,10 @@ function SignInForm() {
             )}
 
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="email"
+                className="text-sm font-medium text-foreground"
+              >
                 Email
               </label>
               <div className="relative">
@@ -200,7 +211,10 @@ function SignInForm() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium text-foreground"
+              >
                 Password
               </label>
               <div className="relative">
@@ -236,7 +250,7 @@ function SignInForm() {
 
           {/* Sign Up Link */}
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
+            Don&apos;t have an account?{" "}
             <Link
               href={`/auth/signup?returnUrl=${encodeURIComponent(returnUrl)}`}
               className="text-primary hover:underline font-medium"

@@ -6,7 +6,7 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-400
  */
 
-'use client';
+"use client";
 
 import React, {
   createContext,
@@ -15,7 +15,7 @@ import React, {
   useEffect,
   useState,
   useMemo,
-} from 'react';
+} from "react";
 import type {
   AuthContextValue,
   AuthState,
@@ -28,13 +28,14 @@ import type {
   PasswordResetRequest,
   PasswordUpdateRequest,
   AuthResult,
-} from '@/types/auth';
-import { mapAuthErrorCode, getAuthErrorMessage } from '@/types/auth';
+} from "@/types/auth";
+import { mapAuthErrorCode, getAuthErrorMessage } from "@/types/auth";
 import {
   getSupabaseAuthClient,
   isSessionExpired,
   type SupabaseAuthClient,
-} from '@/lib/supabase';
+  AUTH_STORAGE_KEY,
+} from "@/lib/supabase";
 
 /**
  * Auth context
@@ -64,17 +65,19 @@ export function AuthProvider({
   autoRefresh = true,
   refreshBuffer = 60000, // 1 minute before expiry
 }: AuthProviderProps): React.ReactElement {
-  const [state, setState] = useState<AuthState>('loading');
+  const [state, setState] = useState<AuthState>("loading");
   const [user, setUser] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
 
   const client = useMemo(
     () => supabaseClient || getSupabaseAuthClient(),
-    [supabaseClient]
+    [supabaseClient],
   );
 
-  // Initialize auth state from stored session
-  useEffect(() => {
+  /**
+   * Check and update auth state from stored session
+   */
+  const checkAuthState = useCallback(() => {
     const storedSession = client.getSession();
 
     if (storedSession) {
@@ -85,20 +88,112 @@ export function AuthProvider({
             const transformed = client.getSession();
             setSession(transformed);
             setUser(transformed?.user || null);
-            setState('authenticated');
+            setState("authenticated");
           } else {
-            setState('unauthenticated');
+            setState("unauthenticated");
+            setUser(null);
+            setSession(null);
           }
         });
       } else {
         setSession(storedSession);
         setUser(storedSession.user);
-        setState('authenticated');
+        setState("authenticated");
       }
     } else {
-      setState('unauthenticated');
+      setState("unauthenticated");
+      setUser(null);
+      setSession(null);
     }
   }, [client]);
+
+  // Initialize auth state from stored session
+  useEffect(() => {
+    checkAuthState();
+
+    // Also check after a short delay to catch sessions stored just before mount
+    // (e.g., OAuth callback that redirects immediately)
+    const timeoutId = setTimeout(() => {
+      checkAuthState();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [checkAuthState]);
+
+  // Listen for storage changes (OAuth callback stores session in localStorage)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === AUTH_STORAGE_KEY && e.newValue) {
+        // Session was stored, re-check auth state
+        checkAuthState();
+      } else if (e.key === AUTH_STORAGE_KEY && !e.newValue) {
+        // Session was removed, clear auth state
+        setState("unauthenticated");
+        setUser(null);
+        setSession(null);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [checkAuthState]);
+
+  // Listen for visibility changes (re-check after OAuth redirect)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Page became visible, re-check auth state
+        checkAuthState();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [checkAuthState]);
+
+  // Listen for window focus (re-check after OAuth redirect)
+  useEffect(() => {
+    const handleFocus = () => {
+      // Window regained focus, re-check auth state
+      checkAuthState();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [checkAuthState]);
+
+  // Listen for custom auth session stored event (from OAuth callback)
+  useEffect(() => {
+    const handleAuthSessionStored = () => {
+      // Session was stored, re-check auth state immediately
+      checkAuthState();
+    };
+
+    window.addEventListener("auth-session-stored", handleAuthSessionStored);
+    return () =>
+      window.removeEventListener(
+        "auth-session-stored",
+        handleAuthSessionStored,
+      );
+  }, [checkAuthState]);
+
+  // Listen for custom auth session cleared event (from sign out)
+  useEffect(() => {
+    const handleAuthSessionCleared = () => {
+      // Session was cleared, ensure state is unauthenticated
+      setState("unauthenticated");
+      setUser(null);
+      setSession(null);
+    };
+
+    window.addEventListener("auth-session-cleared", handleAuthSessionCleared);
+    return () =>
+      window.removeEventListener(
+        "auth-session-cleared",
+        handleAuthSessionCleared,
+      );
+  }, []);
 
   // Auto-refresh session before expiry
   useEffect(() => {
@@ -111,7 +206,7 @@ export function AuthProvider({
       // Already expired or about to, refresh immediately
       client.refreshSession().then(({ error }) => {
         if (error) {
-          setState('unauthenticated');
+          setState("unauthenticated");
           setUser(null);
           setSession(null);
         } else {
@@ -128,7 +223,7 @@ export function AuthProvider({
     const timer = setTimeout(() => {
       client.refreshSession().then(({ error }) => {
         if (error) {
-          setState('unauthenticated');
+          setState("unauthenticated");
           setUser(null);
           setSession(null);
         } else {
@@ -153,7 +248,9 @@ export function AuthProvider({
         const { session: supabaseSession, error } = await client.signUp(
           request.email,
           request.password,
-          request.displayName ? { display_name: request.displayName } : undefined
+          request.displayName
+            ? { display_name: request.displayName }
+            : undefined,
         );
 
         if (error) {
@@ -170,7 +267,7 @@ export function AuthProvider({
           if (newSession) {
             setSession(newSession);
             setUser(newSession.user);
-            setState('authenticated');
+            setState("authenticated");
             return { success: true, user: newSession.user };
           }
         }
@@ -178,17 +275,17 @@ export function AuthProvider({
         // Email confirmation required
         return {
           success: true,
-          error: 'Please check your email to confirm your account',
+          error: "Please check your email to confirm your account",
         };
       } catch (error) {
         return {
           success: false,
-          error: 'An unexpected error occurred',
-          errorCode: 'unknown_error',
+          error: "An unexpected error occurred",
+          errorCode: "unknown_error",
         };
       }
     },
-    [client]
+    [client],
   );
 
   /**
@@ -197,10 +294,8 @@ export function AuthProvider({
   const signIn = useCallback(
     async (request: SignInRequest): Promise<AuthResult> => {
       try {
-        const { session: supabaseSession, error } = await client.signInWithPassword(
-          request.email,
-          request.password
-        );
+        const { session: supabaseSession, error } =
+          await client.signInWithPassword(request.email, request.password);
 
         if (error) {
           const errorCode = mapAuthErrorCode(error.message);
@@ -216,25 +311,25 @@ export function AuthProvider({
           if (newSession) {
             setSession(newSession);
             setUser(newSession.user);
-            setState('authenticated');
+            setState("authenticated");
             return { success: true, user: newSession.user };
           }
         }
 
         return {
           success: false,
-          error: 'Sign in failed',
-          errorCode: 'unknown_error',
+          error: "Sign in failed",
+          errorCode: "unknown_error",
         };
       } catch (error) {
         return {
           success: false,
-          error: 'An unexpected error occurred',
-          errorCode: 'unknown_error',
+          error: "An unexpected error occurred",
+          errorCode: "unknown_error",
         };
       }
     },
-    [client]
+    [client],
   );
 
   /**
@@ -245,14 +340,14 @@ export function AuthProvider({
       try {
         const { url, error } = await client.signInWithOAuth(
           request.provider,
-          request.redirectTo
+          request.redirectTo,
         );
 
         if (error) {
           return {
             success: false,
             error: error.message,
-            errorCode: 'unknown_error',
+            errorCode: "unknown_error",
           };
         }
 
@@ -264,18 +359,18 @@ export function AuthProvider({
 
         return {
           success: false,
-          error: 'OAuth sign in failed',
-          errorCode: 'unknown_error',
+          error: "OAuth sign in failed",
+          errorCode: "unknown_error",
         };
       } catch (error) {
         return {
           success: false,
-          error: 'An unexpected error occurred',
-          errorCode: 'unknown_error',
+          error: "An unexpected error occurred",
+          errorCode: "unknown_error",
         };
       }
     },
-    [client]
+    [client],
   );
 
   /**
@@ -286,7 +381,7 @@ export function AuthProvider({
       try {
         const { error } = await client.signInWithOtp(
           request.email,
-          request.redirectTo
+          request.redirectTo,
         );
 
         if (error) {
@@ -300,17 +395,17 @@ export function AuthProvider({
 
         return {
           success: true,
-          error: 'Check your email for the magic link',
+          error: "Check your email for the magic link",
         };
       } catch (error) {
         return {
           success: false,
-          error: 'An unexpected error occurred',
-          errorCode: 'unknown_error',
+          error: "An unexpected error occurred",
+          errorCode: "unknown_error",
         };
       }
     },
-    [client]
+    [client],
   );
 
   /**
@@ -318,9 +413,16 @@ export function AuthProvider({
    */
   const signOut = useCallback(async (): Promise<void> => {
     await client.signOut();
-    setState('unauthenticated');
+
+    // Clear state immediately - this will trigger re-render
+    setState("unauthenticated");
     setUser(null);
     setSession(null);
+
+    // Dispatch custom event to notify other components of sign out
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("auth-session-cleared"));
+    }
   }, [client]);
 
   /**
@@ -342,17 +444,17 @@ export function AuthProvider({
 
         return {
           success: true,
-          error: 'Check your email for password reset instructions',
+          error: "Check your email for password reset instructions",
         };
       } catch (error) {
         return {
           success: false,
-          error: 'An unexpected error occurred',
-          errorCode: 'unknown_error',
+          error: "An unexpected error occurred",
+          errorCode: "unknown_error",
         };
       }
     },
-    [client]
+    [client],
   );
 
   /**
@@ -361,7 +463,9 @@ export function AuthProvider({
   const updatePassword = useCallback(
     async (request: PasswordUpdateRequest): Promise<AuthResult> => {
       try {
-        const { error } = await client.updateUser({ password: request.password });
+        const { error } = await client.updateUser({
+          password: request.password,
+        });
 
         if (error) {
           const errorCode = mapAuthErrorCode(error.message);
@@ -376,12 +480,12 @@ export function AuthProvider({
       } catch (error) {
         return {
           success: false,
-          error: 'An unexpected error occurred',
-          errorCode: 'unknown_error',
+          error: "An unexpected error occurred",
+          errorCode: "unknown_error",
         };
       }
     },
-    [client]
+    [client],
   );
 
   /**
@@ -389,7 +493,7 @@ export function AuthProvider({
    */
   const updateProfile = useCallback(
     async (
-      updates: Partial<Pick<UserProfile, 'displayName' | 'avatarUrl'>>
+      updates: Partial<Pick<UserProfile, "displayName" | "avatarUrl">>,
     ): Promise<AuthResult> => {
       try {
         const { user: updatedUser, error } = await client.updateUser({
@@ -403,7 +507,7 @@ export function AuthProvider({
           return {
             success: false,
             error: error.message,
-            errorCode: 'unknown_error',
+            errorCode: "unknown_error",
           };
         }
 
@@ -418,12 +522,12 @@ export function AuthProvider({
       } catch (error) {
         return {
           success: false,
-          error: 'An unexpected error occurred',
-          errorCode: 'unknown_error',
+          error: "An unexpected error occurred",
+          errorCode: "unknown_error",
         };
       }
     },
-    [client]
+    [client],
   );
 
   /**
@@ -433,7 +537,7 @@ export function AuthProvider({
     const { error } = await client.refreshSession();
 
     if (error) {
-      setState('unauthenticated');
+      setState("unauthenticated");
       setUser(null);
       setSession(null);
     } else {
@@ -441,7 +545,7 @@ export function AuthProvider({
       if (newSession) {
         setSession(newSession);
         setUser(newSession.user);
-        setState('authenticated');
+        setState("authenticated");
       }
     }
   }, [client]);
@@ -474,7 +578,7 @@ export function AuthProvider({
       updatePassword,
       updateProfile,
       refreshSession,
-    ]
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -487,7 +591,7 @@ export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
 
   return context;
@@ -498,7 +602,7 @@ export function useAuth(): AuthContextValue {
  */
 export function useIsAuthenticated(): boolean {
   const { state } = useAuth();
-  return state === 'authenticated';
+  return state === "authenticated";
 }
 
 /**

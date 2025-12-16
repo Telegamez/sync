@@ -89,6 +89,9 @@ function CallbackHandler() {
                 : "";
             document.cookie = `${AUTH_STORAGE_KEY}=${encodeURIComponent(JSON.stringify(session))}; path=/; expires=${expiresAt.toUTCString()}; SameSite=Lax${cookieDomain}`;
 
+            // Dispatch custom event to notify AuthContext of session change
+            window.dispatchEvent(new CustomEvent("auth-session-stored"));
+
             setStatus("success");
 
             // Redirect after a short delay
@@ -168,6 +171,9 @@ function CallbackHandler() {
               ? "; domain=.chnl.net"
               : "";
           document.cookie = `${AUTH_STORAGE_KEY}=${encodeURIComponent(JSON.stringify(session))}; path=/; expires=${expiresAt.toUTCString()}; SameSite=Lax${cookieDomain}`;
+
+          // Dispatch custom event to notify AuthContext of session change
+          window.dispatchEvent(new CustomEvent("auth-session-stored"));
 
           setStatus("success");
 

@@ -133,13 +133,27 @@ export function getStoredSession(): Session | null {
 
     const data = JSON.parse(stored);
 
-    // Reconstruct dates
+    // Validate required fields exist
+    if (!data.accessToken || !data.user?.id) {
+      return null;
+    }
+
+    // Reconstruct dates with fallbacks
     return {
-      ...data,
-      expiresAt: new Date(data.expiresAt),
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken || "",
+      expiresAt: data.expiresAt
+        ? new Date(data.expiresAt)
+        : new Date(Date.now() + 3600000),
       user: {
-        ...data.user,
-        createdAt: new Date(data.user.createdAt),
+        id: data.user.id,
+        email: data.user.email || "",
+        displayName:
+          data.user.displayName || data.user.email?.split("@")[0] || "User",
+        avatarUrl: data.user.avatarUrl,
+        createdAt: data.user.createdAt
+          ? new Date(data.user.createdAt)
+          : new Date(),
         lastSignInAt: data.user.lastSignInAt
           ? new Date(data.user.lastSignInAt)
           : undefined,
@@ -151,26 +165,42 @@ export function getStoredSession(): Session | null {
 }
 
 /**
- * Store session in localStorage
+ * Store session in localStorage and cookie (for middleware)
  */
 export function storeSession(session: Session): void {
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+    const sessionJson = JSON.stringify(session);
+
+    // Store in localStorage
+    localStorage.setItem(AUTH_STORAGE_KEY, sessionJson);
+
+    // Store in cookie for middleware (domain=.chnl.net for subdomain support)
+    const cookieDomain = window.location.hostname.endsWith(".chnl.net")
+      ? "; domain=.chnl.net"
+      : "";
+    document.cookie = `${AUTH_STORAGE_KEY}=${encodeURIComponent(sessionJson)}; path=/; expires=${session.expiresAt.toUTCString()}; SameSite=Lax${cookieDomain}`;
   } catch {
     // Ignore storage errors
   }
 }
 
 /**
- * Clear stored session
+ * Clear stored session from localStorage and cookie
  */
 export function clearStoredSession(): void {
   if (typeof window === "undefined") return;
 
   try {
+    // Clear localStorage
     localStorage.removeItem(AUTH_STORAGE_KEY);
+
+    // Clear cookie (set expired date)
+    const cookieDomain = window.location.hostname.endsWith(".chnl.net")
+      ? "; domain=.chnl.net"
+      : "";
+    document.cookie = `${AUTH_STORAGE_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${cookieDomain}`;
   } catch {
     // Ignore storage errors
   }
@@ -306,7 +336,7 @@ export class SupabaseAuthClient {
    * Sign in with OAuth provider
    */
   async signInWithOAuth(
-    provider: "google" | "github",
+    provider: "google" | "apple",
     redirectTo?: string,
   ): Promise<{ url: string | null; error: Error | null }> {
     if (!isSupabaseConfigured()) {
@@ -550,9 +580,14 @@ export class SupabaseAuthClient {
   }
 
   /**
-   * Get current session
+   * Get current session (always reads fresh from localStorage)
    */
   getSession(): Session | null {
+    // Always read fresh from localStorage to pick up sessions stored by OAuth callback
+    const storedSession = getStoredSession();
+    if (storedSession) {
+      this.currentSession = storedSession;
+    }
     return this.currentSession;
   }
 
@@ -560,7 +595,7 @@ export class SupabaseAuthClient {
    * Get current user
    */
   getUser(): UserProfile | null {
-    return this.currentSession?.user || null;
+    return this.getSession()?.user || null;
   }
 
   /**
