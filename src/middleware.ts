@@ -6,14 +6,19 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-400
  */
 
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { requiresAuth, getAuthRedirect, PUBLIC_ROUTES, matchesPattern } from '@/types/auth';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import {
+  requiresAuth,
+  getAuthRedirect,
+  PUBLIC_ROUTES,
+  matchesPattern,
+} from "@/types/auth";
 
 /**
  * Auth storage key (must match client)
  */
-const AUTH_STORAGE_KEY = 'swensync-auth';
+const AUTH_STORAGE_KEY = "swensync-auth";
 
 /**
  * Check if request has valid auth cookie/header
@@ -37,11 +42,26 @@ function hasValidAuth(request: NextRequest): boolean {
   }
 
   // Check for Authorization header (for API routes)
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader?.startsWith('Bearer ')) {
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
     return true; // Token validation happens at API level
   }
 
+  return false;
+}
+
+/**
+ * Check if request is from a room subdomain (e.g., abc123.chnl.net)
+ * These requests get internally rewritten by nginx to /rooms/{subdomain}
+ */
+function isRoomSubdomainRequest(request: NextRequest): boolean {
+  const host =
+    request.headers.get("x-original-host") || request.headers.get("host") || "";
+  // Match pattern like "abc123.chnl.net" but not "www.chnl.net"
+  const subdomainMatch = host.match(/^([a-z0-9]+)\.chnl\.net$/i);
+  if (subdomainMatch && subdomainMatch[1] !== "www") {
+    return true;
+  }
   return false;
 }
 
@@ -53,15 +73,21 @@ export function middleware(request: NextRequest): NextResponse {
 
   // Skip middleware for static files and Next.js internals
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/static') ||
-    pathname.includes('.') // Files with extensions (images, etc.)
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/static") ||
+    pathname.includes(".") // Files with extensions (images, etc.)
   ) {
     return NextResponse.next();
   }
 
   // Skip API routes (they handle their own auth)
-  if (pathname.startsWith('/api')) {
+  if (pathname.startsWith("/api")) {
+    return NextResponse.next();
+  }
+
+  // Skip auth for room subdomain requests (e.g., abc123.chnl.net)
+  // These are publicly accessible room links
+  if (isRoomSubdomainRequest(request)) {
     return NextResponse.next();
   }
 
@@ -74,7 +100,7 @@ export function middleware(request: NextRequest): NextResponse {
       const redirectUrl = getAuthRedirect(pathname);
       const url = request.nextUrl.clone();
       url.pathname = redirectUrl;
-      url.searchParams.set('returnUrl', pathname);
+      url.searchParams.set("returnUrl", pathname);
 
       return NextResponse.redirect(url);
     }
@@ -82,10 +108,10 @@ export function middleware(request: NextRequest): NextResponse {
 
   // If authenticated and trying to access auth pages, redirect to rooms
   if (hasValidAuth(request)) {
-    const authPages = ['/auth/signin', '/auth/signup'];
-    if (authPages.some(page => pathname === page)) {
+    const authPages = ["/auth/signin", "/auth/signup"];
+    if (authPages.some((page) => pathname === page)) {
       const url = request.nextUrl.clone();
-      url.pathname = '/rooms';
+      url.pathname = "/rooms";
       return NextResponse.redirect(url);
     }
   }
@@ -106,6 +132,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],
 };

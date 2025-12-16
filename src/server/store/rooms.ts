@@ -39,9 +39,17 @@ if (process.env.NODE_ENV !== "production") {
 
 /**
  * Generate a unique room ID
+ * Uses lowercase-only alphabet for DNS-compatible subdomain routing
+ * (subdomains are case-insensitive, so qUDObFiRZM becomes qudobfirzm)
  */
 export function generateRoomId(): RoomId {
-  return nanoid(10);
+  // Lowercase alphanumeric alphabet (no uppercase to avoid subdomain case issues)
+  const alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+  let id = "";
+  for (let i = 0; i < 10; i++) {
+    id += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return id;
 }
 
 /**
@@ -81,9 +89,22 @@ export function createRoom(request: CreateRoomRequest, ownerId: PeerId): Room {
 
 /**
  * Get a room by ID
+ * Supports case-insensitive lookup for subdomain compatibility
  */
 export function getRoom(roomId: RoomId): Room | undefined {
-  return rooms.get(roomId);
+  // Try exact match first
+  const exactMatch = rooms.get(roomId);
+  if (exactMatch) return exactMatch;
+
+  // Try case-insensitive match for subdomain routing compatibility
+  const lowerRoomId = roomId.toLowerCase();
+  for (const [id, room] of rooms) {
+    if (id.toLowerCase() === lowerRoomId) {
+      return room;
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -203,9 +224,20 @@ export function closeRoom(roomId: RoomId): Room | undefined {
 
 /**
  * Check if a room exists
+ * Supports case-insensitive lookup for subdomain compatibility
  */
 export function roomExists(roomId: RoomId): boolean {
-  return rooms.has(roomId);
+  if (rooms.has(roomId)) return true;
+
+  // Try case-insensitive match
+  const lowerRoomId = roomId.toLowerCase();
+  for (const id of rooms.keys()) {
+    if (id.toLowerCase() === lowerRoomId) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
