@@ -10,10 +10,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { RoomLobby } from "@/components/room";
-import { ArrowLeft, Users } from "lucide-react";
-import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { Users, LogOut, Loader2 } from "lucide-react";
 
 /**
  * Room Lobby Page Component
@@ -22,7 +22,15 @@ import Link from "next/link";
  */
 export default function RoomsPage() {
   const router = useRouter();
+  const { user, state, signOut } = useAuth();
   const [isJoining, setIsJoining] = useState<string | null>(null);
+
+  // Redirect unauthenticated users to sign-in page
+  useEffect(() => {
+    if (state === "unauthenticated") {
+      router.replace("/auth/signin?returnUrl=/rooms");
+    }
+  }, [state, router]);
 
   /**
    * Handle joining a room
@@ -48,20 +56,23 @@ export default function RoomsPage() {
     router.push("/rooms/create");
   }, [router]);
 
+  // Show loading state while checking auth or redirecting
+  if (state === "loading" || state === "unauthenticated") {
+    return (
+      <div className="h-dvh h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="h-dvh h-screen bg-background flex flex-col fixed inset-0 overflow-hidden">
       {/* Header */}
       <header className="flex-shrink-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Back to home */}
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="hidden sm:inline">Back to Home</span>
-            </Link>
+            {/* Spacer for balance */}
+            <div className="w-24" />
 
             {/* Title */}
             <div className="flex items-center gap-2">
@@ -71,8 +82,18 @@ export default function RoomsPage() {
               </h1>
             </div>
 
-            {/* Placeholder for balance */}
-            <div className="w-24" />
+            {/* Auth button */}
+            <div className="w-24 flex justify-end">
+              {user && (
+                <button
+                  onClick={signOut}
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
