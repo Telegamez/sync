@@ -7,13 +7,13 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-117
  */
 
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
-import { RoomLobby } from '@/components/room';
-import { ArrowLeft, Users } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
+import { RoomLobby } from "@/components/room";
+import { ArrowLeft, Users } from "lucide-react";
+import Link from "next/link";
 
 /**
  * Room Lobby Page Component
@@ -34,24 +34,24 @@ export default function RoomsPage() {
         // Navigate to the room experience page
         router.push(`/rooms/${roomId}`);
       } catch (error) {
-        console.error('Failed to join room:', error);
+        console.error("Failed to join room:", error);
         setIsJoining(null);
       }
     },
-    [router]
+    [router],
   );
 
   /**
    * Handle creating a new room
    */
   const handleCreateRoom = useCallback(() => {
-    router.push('/rooms/create');
+    router.push("/rooms/create");
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-dvh h-screen bg-background flex flex-col fixed inset-0 overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="flex-shrink-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Back to home */}
@@ -78,46 +78,46 @@ export default function RoomsPage() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page description */}
-        <div className="mb-8 text-center">
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Join an existing collaboration room or create a new one to start
-            a shared AI conversation with your team.
-          </p>
-        </div>
-
-        {/* Room lobby component */}
-        <RoomLobby
-          onJoinRoom={handleJoinRoom}
-          onCreateRoom={handleCreateRoom}
-          refreshInterval={30000}
-          showCreateButton
-          className="max-w-5xl mx-auto"
-        />
-
-        {/* Joining overlay */}
-        {isJoining && (
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-card border border-border rounded-lg p-8 text-center shadow-xl">
-              <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-lg font-medium text-foreground">
-                Joining room...
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Establishing connection
-              </p>
-            </div>
+      <main className="flex-1 overflow-y-auto touch-scroll overscroll-contain">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Page description */}
+          <div className="mb-8 text-center">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Join an existing collaboration room or create a new one to start a
+              shared AI conversation with your team.
+            </p>
           </div>
-        )}
+
+          {/* Room lobby component */}
+          <RoomLobby
+            onJoinRoom={handleJoinRoom}
+            onCreateRoom={handleCreateRoom}
+            refreshInterval={30000}
+            showCreateButton
+            className="max-w-5xl mx-auto"
+          />
+
+          {/* Joining overlay */}
+          {isJoining && (
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-card border border-border rounded-lg p-8 text-center shadow-xl">
+                <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+                <p className="text-lg font-medium text-foreground">
+                  Joining room...
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Establishing connection
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-6 mt-auto">
+      <footer className="flex-shrink-0 border-t border-border py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          <p>
-            Swensync - The AI Collaboration Engine
-          </p>
+          <p>Swensync - The AI Collaboration Engine</p>
         </div>
       </footer>
     </div>

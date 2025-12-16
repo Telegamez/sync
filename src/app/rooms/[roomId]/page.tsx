@@ -894,7 +894,7 @@ export default function RoomPage() {
    */
   if (roomState === "loading" || roomState === "joining") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-dvh h-screen bg-background flex items-center justify-center fixed inset-0">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
           <p className="text-lg font-medium text-foreground">
@@ -945,7 +945,7 @@ export default function RoomPage() {
     const Icon = config.icon;
 
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="h-dvh h-screen bg-background flex items-center justify-center p-4 fixed inset-0">
         <div className="max-w-md w-full text-center">
           <div className="bg-card border border-border rounded-lg p-8 shadow-sm">
             <Icon className="w-16 h-16 text-red-400 mx-auto mb-4" />
@@ -970,7 +970,7 @@ export default function RoomPage() {
    * Render connected room experience
    */
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-dvh h-screen bg-background flex flex-col overflow-hidden fixed inset-0">
       {/* Header */}
       <header className="flex-shrink-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1242,8 +1242,8 @@ export default function RoomPage() {
       </main>
 
       {/* Controls footer */}
-      <footer className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <footer className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border pb-safe">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
           <RoomControls
             isMuted={localIsMuted}
             onMuteToggle={handleMuteToggle}

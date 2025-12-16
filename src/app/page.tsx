@@ -46,7 +46,10 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col p-8" style={backgroundStyle}>
+    <main
+      className="h-dvh h-screen flex flex-col p-8 fixed inset-0 overflow-y-auto touch-scroll overscroll-contain"
+      style={backgroundStyle}
+    >
       {/* Tagline and About Us at top - background image has branding */}
       <div className="text-center pt-2 pb-4">
         <p className="text-lg text-foreground/80 font-medium">

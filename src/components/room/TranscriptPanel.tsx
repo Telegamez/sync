@@ -410,9 +410,12 @@ export function TranscriptPanel({
     });
   }, []);
 
-  // Mobile sheet styles - bottom-24 keeps panel above the footer controls
+  // Mobile sheet styles - dynamically sized to fill space between header and footer
+  // top-32 (8rem/128px) = below header, bottom-48 (12rem/192px) = above footer controls
+  // Uses calc to dynamically fill available space
+  // Uses touch-scroll class for smooth native scrolling on iOS
   const containerClasses = mobileSheet
-    ? "fixed inset-x-0 bottom-24 z-50 bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 mx-2 max-h-[60vh] flex flex-col"
+    ? "fixed inset-x-0 top-32 bottom-48 z-50 bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 mx-2 flex flex-col touch-scroll"
     : `bg-gray-900/80 backdrop-blur-sm rounded-lg border border-gray-700/50 flex flex-col ${className}`;
 
   return (
@@ -488,7 +491,7 @@ export function TranscriptPanel({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto min-h-0"
+        className="flex-1 overflow-y-auto min-h-0 touch-scroll overscroll-contain"
       >
         {/* Loading state */}
         {isLoading ? (
