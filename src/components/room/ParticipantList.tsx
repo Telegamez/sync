@@ -13,6 +13,10 @@
 import { useMemo, useState, useEffect } from "react";
 import type { PeerId, PeerRole, PeerConnectionState } from "@/types/peer";
 import { InwardWaveform, type InwardWaveformColor } from "./InwardWaveform";
+import {
+  getParticipantColor,
+  type ParticipantColorConfig,
+} from "@/lib/participant-colors";
 
 /**
  * Extended participant info with presence state
@@ -154,87 +158,6 @@ function getConnectionStatusLabel(
     default:
       return "Unknown status";
   }
-}
-
-/**
- * Avatar color palette - each participant gets a unique color
- * Colors are assigned consistently based on participant ID hash
- */
-const AVATAR_COLORS: Array<{
-  name: InwardWaveformColor;
-  border: string;
-  text: string;
-  bg: string;
-}> = [
-  {
-    name: "blue",
-    border: "border-blue-500",
-    text: "text-blue-500",
-    bg: "bg-blue-500/20",
-  },
-  {
-    name: "emerald",
-    border: "border-emerald-500",
-    text: "text-emerald-500",
-    bg: "bg-emerald-500/20",
-  },
-  {
-    name: "amber",
-    border: "border-amber-500",
-    text: "text-amber-500",
-    bg: "bg-amber-500/20",
-  },
-  {
-    name: "rose",
-    border: "border-rose-500",
-    text: "text-rose-500",
-    bg: "bg-rose-500/20",
-  },
-  {
-    name: "cyan",
-    border: "border-cyan-500",
-    text: "text-cyan-500",
-    bg: "bg-cyan-500/20",
-  },
-  {
-    name: "orange",
-    border: "border-orange-500",
-    text: "text-orange-500",
-    bg: "bg-orange-500/20",
-  },
-  {
-    name: "pink",
-    border: "border-pink-500",
-    text: "text-pink-500",
-    bg: "bg-pink-500/20",
-  },
-  {
-    name: "indigo",
-    border: "border-indigo-500",
-    text: "text-indigo-500",
-    bg: "bg-indigo-500/20",
-  },
-  {
-    name: "green",
-    border: "border-green-500",
-    text: "text-green-500",
-    bg: "bg-green-500/20",
-  },
-];
-
-/**
- * Get a consistent color for a participant based on their ID
- * Uses a simple hash to ensure the same ID always gets the same color
- */
-function getAvatarColor(id: string): (typeof AVATAR_COLORS)[0] {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    const char = id.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  const index = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
 }
 
 /**
@@ -384,6 +307,7 @@ function ParticipantItem({
   showConnectionStatus,
   showRoleBadge,
   sizeConfig,
+  colorConfig,
   onClick,
 }: {
   participant: ParticipantInfo;
@@ -392,6 +316,7 @@ function ParticipantItem({
   showConnectionStatus: boolean;
   showRoleBadge: boolean;
   sizeConfig: (typeof AVATAR_SIZE_CLASSES)[AvatarSizeConfig];
+  colorConfig: ParticipantColorConfig;
   onClick?: () => void;
 }) {
   const {
@@ -414,10 +339,8 @@ function ParticipantItem({
   const connectionColor = getConnectionStatusColor(connectionState);
   const connectionLabel = getConnectionStatusLabel(connectionState);
 
-  // Get consistent color for this participant based on their ID
-  const avatarColor = getAvatarColor(participant.id);
-  // AI always uses purple, others use their assigned color
-  const waveformColor: InwardWaveformColor = isAI ? "purple" : avatarColor.name;
+  // Use the color config passed in (already handles AI = purple)
+  const waveformColor: InwardWaveformColor = colorConfig.name;
 
   return (
     <button
@@ -443,7 +366,7 @@ function ParticipantItem({
             alt={displayName}
             className={`
               rounded-full object-cover border-2 transition-all
-              ${avatarColor.border}
+              ${colorConfig.border}
               ${sizeConfig.avatar}
             `}
           />
@@ -451,8 +374,8 @@ function ParticipantItem({
           <div
             className={`
               rounded-full flex items-center justify-center font-semibold
-              ${avatarColor.bg} ${avatarColor.text}
-              border-2 ${avatarColor.border} transition-all
+              ${colorConfig.bg} ${colorConfig.text}
+              border-2 ${colorConfig.border} transition-all
               ${sizeConfig.avatar} ${sizeConfig.text}
             `}
           >
@@ -672,6 +595,25 @@ export function ParticipantList({
     });
   }, [participants, localPeerId]);
 
+  // Build color map: each participant gets a unique color, AI always gets purple
+  const participantColorMap = useMemo(() => {
+    const colorMap = new Map<string, ParticipantColorConfig>();
+    let humanIndex = 0;
+
+    for (const participant of sortedParticipants) {
+      colorMap.set(
+        participant.id,
+        getParticipantColor(humanIndex, participant.isAI),
+      );
+      // Only increment index for non-AI participants
+      if (!participant.isAI) {
+        humanIndex++;
+      }
+    }
+
+    return colorMap;
+  }, [sortedParticipants]);
+
   // Apply max visible limit
   const visibleParticipants = maxVisible
     ? sortedParticipants.slice(0, maxVisible)
@@ -713,6 +655,7 @@ export function ParticipantList({
           showConnectionStatus={showConnectionStatus}
           showRoleBadge={showRoleBadge}
           sizeConfig={sizeConfig}
+          colorConfig={participantColorMap.get(participant.id)!}
           onClick={
             onParticipantClick
               ? () => onParticipantClick(participant.id)

@@ -7,11 +7,11 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-112
  */
 
-'use client';
+"use client";
 
-import React, { useState, useCallback } from 'react';
-import { Users, Loader2 } from 'lucide-react';
-import type { RoomSummary, RoomStatus, AIPersonality } from '@/types/room';
+import React, { useState, useCallback } from "react";
+import { Users, Loader2 } from "lucide-react";
+import type { RoomSummary, RoomStatus, AIPersonality } from "@/types/room";
 
 /**
  * Props for the RoomCard component
@@ -34,36 +34,39 @@ export interface RoomCardProps {
  */
 function getStatusBadgeClasses(status: RoomStatus): string {
   switch (status) {
-    case 'waiting':
-      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-    case 'active':
-      return 'bg-green-500/20 text-green-400 border-green-500/30';
-    case 'full':
-      return 'bg-red-500/20 text-red-400 border-red-500/30';
-    case 'closed':
-      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    case "waiting":
+      return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+    case "active":
+      return "bg-green-500/20 text-green-400 border-green-500/30";
+    case "full":
+      return "bg-red-500/20 text-red-400 border-red-500/30";
+    case "closed":
+      return "bg-gray-500/20 text-gray-400 border-gray-500/30";
     default:
-      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      return "bg-gray-500/20 text-gray-400 border-gray-500/30";
   }
 }
 
 /**
  * Get AI personality display info
  */
-function getAIPersonalityInfo(personality: AIPersonality): { label: string; color: string } {
+function getAIPersonalityInfo(personality: AIPersonality): {
+  label: string;
+  color: string;
+} {
   switch (personality) {
-    case 'facilitator':
-      return { label: 'Facilitator', color: 'text-blue-400' };
-    case 'assistant':
-      return { label: 'Assistant', color: 'text-green-400' };
-    case 'expert':
-      return { label: 'Expert', color: 'text-purple-400' };
-    case 'brainstorm':
-      return { label: 'Brainstorm', color: 'text-orange-400' };
-    case 'custom':
-      return { label: 'Custom', color: 'text-pink-400' };
+    case "facilitator":
+      return { label: "Facilitator", color: "text-blue-400" };
+    case "assistant":
+      return { label: "Assistant", color: "text-green-400" };
+    case "expert":
+      return { label: "Expert", color: "text-purple-400" };
+    case "brainstorm":
+      return { label: "Brainstorm", color: "text-orange-400" };
+    case "custom":
+      return { label: "Custom", color: "text-pink-400" };
     default:
-      return { label: 'Assistant', color: 'text-gray-400' };
+      return { label: "Assistant", color: "text-gray-400" };
   }
 }
 
@@ -77,7 +80,7 @@ function formatRelativeTime(date: Date): string {
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 1) return 'Just now';
+  if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   return `${diffDays}d ago`;
@@ -88,32 +91,37 @@ function formatRelativeTime(date: Date): string {
  */
 function getInitials(name: string): string {
   return name
-    .split(' ')
+    .split(" ")
     .map((part) => part[0])
-    .join('')
+    .join("")
     .toUpperCase()
     .slice(0, 2);
 }
 
 /**
  * Avatar colors for participants without avatar images
+ * Note: Purple is reserved for AI, so excluded from this palette
  */
 const AVATAR_COLORS = [
-  'bg-blue-500',
-  'bg-green-500',
-  'bg-purple-500',
-  'bg-orange-500',
-  'bg-pink-500',
-  'bg-teal-500',
-  'bg-indigo-500',
-  'bg-red-500',
+  "bg-blue-500",
+  "bg-green-500",
+  "bg-orange-500",
+  "bg-pink-500",
+  "bg-teal-500",
+  "bg-indigo-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-cyan-500",
+  "bg-emerald-500",
 ];
 
 /**
  * Get avatar color based on index or name
  */
 function getAvatarColor(index: number, name: string): string {
-  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = name
+    .split("")
+    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return AVATAR_COLORS[(index + hash) % AVATAR_COLORS.length];
 }
 
@@ -128,7 +136,13 @@ interface ParticipantAvatarProps {
   overflowCount?: number;
 }
 
-function ParticipantAvatar({ name, avatarUrl, index, isOverflow, overflowCount }: ParticipantAvatarProps) {
+function ParticipantAvatar({
+  name,
+  avatarUrl,
+  index,
+  isOverflow,
+  overflowCount,
+}: ParticipantAvatarProps) {
   if (isOverflow && overflowCount) {
     return (
       <div
@@ -184,11 +198,11 @@ export function RoomCard({
   onJoin,
   participantAvatars = [],
   showAIPersonality = true,
-  className = '',
+  className = "",
 }: RoomCardProps) {
   const [isJoining, setIsJoining] = useState(false);
 
-  const isJoinable = room.status !== 'full' && room.status !== 'closed';
+  const isJoinable = room.status !== "full" && room.status !== "closed";
   const aiInfo = getAIPersonalityInfo(room.aiPersonality);
 
   // Show up to 4 avatars, then overflow indicator
@@ -214,10 +228,10 @@ export function RoomCard({
    * Get join button text
    */
   const getJoinButtonText = (): string => {
-    if (isJoining) return 'Joining...';
-    if (room.status === 'full') return 'Room Full';
-    if (room.status === 'closed') return 'Closed';
-    return 'Join Room';
+    if (isJoining) return "Joining...";
+    if (room.status === "full") return "Room Full";
+    if (room.status === "closed") return "Closed";
+    return "Join Room";
   };
 
   return (
@@ -227,7 +241,10 @@ export function RoomCard({
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="font-semibold text-foreground truncate flex-1" title={room.name}>
+        <h3
+          className="font-semibold text-foreground truncate flex-1"
+          title={room.name}
+        >
           {room.name}
         </h3>
         <span
@@ -239,7 +256,10 @@ export function RoomCard({
 
       {/* Description */}
       {room.description && (
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3" title={room.description}>
+        <p
+          className="text-sm text-muted-foreground line-clamp-2 mb-3"
+          title={room.description}
+        >
           {room.description}
         </p>
       )}
