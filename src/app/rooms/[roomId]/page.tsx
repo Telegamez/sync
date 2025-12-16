@@ -16,7 +16,6 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Users,
   AlertCircle,
   Loader2,
   LogOut,
@@ -27,6 +26,7 @@ import {
   X,
   Mic,
   Search,
+  Users,
 } from "lucide-react";
 import {
   ParticipantList,
@@ -1015,30 +1015,26 @@ export default function RoomPage() {
               <span className="hidden sm:inline">Leave</span>
             </button>
 
-            {/* Room info */}
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              <div className="text-center">
-                <div className="flex items-center gap-2 justify-center">
-                  <h1 className="text-lg font-semibold text-foreground truncate max-w-[200px] sm:max-w-[300px]">
-                    {room?.name || "Room"}
-                  </h1>
-                  {/* Recording indicator - shows when transcript is enabled and has entries */}
-                  {isTranscriptEnabled && transcript.entries.length > 0 && (
-                    <span
-                      className="flex items-center gap-1 text-xs text-red-400"
-                      title="Recording transcript"
-                    >
-                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <span className="hidden sm:inline">REC</span>
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {participants.length}/{room?.maxParticipants || 4}{" "}
-                  participants
-                </p>
+            {/* Room info - simplified for mobile */}
+            <div className="text-center">
+              <div className="flex items-center gap-2 justify-center">
+                <h1 className="text-lg font-semibold text-foreground truncate max-w-[160px] sm:max-w-[300px]">
+                  {room?.name || "Room"}
+                </h1>
+                {/* Recording indicator - shows when transcript is enabled and has entries */}
+                {isTranscriptEnabled && transcript.entries.length > 0 && (
+                  <span
+                    className="flex items-center gap-1 text-xs text-red-400"
+                    title="Recording transcript"
+                  >
+                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    <span className="hidden sm:inline">REC</span>
+                  </span>
+                )}
               </div>
+              <p className="text-xs text-muted-foreground">
+                {participants.length}/{room?.maxParticipants || 4} participants
+              </p>
             </div>
 
             {/* Header right actions */}
