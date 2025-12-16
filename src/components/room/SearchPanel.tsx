@@ -377,23 +377,6 @@ export function SearchPanel({
           </div>
         )}
       </div>
-
-      {/* Footer with related searches */}
-      {results?.relatedSearches && results.relatedSearches.length > 0 && (
-        <div className="px-4 py-2 border-t border-gray-700/50 bg-gray-800/50">
-          <div className="text-xs text-gray-500 mb-1">Related:</div>
-          <div className="flex flex-wrap gap-1">
-            {results.relatedSearches.slice(0, 5).map((search, index) => (
-              <span
-                key={index}
-                className="text-xs px-2 py-1 bg-gray-700/50 text-gray-400 rounded-full"
-              >
-                {search}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
