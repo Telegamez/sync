@@ -234,9 +234,9 @@ export function SearchPanel({
         : results.videos
     : [];
 
-  // Mobile sheet styles - full width bottom sheet that takes most of the screen
+  // Mobile sheet styles - matches TranscriptPanel positioning (bottom-48 leaves space for PTT button)
   const containerClasses = mobileSheet
-    ? "fixed inset-x-0 top-20 bottom-0 z-50 bg-gray-900 rounded-t-2xl shadow-2xl border-t border-x border-gray-700 flex flex-col touch-scroll"
+    ? "fixed inset-x-0 top-32 bottom-48 z-50 bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 mx-2 flex flex-col touch-scroll"
     : `bg-gray-900/80 backdrop-blur-sm rounded-lg border border-gray-700/50 flex flex-col ${className}`;
 
   return (
