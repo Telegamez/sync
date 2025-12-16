@@ -6,7 +6,7 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-400
  */
 
-import type { UserProfile, Session } from '@/types/auth';
+import type { UserProfile, Session } from "@/types/auth";
 
 /**
  * Supabase configuration from environment
@@ -26,8 +26,8 @@ export function getSupabaseConfig(): SupabaseConfig {
   if (!url || !anonKey) {
     // Return mock config for development/testing without Supabase
     return {
-      url: 'http://localhost:54321',
-      anonKey: 'mock-anon-key',
+      url: "http://localhost:54321",
+      anonKey: "mock-anon-key",
     };
   }
 
@@ -85,13 +85,13 @@ export function transformUser(user: SupabaseUser): UserProfile {
 
   return {
     id: user.id,
-    email: user.email || '',
+    email: user.email || "",
     displayName:
       metadata.display_name ||
       metadata.full_name ||
       metadata.name ||
-      user.email?.split('@')[0] ||
-      'User',
+      user.email?.split("@")[0] ||
+      "User",
     avatarUrl: metadata.avatar_url || metadata.picture,
     createdAt: user.created_at ? new Date(user.created_at) : new Date(),
     lastSignInAt: user.last_sign_in_at
@@ -119,13 +119,13 @@ export function transformSession(session: SupabaseSession): Session {
 /**
  * Storage key for auth tokens
  */
-export const AUTH_STORAGE_KEY = 'swensync-auth';
+export const AUTH_STORAGE_KEY = "sync-auth";
 
 /**
  * Get stored session from localStorage
  */
 export function getStoredSession(): Session | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
 
   try {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -154,7 +154,7 @@ export function getStoredSession(): Session | null {
  * Store session in localStorage
  */
 export function storeSession(session: Session): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   try {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
@@ -167,7 +167,7 @@ export function storeSession(session: Session): void {
  * Clear stored session
  */
 export function clearStoredSession(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   try {
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -203,7 +203,7 @@ export class SupabaseAuthClient {
   async signUp(
     email: string,
     password: string,
-    metadata?: SupabaseUserMetadata
+    metadata?: SupabaseUserMetadata,
   ): Promise<{ session: SupabaseSession | null; error: Error | null }> {
     if (!isSupabaseConfigured()) {
       return this.mockSignUp(email, password, metadata);
@@ -211,9 +211,9 @@ export class SupabaseAuthClient {
 
     try {
       const response = await fetch(`${this.config.url}/auth/v1/signup`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           apikey: this.config.anonKey,
         },
         body: JSON.stringify({
@@ -226,7 +226,12 @@ export class SupabaseAuthClient {
       const data = await response.json();
 
       if (!response.ok) {
-        return { session: null, error: new Error(data.error_description || data.msg || 'Sign up failed') };
+        return {
+          session: null,
+          error: new Error(
+            data.error_description || data.msg || "Sign up failed",
+          ),
+        };
       }
 
       if (data.access_token) {
@@ -253,26 +258,34 @@ export class SupabaseAuthClient {
    */
   async signInWithPassword(
     email: string,
-    password: string
+    password: string,
   ): Promise<{ session: SupabaseSession | null; error: Error | null }> {
     if (!isSupabaseConfigured()) {
       return this.mockSignIn(email, password);
     }
 
     try {
-      const response = await fetch(`${this.config.url}/auth/v1/token?grant_type=password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: this.config.anonKey,
+      const response = await fetch(
+        `${this.config.url}/auth/v1/token?grant_type=password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: this.config.anonKey,
+          },
+          body: JSON.stringify({ email, password }),
         },
-        body: JSON.stringify({ email, password }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        return { session: null, error: new Error(data.error_description || data.msg || 'Sign in failed') };
+        return {
+          session: null,
+          error: new Error(
+            data.error_description || data.msg || "Sign in failed",
+          ),
+        };
       }
 
       const session: SupabaseSession = {
@@ -293,11 +306,14 @@ export class SupabaseAuthClient {
    * Sign in with OAuth provider
    */
   async signInWithOAuth(
-    provider: 'google' | 'github',
-    redirectTo?: string
+    provider: "google" | "github",
+    redirectTo?: string,
   ): Promise<{ url: string | null; error: Error | null }> {
     if (!isSupabaseConfigured()) {
-      return { url: null, error: new Error('OAuth not available in mock mode') };
+      return {
+        url: null,
+        error: new Error("OAuth not available in mock mode"),
+      };
     }
 
     try {
@@ -318,30 +334,35 @@ export class SupabaseAuthClient {
    */
   async signInWithOtp(
     email: string,
-    redirectTo?: string
+    redirectTo?: string,
   ): Promise<{ error: Error | null }> {
     if (!isSupabaseConfigured()) {
-      return { error: new Error('Magic link not available in mock mode') };
+      return { error: new Error("Magic link not available in mock mode") };
     }
 
     try {
       const response = await fetch(`${this.config.url}/auth/v1/otp`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           apikey: this.config.anonKey,
         },
         body: JSON.stringify({
           email,
           options: {
-            emailRedirectTo: redirectTo || `${window.location.origin}/auth/callback`,
+            emailRedirectTo:
+              redirectTo || `${window.location.origin}/auth/callback`,
           },
         }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        return { error: new Error(data.error_description || data.msg || 'Failed to send magic link') };
+        return {
+          error: new Error(
+            data.error_description || data.msg || "Failed to send magic link",
+          ),
+        };
       }
 
       return { error: null };
@@ -355,7 +376,7 @@ export class SupabaseAuthClient {
    */
   async resetPasswordForEmail(
     email: string,
-    redirectTo?: string
+    redirectTo?: string,
   ): Promise<{ error: Error | null }> {
     if (!isSupabaseConfigured()) {
       return { error: null }; // Mock success
@@ -363,22 +384,27 @@ export class SupabaseAuthClient {
 
     try {
       const response = await fetch(`${this.config.url}/auth/v1/recover`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           apikey: this.config.anonKey,
         },
         body: JSON.stringify({
           email,
           options: {
-            redirectTo: redirectTo || `${window.location.origin}/auth/reset-password`,
+            redirectTo:
+              redirectTo || `${window.location.origin}/auth/reset-password`,
           },
         }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        return { error: new Error(data.error_description || data.msg || 'Failed to reset password') };
+        return {
+          error: new Error(
+            data.error_description || data.msg || "Failed to reset password",
+          ),
+        };
       }
 
       return { error: null };
@@ -390,22 +416,23 @@ export class SupabaseAuthClient {
   /**
    * Update password
    */
-  async updateUser(
-    updates: { password?: string; data?: SupabaseUserMetadata }
-  ): Promise<{ user: SupabaseUser | null; error: Error | null }> {
+  async updateUser(updates: {
+    password?: string;
+    data?: SupabaseUserMetadata;
+  }): Promise<{ user: SupabaseUser | null; error: Error | null }> {
     if (!isSupabaseConfigured()) {
       return this.mockUpdateUser(updates);
     }
 
     if (!this.currentSession) {
-      return { user: null, error: new Error('Not authenticated') };
+      return { user: null, error: new Error("Not authenticated") };
     }
 
     try {
       const response = await fetch(`${this.config.url}/auth/v1/user`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           apikey: this.config.anonKey,
           Authorization: `Bearer ${this.currentSession.accessToken}`,
         },
@@ -415,7 +442,12 @@ export class SupabaseAuthClient {
       const data = await response.json();
 
       if (!response.ok) {
-        return { user: null, error: new Error(data.error_description || data.msg || 'Failed to update user') };
+        return {
+          user: null,
+          error: new Error(
+            data.error_description || data.msg || "Failed to update user",
+          ),
+        };
       }
 
       // Update stored session with new user data
@@ -445,7 +477,7 @@ export class SupabaseAuthClient {
     try {
       if (this.currentSession) {
         await fetch(`${this.config.url}/auth/v1/logout`, {
-          method: 'POST',
+          method: "POST",
           headers: {
             apikey: this.config.anonKey,
             Authorization: `Bearer ${this.currentSession.accessToken}`,
@@ -464,32 +496,43 @@ export class SupabaseAuthClient {
   /**
    * Refresh session
    */
-  async refreshSession(): Promise<{ session: SupabaseSession | null; error: Error | null }> {
+  async refreshSession(): Promise<{
+    session: SupabaseSession | null;
+    error: Error | null;
+  }> {
     if (!isSupabaseConfigured()) {
       return { session: null, error: null };
     }
 
     if (!this.currentSession) {
-      return { session: null, error: new Error('No session to refresh') };
+      return { session: null, error: new Error("No session to refresh") };
     }
 
     try {
-      const response = await fetch(`${this.config.url}/auth/v1/token?grant_type=refresh_token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: this.config.anonKey,
+      const response = await fetch(
+        `${this.config.url}/auth/v1/token?grant_type=refresh_token`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: this.config.anonKey,
+          },
+          body: JSON.stringify({
+            refresh_token: this.currentSession.refreshToken,
+          }),
         },
-        body: JSON.stringify({
-          refresh_token: this.currentSession.refreshToken,
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         this.clearSession();
-        return { session: null, error: new Error(data.error_description || data.msg || 'Session refresh failed') };
+        return {
+          session: null,
+          error: new Error(
+            data.error_description || data.msg || "Session refresh failed",
+          ),
+        };
       }
 
       const session: SupabaseSession = {
@@ -541,14 +584,20 @@ export class SupabaseAuthClient {
   private mockSignUp(
     email: string,
     password: string,
-    metadata?: SupabaseUserMetadata
+    metadata?: SupabaseUserMetadata,
   ): { session: SupabaseSession | null; error: Error | null } {
     if (password.length < 6) {
-      return { session: null, error: new Error('Password should be at least 6 characters') };
+      return {
+        session: null,
+        error: new Error("Password should be at least 6 characters"),
+      };
     }
 
-    if (!email.includes('@')) {
-      return { session: null, error: new Error('Unable to validate email address: invalid format') };
+    if (!email.includes("@")) {
+      return {
+        session: null,
+        error: new Error("Unable to validate email address: invalid format"),
+      };
     }
 
     const user: SupabaseUser = {
@@ -571,17 +620,17 @@ export class SupabaseAuthClient {
 
   private mockSignIn(
     email: string,
-    password: string
+    password: string,
   ): { session: SupabaseSession | null; error: Error | null } {
     // For mock, accept any valid-looking credentials
-    if (!email.includes('@') || password.length < 6) {
-      return { session: null, error: new Error('Invalid login credentials') };
+    if (!email.includes("@") || password.length < 6) {
+      return { session: null, error: new Error("Invalid login credentials") };
     }
 
     const user: SupabaseUser = {
-      id: `mock-user-${email.replace(/[^a-z0-9]/gi, '')}`,
+      id: `mock-user-${email.replace(/[^a-z0-9]/gi, "")}`,
       email,
-      user_metadata: { display_name: email.split('@')[0] },
+      user_metadata: { display_name: email.split("@")[0] },
       created_at: new Date().toISOString(),
       last_sign_in_at: new Date().toISOString(),
     };
@@ -597,15 +646,19 @@ export class SupabaseAuthClient {
     return { session, error: null };
   }
 
-  private mockUpdateUser(
-    updates: { password?: string; data?: SupabaseUserMetadata }
-  ): { user: SupabaseUser | null; error: Error | null } {
+  private mockUpdateUser(updates: {
+    password?: string;
+    data?: SupabaseUserMetadata;
+  }): { user: SupabaseUser | null; error: Error | null } {
     if (!this.currentSession) {
-      return { user: null, error: new Error('Not authenticated') };
+      return { user: null, error: new Error("Not authenticated") };
     }
 
     if (updates.password && updates.password.length < 6) {
-      return { user: null, error: new Error('Password should be at least 6 characters') };
+      return {
+        user: null,
+        error: new Error("Password should be at least 6 characters"),
+      };
     }
 
     const updatedUser: SupabaseUser = {
@@ -646,6 +699,8 @@ export function getSupabaseAuthClient(): SupabaseAuthClient {
 /**
  * Create a new Supabase auth client (for testing)
  */
-export function createSupabaseAuthClient(config?: SupabaseConfig): SupabaseAuthClient {
+export function createSupabaseAuthClient(
+  config?: SupabaseConfig,
+): SupabaseAuthClient {
   return new SupabaseAuthClient(config);
 }

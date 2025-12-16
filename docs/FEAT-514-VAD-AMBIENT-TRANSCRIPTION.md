@@ -47,7 +47,7 @@ The project already has **two VAD implementations** we can reuse:
 
 ### 1. Silero VAD (`@ricky0123/vad-web`)
 
-**Location:** `src/hooks/useSwensyncRealtime.ts` (lines 343-432)
+**Location:** `src/hooks/usesyncRealtime.ts` (lines 343-432)
 
 ```typescript
 // Already configured for fast turn detection:
@@ -249,13 +249,13 @@ export function useAmbientTranscription(
 
 Given the existing code, **Silero VAD is the better choice** because:
 
-1. Already proven in production (useSwensyncRealtime)
+1. Already proven in production (usesyncRealtime)
 2. Neural network accuracy reduces false positives
 3. Configurable redemptionMs allows tuning for ambient transcription
 
-### Note: Different Use Case from useSwensyncRealtime
+### Note: Different Use Case from usesyncRealtime
 
-In `useSwensyncRealtime`, there's a **race condition by design** where:
+In `usesyncRealtime`, there's a **race condition by design** where:
 
 - **Client VAD** detects speech end locally (200ms redemption)
 - **Server VAD** detects speech end remotely (350ms silence)
@@ -270,7 +270,7 @@ For **ambient transcription**, we don't need this race. The pattern is simpler:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                   useSwensyncRealtime (PTT)                  │
+│                   usesyncRealtime (PTT)                  │
 ├──────────────────────────────────────────────────────────────┤
 │  Client VAD ──┬── commit signal ──► OpenAI Server VAD       │
 │               │   (race for faster)                          │
@@ -289,11 +289,11 @@ For **ambient transcription**, we don't need this race. The pattern is simpler:
 
 ### Task 1: Extract Silero VAD into Reusable Hook
 
-**File:** `src/hooks/useSileroVAD.ts` (NEW - extracted from useSwensyncRealtime)
+**File:** `src/hooks/useSileroVAD.ts` (NEW - extracted from usesyncRealtime)
 
 **Steps:**
 
-1. Extract MicVAD initialization logic from useSwensyncRealtime
+1. Extract MicVAD initialization logic from usesyncRealtime
 2. Create standalone hook with configurable thresholds
 3. Expose: isVoiceActive, isSpeechStart (event), isSpeechEnd (event)
 4. Handle stream lifecycle (start/stop/destroy)

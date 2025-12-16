@@ -110,14 +110,14 @@ Changes needed:
 const [displayName, setDisplayName] = useState(() => {
   if (typeof window !== "undefined") {
     // Check localStorage first (persisted)
-    const stored = localStorage.getItem("swensync_vanityUsername");
+    const stored = localStorage.getItem("sync_vanityUsername");
     if (stored) return stored;
     // Fall back to session storage
-    const session = sessionStorage.getItem("swensync_displayName");
+    const session = sessionStorage.getItem("sync_displayName");
     if (session) return session;
     // Generate new
     const newName = `User-${Math.random().toString(36).slice(2, 6)}`;
-    sessionStorage.setItem("swensync_displayName", newName);
+    sessionStorage.setItem("sync_displayName", newName);
     return newName;
   }
   return "User";
@@ -129,7 +129,7 @@ const handleUsernameChange = useCallback(
   (newName: string) => {
     setDisplayName(newName);
     // Persist to localStorage
-    localStorage.setItem("swensync_vanityUsername", newName);
+    localStorage.setItem("sync_vanityUsername", newName);
     // Update via signaling
     const client = getClient();
     if (client) {
@@ -183,7 +183,7 @@ The AI already receives `activeSpeakerName` from [server.ts:735](server.ts#L735)
 ```
 User clicks edit → Modal opens → User enters new name → Save
     ↓
-localStorage.setItem("swensync_vanityUsername", newName)
+localStorage.setItem("sync_vanityUsername", newName)
     ↓
 signalingClient.updateDisplayName(newName)
     ↓

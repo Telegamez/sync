@@ -1,5 +1,5 @@
 /**
- * SwensyncOverlayRoom Component
+ * SyncOverlayRoom Component
  *
  * Enhanced full-screen overlay for multi-peer room voice conversations.
  * Displays shared AI state, current speaker, and room-specific controls.
@@ -7,22 +7,33 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-306
  */
 
-'use client';
+"use client";
 
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { X, Loader2, AlertCircle, Users, Settings, Volume2, VolumeX } from 'lucide-react';
-import { isMobile } from 'react-device-detect';
-import { AudioWaveVisualizer } from '@/components/swensync/AudioWaveVisualizer';
-import { VisualizerModeSwitcher, type VisualizerVariant } from '@/components/swensync/VisualizerModeSwitcher';
-import { SessionTimer } from '@/components/swensync/SessionTimer';
-import { AIStateIndicator, AIStateBadge } from './AIStateIndicator';
-import { SpeakingIndicator, type SpeakerInfo } from './SpeakingIndicator';
-import { ParticipantAvatar } from './ParticipantAvatar';
-import { PTTButton, MainPTTButton } from './PTTButton';
-import type { AIResponseState } from '@/types/voice-mode';
-import type { PeerId } from '@/types/peer';
-import type { RoomId } from '@/types/room';
+import React, { useEffect, useCallback, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
+import {
+  X,
+  Loader2,
+  AlertCircle,
+  Users,
+  Settings,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { isMobile } from "react-device-detect";
+import { AudioWaveVisualizer } from "@/components/sync/AudioWaveVisualizer";
+import {
+  VisualizerModeSwitcher,
+  type VisualizerVariant,
+} from "@/components/sync/VisualizerModeSwitcher";
+import { SessionTimer } from "@/components/sync/SessionTimer";
+import { AIStateIndicator, AIStateBadge } from "./AIStateIndicator";
+import { SpeakingIndicator, type SpeakerInfo } from "./SpeakingIndicator";
+import { ParticipantAvatar } from "./ParticipantAvatar";
+import { PTTButton, MainPTTButton } from "./PTTButton";
+import type { AIResponseState } from "@/types/voice-mode";
+import type { PeerId } from "@/types/peer";
+import type { RoomId } from "@/types/room";
 
 /**
  * Participant info for room overlay
@@ -73,12 +84,17 @@ export interface RoomAISession {
 /**
  * Room overlay connection state
  */
-export type RoomOverlayConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+export type RoomOverlayConnectionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "error";
 
 /**
- * SwensyncOverlayRoom props
+ * SyncOverlayRoom props
  */
-export interface SwensyncOverlayRoomProps {
+export interface SyncOverlayRoomProps {
   /** Whether the overlay is open */
   isOpen: boolean;
   /** Callback when overlay should close */
@@ -133,17 +149,17 @@ export interface SwensyncOverlayRoomProps {
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
- * SwensyncOverlayRoom - Enhanced overlay for multi-peer rooms
+ * SyncOverlayRoom - Enhanced overlay for multi-peer rooms
  */
-export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
+export const SyncOverlayRoom: React.FC<SyncOverlayRoomProps> = ({
   isOpen,
   onClose,
   roomId,
-  roomName = 'Room',
+  roomName = "Room",
   localPeerId,
   connectionState,
   error,
@@ -167,7 +183,8 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
   // Track if we're mounted (for portal)
   const [mounted, setMounted] = useState(false);
   // Visualization mode state
-  const [visualizerMode, setVisualizerMode] = useState<VisualizerVariant>('bars');
+  const [visualizerMode, setVisualizerMode] =
+    useState<VisualizerVariant>("bars");
   // Track mobile landscape mode
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
@@ -187,35 +204,35 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
     };
 
     checkOrientation();
-    window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
+    window.addEventListener("resize", checkOrientation);
+    window.addEventListener("orientationchange", checkOrientation);
 
     return () => {
-      window.removeEventListener('resize', checkOrientation);
-      window.removeEventListener('orientationchange', checkOrientation);
+      window.removeEventListener("resize", checkOrientation);
+      window.removeEventListener("orientationchange", checkOrientation);
     };
   }, []);
 
   // Handle ESC key to close overlay
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   // Auto-connect when overlay opens
   useEffect(() => {
-    if (isOpen && connectionState === 'idle' && onConnect) {
+    if (isOpen && connectionState === "idle" && onConnect) {
       onConnect();
     }
   }, [isOpen, connectionState, onConnect]);
 
   // Disconnect when overlay closes
   useEffect(() => {
-    if (!isOpen && connectionState === 'connected' && onDisconnect) {
+    if (!isOpen && connectionState === "connected" && onDisconnect) {
       onDisconnect();
     }
   }, [isOpen, connectionState, onDisconnect]);
@@ -224,12 +241,12 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    window.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
+    window.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
     };
   }, [isOpen, handleKeyDown]);
 
@@ -247,8 +264,8 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
   // Get currently speaking participants
   const speakers = useMemo((): SpeakerInfo[] => {
     return participants
-      .filter((p) => p.isSpeaking)
-      .map((p) => ({
+      .filter((p: RoomParticipant) => p.isSpeaking)
+      .map((p: RoomParticipant) => ({
         id: p.id,
         displayName: p.displayName,
         avatarUrl: p.avatarUrl,
@@ -260,7 +277,9 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
   // Get participant who AI is responding to
   const respondingToParticipant = useMemo(() => {
     if (!aiSession.currentSpeakerId) return null;
-    return participants.find((p) => p.id === aiSession.currentSpeakerId);
+    return participants.find(
+      (p: RoomParticipant) => p.id === aiSession.currentSpeakerId,
+    );
   }, [aiSession.currentSpeakerId, participants]);
 
   // Check if local user is current speaker
@@ -269,14 +288,14 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
   // Get animation state for visualizer
   const animState = useMemo(() => {
     switch (aiSession.state) {
-      case 'listening':
-        return 'Listening';
-      case 'processing':
-        return 'Thinking';
-      case 'speaking':
-        return 'Speaking';
+      case "listening":
+        return "Listening";
+      case "processing":
+        return "Thinking";
+      case "speaking":
+        return "Speaking";
       default:
-        return 'Listening';
+        return "Listening";
     }
   }, [aiSession.state]);
 
@@ -285,16 +304,16 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
 
   // Determine background style
   const getBackgroundImage = () => {
-    if (!isMobileDevice) return '/landscape1920X1080.png';
-    if (isMobileLandscape) return '/landscape-background.png';
-    return '/portrait-background.png';
+    if (!isMobileDevice) return "/landscape1920X1080.png";
+    if (isMobileLandscape) return "/landscape-background.png";
+    return "/portrait-background.png";
   };
 
   const backgroundStyle = {
     backgroundImage: `url(${getBackgroundImage()})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
   };
 
   // Render header participants (compact avatars)
@@ -304,7 +323,7 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
 
     return (
       <div className="flex items-center -space-x-2">
-        {visibleParticipants.map((p) => (
+        {visibleParticipants.map((p: RoomParticipant) => (
           <ParticipantAvatar
             key={p.id}
             displayName={p.displayName}
@@ -328,13 +347,17 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
 
   // Render main content based on connection state
   const renderContent = () => {
-    if (connectionState === 'error') {
+    if (connectionState === "error") {
       return (
         <div className="flex flex-col items-center gap-3 sm:gap-4 text-foreground">
           <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-red-400" />
-          <h2 className="text-lg sm:text-xl font-semibold">Connection Failed</h2>
+          <h2 className="text-lg sm:text-xl font-semibold">
+            Connection Failed
+          </h2>
           <p className="text-muted-foreground text-center max-w-md text-sm sm:text-base">
-            {error?.message || aiSession.lastError || 'Unable to connect. Please try again.'}
+            {error?.message ||
+              aiSession.lastError ||
+              "Unable to connect. Please try again."}
           </p>
           <button
             onClick={handleRetry}
@@ -346,12 +369,17 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
       );
     }
 
-    if (connectionState === 'connecting' || connectionState === 'reconnecting') {
+    if (
+      connectionState === "connecting" ||
+      connectionState === "reconnecting"
+    ) {
       return (
         <div className="flex flex-col items-center gap-3 sm:gap-4 text-foreground">
           <Loader2 className="w-12 h-12 sm:w-16 sm:h-16 animate-spin text-primary" />
           <h2 className="text-lg sm:text-xl font-semibold">
-            {connectionState === 'reconnecting' ? 'Reconnecting...' : 'Connecting to Room'}
+            {connectionState === "reconnecting"
+              ? "Reconnecting..."
+              : "Connecting to Room"}
           </h2>
           <p className="text-muted-foreground text-sm">{roomName}</p>
         </div>
@@ -360,13 +388,19 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
 
     // Connected - show room content
     return (
-      <div className={`w-full max-w-4xl h-full flex flex-col ${isMobileLandscape ? 'justify-start' : 'justify-center'}`}>
+      <div
+        className={`w-full max-w-4xl h-full flex flex-col ${isMobileLandscape ? "justify-start" : "justify-center"}`}
+      >
         {/* AI State and Speaker Info */}
-        <div className={`text-center ${isMobileLandscape ? 'pt-2 pb-2' : 'pb-4 sm:pb-6'}`}>
+        <div
+          className={`text-center ${isMobileLandscape ? "pt-2 pb-2" : "pb-4 sm:pb-6"}`}
+        >
           {/* Who AI is responding to */}
-          {aiSession.state === 'speaking' && respondingToParticipant && (
+          {aiSession.state === "speaking" && respondingToParticipant && (
             <div className="flex items-center justify-center gap-2 mb-2">
-              <span className="text-muted-foreground text-sm">Responding to</span>
+              <span className="text-muted-foreground text-sm">
+                Responding to
+              </span>
               <ParticipantAvatar
                 displayName={respondingToParticipant.displayName}
                 avatarUrl={respondingToParticipant.avatarUrl}
@@ -374,7 +408,9 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
                 isLocal={respondingToParticipant.isLocal}
               />
               <span className="text-foreground font-medium">
-                {respondingToParticipant.isLocal ? 'you' : respondingToParticipant.displayName}
+                {respondingToParticipant.isLocal
+                  ? "you"
+                  : respondingToParticipant.displayName}
               </span>
             </div>
           )}
@@ -394,7 +430,7 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
           />
 
           {/* Current speakers */}
-          {speakers.length > 0 && aiSession.state === 'listening' && (
+          {speakers.length > 0 && aiSession.state === "listening" && (
             <div className="mt-3">
               <SpeakingIndicator
                 speakers={speakers}
@@ -420,7 +456,7 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
   // Use portal to render at document body level
   const overlayContent = (
     <div
-      className={`fixed inset-0 z-[9999] flex ${isMobileLandscape ? 'flex-row' : 'flex-col'}`}
+      className={`fixed inset-0 z-[9999] flex ${isMobileLandscape ? "flex-row" : "flex-col"}`}
       style={backgroundStyle}
       role="dialog"
       aria-modal="true"
@@ -434,7 +470,7 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
           {/* Left: Room info and participants */}
           <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
             {/* Session timer */}
-            {connectionState === 'connected' && (
+            {connectionState === "connected" && (
               <SessionTimer
                 duration={aiSession.sessionDuration}
                 isExpiring={aiSession.isExpiring}
@@ -443,7 +479,9 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
 
             {/* Room name */}
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-foreground font-medium truncate">{roomName}</span>
+              <span className="text-foreground font-medium truncate">
+                {roomName}
+              </span>
               <AIStateBadge state={aiSession.state} />
             </div>
 
@@ -493,7 +531,7 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
             <X className="h-5 w-5 text-foreground" />
           </button>
 
-          {connectionState === 'connected' && (
+          {connectionState === "connected" && (
             <>
               <SessionTimer
                 duration={aiSession.sessionDuration}
@@ -514,30 +552,38 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
       )}
 
       {/* Main content area */}
-      <div className={`flex-1 flex flex-col items-center ${isMobileLandscape ? 'p-2 justify-start' : 'p-2 sm:p-4 justify-center'}`}>
+      <div
+        className={`flex-1 flex flex-col items-center ${isMobileLandscape ? "p-2 justify-start" : "p-2 sm:p-4 justify-center"}`}
+      >
         {renderContent()}
       </div>
 
       {/* Footer controls - Portrait/Desktop: bottom, Mobile Landscape: right sidebar */}
-      <div className={`flex flex-col items-center ${
-        isMobileLandscape
-          ? 'p-2 justify-center gap-3 min-w-[80px]'
-          : 'p-3 pb-5 sm:p-4 sm:pb-6 gap-3'
-      }`}>
-        {connectionState === 'connected' && (
+      <div
+        className={`flex flex-col items-center ${
+          isMobileLandscape
+            ? "p-2 justify-center gap-3 min-w-[80px]"
+            : "p-3 pb-5 sm:p-4 sm:pb-6 gap-3"
+        }`}
+      >
+        {connectionState === "connected" && (
           <>
             {/* Room controls row */}
-            <div className={`flex items-center ${isMobileLandscape ? 'flex-col gap-2' : 'gap-3'}`}>
+            <div
+              className={`flex items-center ${isMobileLandscape ? "flex-col gap-2" : "gap-3"}`}
+            >
               {/* Mute button */}
               {onToggleMute && (
                 <button
                   onClick={onToggleMute}
                   className={`p-3 rounded-full transition-colors ${
                     isLocalMuted
-                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                      : 'bg-foreground/10 text-foreground hover:bg-foreground/20'
+                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      : "bg-foreground/10 text-foreground hover:bg-foreground/20"
                   }`}
-                  aria-label={isLocalMuted ? 'Unmute microphone' : 'Mute microphone'}
+                  aria-label={
+                    isLocalMuted ? "Unmute microphone" : "Mute microphone"
+                  }
                   aria-pressed={isLocalMuted}
                 >
                   {isLocalMuted ? (
@@ -570,19 +616,23 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
       </div>
 
       {/* Expiring session warning */}
-      {aiSession.isExpiring && connectionState === 'connected' && (
-        <div className={`absolute left-1/2 -translate-x-1/2 px-3 py-1.5 sm:px-4 sm:py-2 bg-orange-500/30 border border-orange-400/50 rounded-lg text-orange-200 text-xs sm:text-sm ${
-          isMobileLandscape ? 'top-2' : 'top-16 sm:top-20'
-        }`}>
+      {aiSession.isExpiring && connectionState === "connected" && (
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 px-3 py-1.5 sm:px-4 sm:py-2 bg-orange-500/30 border border-orange-400/50 rounded-lg text-orange-200 text-xs sm:text-sm ${
+            isMobileLandscape ? "top-2" : "top-16 sm:top-20"
+          }`}
+        >
           Session ending in {formatTime(10 * 60 - aiSession.sessionDuration)}
         </div>
       )}
 
       {/* Queue position indicator */}
-      {aiSession.queuePosition > 0 && connectionState === 'connected' && (
-        <div className={`absolute left-1/2 -translate-x-1/2 px-3 py-1.5 bg-blue-500/30 border border-blue-400/50 rounded-lg text-blue-200 text-xs sm:text-sm ${
-          isMobileLandscape ? 'bottom-2' : 'bottom-20 sm:bottom-24'
-        }`}>
+      {aiSession.queuePosition > 0 && connectionState === "connected" && (
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 px-3 py-1.5 bg-blue-500/30 border border-blue-400/50 rounded-lg text-blue-200 text-xs sm:text-sm ${
+            isMobileLandscape ? "bottom-2" : "bottom-20 sm:bottom-24"
+          }`}
+        >
           {aiSession.queuePosition === 1
             ? "You're next"
             : `Position ${aiSession.queuePosition} of ${aiSession.queueLength}`}
@@ -590,10 +640,12 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
       )}
 
       {/* Session unhealthy warning */}
-      {!aiSession.isHealthy && connectionState === 'connected' && (
-        <div className={`absolute right-4 px-3 py-1.5 bg-red-500/30 border border-red-400/50 rounded-lg text-red-200 text-xs ${
-          isMobileLandscape ? 'top-2' : 'top-16 sm:top-20'
-        }`}>
+      {!aiSession.isHealthy && connectionState === "connected" && (
+        <div
+          className={`absolute right-4 px-3 py-1.5 bg-red-500/30 border border-red-400/50 rounded-lg text-red-200 text-xs ${
+            isMobileLandscape ? "top-2" : "top-16 sm:top-20"
+          }`}
+        >
           AI connection unstable
         </div>
       )}
@@ -607,4 +659,4 @@ export const SwensyncOverlayRoom: React.FC<SwensyncOverlayRoomProps> = ({
 /**
  * Default export
  */
-export default SwensyncOverlayRoom;
+export default SyncOverlayRoom;

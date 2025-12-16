@@ -69,13 +69,13 @@ export type {
   VoiceModeSettingsFullProps,
 } from "./VoiceModeSettings";
 
-export { SwensyncOverlayRoom } from "./SwensyncOverlayRoom";
+export { SyncOverlayRoom } from "./syncOverlayRoom";
 export type {
-  SwensyncOverlayRoomProps,
+  SyncOverlayRoomProps,
   RoomParticipant,
   RoomAISession,
   RoomOverlayConnectionState,
-} from "./SwensyncOverlayRoom";
+} from "./syncOverlayRoom";
 
 export { UsernameModal } from "./UsernameModal";
 export type { UsernameModalProps } from "./UsernameModal";

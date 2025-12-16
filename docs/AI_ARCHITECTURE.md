@@ -1,6 +1,6 @@
-# SwenSync AI Architecture
+# Sync AI Architecture
 
-Technical documentation for developers on how AI services integrate with the SwenSync platform.
+Technical documentation for developers on how AI services integrate with the Sync platform.
 
 ---
 
@@ -18,14 +18,14 @@ Technical documentation for developers on how AI services integrate with the Swe
 
 ## Overview
 
-SwenSync uses multiple OpenAI APIs for different purposes:
+Sync uses multiple OpenAI APIs for different purposes:
 
-| Service          | API                      | Model                     | Purpose                         |
-| ---------------- | ------------------------ | ------------------------- | ------------------------------- |
-| Voice AI Agent   | Realtime API (WebSocket) | `gpt-4o-realtime-preview` | Multi-user voice conversations  |
-| Swensync Overlay | Realtime API (WebRTC)    | `gpt-4o-realtime-preview` | Single-user voice assistant     |
-| Transcription    | Realtime API (WebSocket) | `gpt-4o-mini-transcribe`  | Ambient audio transcription     |
-| Summaries        | Responses API (HTTP)     | `gpt-4o-mini`             | Periodic conversation summaries |
+| Service        | API                      | Model                     | Purpose                         |
+| -------------- | ------------------------ | ------------------------- | ------------------------------- |
+| Voice AI Agent | Realtime API (WebSocket) | `gpt-4o-realtime-preview` | Multi-user voice conversations  |
+| sync Overlay   | Realtime API (WebRTC)    | `gpt-4o-realtime-preview` | Single-user voice assistant     |
+| Transcription  | Realtime API (WebSocket) | `gpt-4o-mini-transcribe`  | Ambient audio transcription     |
+| Summaries      | Responses API (HTTP)     | `gpt-4o-mini`             | Periodic conversation summaries |
 
 ---
 
@@ -83,7 +83,7 @@ ws.send(
 
 ### Realtime API (WebRTC)
 
-Used for client-side Swensync overlay (single-user direct connection).
+Used for client-side sync overlay (single-user direct connection).
 
 ```typescript
 // Browser connects directly to OpenAI
@@ -355,7 +355,7 @@ onTranscriptSummary: (rid: string, summary: TranscriptSummary) => {
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              SwenSync Server                                 │
+│                              Sync Server                                 │
 │                                                                             │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐         │
 │  │ ContextManager  │◄───│ Transcription   │◄───│ Room Audio      │         │

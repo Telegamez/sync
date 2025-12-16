@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { BarChart3, Activity, Circle } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import React from "react";
+import { BarChart3, Activity, Circle } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-export type VisualizerVariant = 'bars' | 'waveform' | 'circular';
+export type VisualizerVariant = "bars" | "waveform" | "circular";
 
 interface VisualizerModeSwitcherProps {
   /** Currently selected visualization mode */
@@ -17,10 +17,18 @@ interface VisualizerModeSwitcherProps {
   compact?: boolean;
 }
 
-const modes: { value: VisualizerVariant; label: string; icon: React.ReactNode }[] = [
-  { value: 'bars', label: 'Bars', icon: <BarChart3 className="w-4 h-4" /> },
-  { value: 'waveform', label: 'Wave', icon: <Activity className="w-4 h-4" /> },
-  { value: 'circular', label: 'Circular', icon: <Circle className="w-4 h-4" /> },
+const modes: {
+  value: VisualizerVariant;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { value: "bars", label: "Bars", icon: <BarChart3 className="w-4 h-4" /> },
+  { value: "waveform", label: "Wave", icon: <Activity className="w-4 h-4" /> },
+  {
+    value: "circular",
+    label: "Circular",
+    icon: <Circle className="w-4 h-4" />,
+  },
 ];
 
 /**
@@ -47,7 +55,7 @@ export const VisualizerModeSwitcher: React.FC<VisualizerModeSwitcherProps> = ({
           onChange(newValue as VisualizerVariant);
         }
       }}
-      className={`${compact ? 'flex-col' : ''} ${className || ''}`}
+      className={`${compact ? "flex-col" : ""} ${className || ""}`}
       size="sm"
     >
       {modes.map((mode) => (

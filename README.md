@@ -1,8 +1,8 @@
-# Swensync
+# sync
 
 ## Purpose
 
-Swensync is the AI Collaboration Engine — synchronized intelligence for teams.
+sync is the AI Collaboration Engine — synchronized intelligence for teams.
 
 ## Overview
 
@@ -43,7 +43,7 @@ To achieve our goal of a lightweight, focused platform, we are explicitly **excl
 
 ### 3. New Visualizer Options
 
-To replace the 3D avatar and better represent "Swensync" (Sense/Swarm/Speed), we will explore 5 high-tech audio visualization concepts. The goal is to find a visual language that feels alive, responsive, and incredibly fast.
+To replace the 3D avatar and better represent "sync" (Sense/Swarm/Speed), we will explore 5 high-tech audio visualization concepts. The goal is to find a visual language that feels alive, responsive, and incredibly fast.
 
 **Proposed Visualizations:**
 
@@ -81,7 +81,7 @@ _We will initially implement the "Digital Pulse" or "Sonic Ring" for MVP but str
 1. Clone the repository:
 
 ```bash
-cd /opt/telegamez/swensync
+cd /opt/telegamez/sync
 ```
 
 2. Install dependencies:
@@ -131,27 +131,27 @@ docker-compose up --build
 ## Project Structure
 
 ```
-swensync/
+sync/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/
 │   │   │   ├── health/         # Health check endpoint
-│   │   │   └── swensync-realtime-token/  # OpenAI token endpoint
+│   │   │   └── sync-realtime-token/  # OpenAI token endpoint
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
 │   │   └── globals.css
 │   ├── components/
-│   │   └── swensync/             # Swensync UI components
-│   │       ├── SwensyncOverlay.tsx
+│   │   └── sync/             # sync UI components
+│   │       ├── syncOverlay.tsx
 │   │       ├── AudioWaveVisualizer.tsx
 │   │       ├── ConnectionStatus.tsx
 │   │       ├── SessionTimer.tsx
 │   │       ├── LatencyStopwatch.tsx
 │   │       └── index.ts
 │   ├── hooks/
-│   │   └── useSwensyncRealtime.ts  # Core WebRTC hook
+│   │   └── usesyncRealtime.ts  # Core WebRTC hook
 │   ├── types/
-│   │   └── swensync.ts           # TypeScript types
+│   │   └── sync.ts           # TypeScript types
 │   └── lib/
 │       └── utils.ts            # Utility functions
 ├── docker-compose.yml
@@ -183,7 +183,7 @@ The application uses Push-to-Talk (PTT) as the default mode for addressing the A
 ### Planned / Roadmap
 
 - **Open Mic (`open`)**: Microphone is always active (gated by Voice Activity Detection). All audio is sent to the AI. Ideal for small, trusted groups. _Requires VAD integration._
-- **Wake Word (`wakeWord`)**: AI activates only when a specific phrase is spoken (e.g., "Hey Swensync"). _Requires speech-to-text integration._
+- **Wake Word (`wakeWord`)**: AI activates only when a specific phrase is spoken (e.g., "Hey sync"). _Requires speech-to-text integration._
 - **Designated Speaker (`designatedSpeaker`)**: Restricted mode where only specific users with permission can address the AI. Perfect for moderated sessions. _Type definitions exist, UI partially implemented._
 
 ## Architecture
@@ -208,11 +208,11 @@ All participants in a room hear the same AI response simultaneously.
 
 Current Architecture
 
-1. Client-Side WebRTC (Single User) - useSwensyncRealtime hook
+1. Client-Side WebRTC (Single User) - usesyncRealtime hook
    Uses native WebRTC (RTCPeerConnection) directly with OpenAI Realtime API
-   Gets ephemeral token from /api/swensync-realtime-token
+   Gets ephemeral token from /api/sync-realtime-token
    Direct browser ↔ OpenAI connection
-   Used for single-user Swensync overlay experience
+   Used for single-user sync overlay experience
 2. Server-Side WebSocket (Multi-User Rooms) - OpenAIRealtimeClient
    Uses WebSocket (wss://api.openai.com/v1/realtime) from the server
    Server acts as intermediary for multiple room participants
@@ -220,7 +220,7 @@ Current Architecture
    Used for shared AI rooms with PTT (Push-to-Talk)
    API Summary
    Component Transport API Model Purpose
-   Client Swensync WebRTC Realtime API gpt-4o-realtime-preview Single-user voice agent
+   Client sync WebRTC Realtime API gpt-4o-realtime-preview Single-user voice agent
    Room AI (server) WebSocket Realtime API gpt-4o-realtime-preview Multi-user shared AI
    Transcription WebSocket Realtime API gpt-4o-mini-transcribe Real-time STT
    Summaries HTTP Responses API gpt-4o-mini Text generation

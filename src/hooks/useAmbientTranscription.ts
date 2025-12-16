@@ -240,7 +240,7 @@ export function useAmbientTranscription(
   const vad = useSileroVAD({
     stream: localStream,
     enabled: vadEnabled,
-    // Use longer redemptionMs than useSwensyncRealtime since we don't need fast commit signals
+    // Use longer redemptionMs than usesyncRealtime since we don't need fast commit signals
     redemptionMs: 800, // 800ms silence before triggering end
     minSpeechMs: 200, // Minimum 200ms of speech
     onSpeechStart: handleVADSpeechStart,

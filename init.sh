@@ -1,14 +1,14 @@
 #!/bin/bash
 
 #######################################
-# SwenSync Environment Bootstrap Script
+# sync Environment Bootstrap Script
 # Long-Horizon Engineering Protocol v1.0
 #######################################
 
 set -e  # Exit on error
 
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║           SwenSync Environment Bootstrap                      ║"
+echo "║           sync Environment Bootstrap                      ║"
 echo "║       Synchronized Intelligence Platform                      ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
@@ -116,7 +116,7 @@ else
         log_warn "Please edit .env and add your OPENAI_API_KEY"
     else
         log_error ".env.example not found. Creating minimal .env..."
-        echo "# SwenSync Environment Variables" > .env
+        echo "# sync Environment Variables" > .env
         echo "OPENAI_API_KEY=your_api_key_here" >> .env
         echo "PORT=24680" >> .env
         log_warn "Please edit .env and add your OPENAI_API_KEY"

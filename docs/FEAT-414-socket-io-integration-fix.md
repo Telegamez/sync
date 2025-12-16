@@ -262,7 +262,7 @@ location / {
 pnpm stop && pnpm prod
 
 # Monitor server logs
-tail -f /tmp/swensync.log
+tail -f /tmp/sync.log
 
 # Test Socket.io polling
 curl -s "https://sync.ference.ai/socket.io/?EIO=4&transport=polling"

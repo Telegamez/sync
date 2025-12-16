@@ -1,11 +1,11 @@
 /**
- * SwenSync Type Definitions - Central Export
+ * Sync Type Definitions - Central Export
  *
- * All types for the SwenSync platform.
+ * All types for the Sync platform.
  */
 
 // Original single-peer types
-export * from "./swensync";
+export * from "./sync";
 
 // Room types (FEAT-100)
 export * from "./room";

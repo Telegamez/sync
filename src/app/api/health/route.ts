@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 /**
  * GET /api/health
@@ -7,8 +7,8 @@ import { NextResponse } from 'next/server';
  */
 export async function GET() {
   return NextResponse.json({
-    status: 'healthy',
-    service: 'swensync',
+    status: "healthy",
+    service: "sync",
     timestamp: new Date().toISOString(),
   });
 }

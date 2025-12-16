@@ -1,4 +1,4 @@
-# Swensync Dockerfile
+# Sync Dockerfile
 # Multi-stage build for optimized production image
 
 # Stage 1: Dependencies

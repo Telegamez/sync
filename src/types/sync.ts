@@ -1,18 +1,18 @@
 /**
- * Swensync Type Definitions
+ * sync Type Definitions
  *
- * Core types for the Swensync Voice AI platform
+ * Core types for the sync Voice AI platform
  */
 
 /**
- * Connection states for the Swensync WebRTC session
+ * Connection states for the sync WebRTC session
  */
-export type SwensyncConnectionState = 'idle' | 'connecting' | 'connected' | 'error';
+export type syncConnectionState = "idle" | "connecting" | "connected" | "error";
 
 /**
  * Animation states for visual feedback
  */
-export type SwensyncAnimState = 'Listening' | 'Focused' | 'Thinking' | 'Speaking';
+export type syncAnimState = "Listening" | "Focused" | "Thinking" | "Speaking";
 
 /**
  * Turn latency measurement
@@ -29,7 +29,7 @@ export interface TurnLatency {
 /**
  * Hook options interface
  */
-export interface SwensyncRealtimeOptions {
+export interface syncRealtimeOptions {
   /** User's name for personalized greeting (optional) */
   userName?: string;
   /** Enable client-side Silero VAD for faster turn detection (default: true) */
@@ -39,9 +39,9 @@ export interface SwensyncRealtimeOptions {
 /**
  * Hook return interface
  */
-export interface SwensyncRealtimeHook {
+export interface syncRealtimeHook {
   /** Current connection state */
-  connectionState: SwensyncConnectionState;
+  connectionState: syncConnectionState;
   /** Connect to OpenAI Realtime API */
   connect: () => Promise<void>;
   /** Disconnect and cleanup resources */
@@ -51,7 +51,7 @@ export interface SwensyncRealtimeHook {
   /** AnalyserNode for audio visualization */
   modelAnalyserNode: AnalyserNode | null;
   /** Current animation state derived from OpenAI events */
-  animState: SwensyncAnimState;
+  animState: syncAnimState;
   /** Whether lip-sync/visualization is currently active (during Speaking state) */
   isVisualizerActive: boolean;
   /** Session duration in seconds */

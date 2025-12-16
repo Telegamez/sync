@@ -1,19 +1,19 @@
-# Swensync Operations Guide
+# sync Operations Guide
 
 ## Quick Reference
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server (port 24680) |
-| `pnpm build` | Build for production |
-| `pnpm start` | Start production server (port 24680) |
-| `pnpm stop` | Stop process on port 24680 |
-| `pnpm restart` | Stop and restart dev server |
-| `pnpm prod` | Build and start production (detached) |
-| `pnpm start:detached` | Start standalone server (detached) |
-| `pnpm logs` | Tail application logs |
-| `pnpm lint` | Run ESLint |
-| `pnpm type-check` | Run TypeScript type checking |
+| Command               | Description                           |
+| --------------------- | ------------------------------------- |
+| `pnpm dev`            | Start development server (port 24680) |
+| `pnpm build`          | Build for production                  |
+| `pnpm start`          | Start production server (port 24680)  |
+| `pnpm stop`           | Stop process on port 24680            |
+| `pnpm restart`        | Stop and restart dev server           |
+| `pnpm prod`           | Build and start production (detached) |
+| `pnpm start:detached` | Start standalone server (detached)    |
+| `pnpm logs`           | Tail application logs                 |
+| `pnpm lint`           | Run ESLint                            |
+| `pnpm type-check`     | Run TypeScript type checking          |
 
 ---
 
@@ -113,7 +113,7 @@ Starts the standalone server in the background without rebuilding.
 pnpm logs
 ```
 
-Tails `/tmp/swensync.log` in real-time.
+Tails `/tmp/sync.log` in real-time.
 
 ### Stop Production Server
 
@@ -121,7 +121,7 @@ Tails `/tmp/swensync.log` in real-time.
 pnpm stop
 ```
 
-Stops the detached server using the PID stored in `/tmp/swensync.pid`.
+Stops the detached server using the PID stored in `/tmp/sync.pid`.
 
 ---
 
@@ -167,7 +167,7 @@ docker-compose down
 ### View Logs
 
 ```bash
-docker-compose logs -f swensync
+docker-compose logs -f sync
 ```
 
 ### Rebuild Without Cache
@@ -184,8 +184,9 @@ curl http://localhost:24680/api/health
 ```
 
 Expected response:
+
 ```json
-{"status":"healthy","service":"swensync","timestamp":"2024-12-04T..."}
+{ "status": "healthy", "service": "sync", "timestamp": "2024-12-04T..." }
 ```
 
 ---
@@ -196,7 +197,7 @@ Expected response:
 ┌─────────────────────────────────────────────────────────────┐
 │                        Browser                               │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │                  SwensyncOverlay                       │    │
+│  │                  syncOverlay                       │    │
 │  │  ┌─────────────┐  ┌──────────────┐  ┌───────────┐   │    │
 │  │  │SessionTimer │  │LatencyStop- │  │  Close    │   │    │
 │  │  │             │  │   watch     │  │  Button   │   │    │
@@ -212,7 +213,7 @@ Expected response:
 │  │  └─────────────────────────────────────────────┘    │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                            │                                 │
-│                    useSwensyncRealtime                         │
+│                    usesyncRealtime                         │
 │                            │                                 │
 └────────────────────────────┼─────────────────────────────────┘
                              │
@@ -221,7 +222,7 @@ Expected response:
 ┌────────────────────────────┼─────────────────────────────────┐
 │                   Next.js Server                             │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │  /api/swensync-realtime-token                         │    │
+│  │  /api/sync-realtime-token                         │    │
 │  │  - Fetches ephemeral token from OpenAI              │    │
 │  └─────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────┐    │
@@ -243,14 +244,14 @@ Expected response:
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/hooks/useSwensyncRealtime.ts` | Core WebRTC hook, state machine, latency tracking |
-| `src/components/swensync/SwensyncOverlay.tsx` | Main overlay UI component |
-| `src/components/swensync/AudioWaveVisualizer.tsx` | 2D audio visualization |
-| `src/components/swensync/LatencyStopwatch.tsx` | Turn latency display |
-| `src/app/api/swensync-realtime-token/route.ts` | Token endpoint |
-| `src/types/swensync.ts` | TypeScript type definitions |
+| File                                          | Purpose                                           |
+| --------------------------------------------- | ------------------------------------------------- |
+| `src/hooks/usesyncRealtime.ts`                | Core WebRTC hook, state machine, latency tracking |
+| `src/components/sync/syncOverlay.tsx`         | Main overlay UI component                         |
+| `src/components/sync/AudioWaveVisualizer.tsx` | 2D audio visualization                            |
+| `src/components/sync/LatencyStopwatch.tsx`    | Turn latency display                              |
+| `src/app/api/sync-realtime-token/route.ts`    | Token endpoint                                    |
+| `src/types/sync.ts`                           | TypeScript type definitions                       |
 
 ---
 
@@ -305,12 +306,12 @@ The stopwatch measures **Time to First Audio (TTFA)**:
 
 ### Color Coding
 
-| Latency | Color | Rating |
-|---------|-------|--------|
-| < 500ms | Green | Excellent |
-| 500ms - 1s | Yellow | Good |
-| 1s - 2s | Orange | Acceptable |
-| > 2s | Red | Slow |
+| Latency    | Color  | Rating     |
+| ---------- | ------ | ---------- |
+| < 500ms    | Green  | Excellent  |
+| 500ms - 1s | Yellow | Good       |
+| 1s - 2s    | Orange | Acceptable |
+| > 2s       | Red    | Slow       |
 
 ---
 
@@ -386,19 +387,21 @@ curl http://localhost:24680/api/health
 The container has a built-in health check that runs every 30 seconds:
 
 ```bash
-docker inspect swensync --format='{{.State.Health.Status}}'
+docker inspect sync --format='{{.State.Health.Status}}'
 ```
 
 ### Logs
 
 Development:
+
 ```bash
 # Logs appear in terminal running pnpm dev
 ```
 
 Docker:
+
 ```bash
-docker-compose logs -f swensync
+docker-compose logs -f sync
 ```
 
 ---
@@ -406,7 +409,7 @@ docker-compose logs -f swensync
 ## Security Notes
 
 1. **API Key**: Never commit `.env` file. It's in `.gitignore`
-2. **Token Endpoint**: The `/api/swensync-realtime-token` endpoint fetches ephemeral tokens server-side to avoid exposing the main API key
+2. **Token Endpoint**: The `/api/sync-realtime-token` endpoint fetches ephemeral tokens server-side to avoid exposing the main API key
 3. **HTTPS**: In production, use Nginx proxy for SSL termination
 
 ---
@@ -420,12 +423,12 @@ pnpm update
 pnpm build
 ```
 
-To update OpenAI model, edit `src/hooks/useSwensyncRealtime.ts`:
+To update OpenAI model, edit `src/hooks/usesyncRealtime.ts`:
 
 ```typescript
-const OPENAI_MODEL = 'gpt-4o-realtime-preview-2024-12-17';
+const OPENAI_MODEL = "gpt-4o-realtime-preview-2024-12-17";
 ```
 
 ---
 
-*Last Updated: 2025-12-04*
+_Last Updated: 2025-12-04_

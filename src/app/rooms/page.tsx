@@ -117,7 +117,7 @@ export default function RoomsPage() {
       {/* Footer */}
       <footer className="flex-shrink-0 border-t border-border py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          <p>Swensync - The AI Collaboration Engine</p>
+          <p>sync - The AI Collaboration Engine</p>
         </div>
       </footer>
     </div>

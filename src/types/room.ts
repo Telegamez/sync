@@ -1,7 +1,7 @@
 /**
  * Room Type Definitions
  *
- * Core types for SwenSync shared room functionality.
+ * Core types for Sync shared room functionality.
  * Part of the Long-Horizon Engineering Protocol - FEAT-100
  */
 

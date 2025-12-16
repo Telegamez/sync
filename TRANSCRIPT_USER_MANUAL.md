@@ -1,6 +1,6 @@
-# SwenSync Transcript System User Manual
+# Sync Transcript System User Manual
 
-This manual covers the transcript functionality implemented in Phase 6 of SwenSync development.
+This manual covers the transcript functionality implemented in Phase 6 of Sync development.
 
 ---
 
@@ -18,7 +18,7 @@ This manual covers the transcript functionality implemented in Phase 6 of SwenSy
 
 ## Overview
 
-The SwenSync Transcript System provides real-time conversation recording with AI-powered summaries. Key features include:
+The Sync Transcript System provides real-time conversation recording with AI-powered summaries. Key features include:
 
 - **Real-time transcription** of participant speech and AI responses
 - **Automatic AI summaries** generated periodically during conversations

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { useRef, useEffect, useCallback } from 'react';
-import type { SwensyncAnimState } from '@/types/swensync';
+import React, { useRef, useEffect, useCallback } from "react";
+import type { syncAnimState } from "@/types/sync";
 
 interface AudioWaveVisualizerProps {
   /** AnalyserNode for audio analysis */
@@ -9,25 +9,25 @@ interface AudioWaveVisualizerProps {
   /** Whether visualization is currently active */
   isActive: boolean;
   /** Current animation state */
-  animState: SwensyncAnimState;
+  animState: syncAnimState;
   /** Visualization variant */
-  variant?: 'bars' | 'waveform' | 'circular';
+  variant?: "bars" | "waveform" | "circular";
 }
 
 /**
  * Get color based on animation state
  */
-function getStateColor(state: SwensyncAnimState): string {
+function getStateColor(state: syncAnimState): string {
   switch (state) {
-    case 'Speaking':
-      return '#22c55e'; // Green
-    case 'Thinking':
-      return '#eab308'; // Yellow
-    case 'Focused':
-      return '#3b82f6'; // Blue
-    case 'Listening':
+    case "Speaking":
+      return "#22c55e"; // Green
+    case "Thinking":
+      return "#eab308"; // Yellow
+    case "Focused":
+      return "#3b82f6"; // Blue
+    case "Listening":
     default:
-      return '#6b7280'; // Gray
+      return "#6b7280"; // Gray
   }
 }
 
@@ -41,7 +41,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
   analyserNode,
   isActive,
   animState,
-  variant = 'bars',
+  variant = "bars",
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -55,7 +55,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
       dataArray: Uint8Array,
       width: number,
       height: number,
-      color: string
+      color: string,
     ) => {
       const barCount = 64;
       const barWidth = width / barCount - 2;
@@ -69,8 +69,11 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
         let barHeight = (dataArray[dataIndex] / 255) * height * 0.8;
 
         // Add minimum height for idle animation
-        if (!isActive || animState === 'Listening') {
-          barHeight = Math.max(barHeight, 5 + Math.sin(Date.now() / 500 + i) * 3);
+        if (!isActive || animState === "Listening") {
+          barHeight = Math.max(
+            barHeight,
+            5 + Math.sin(Date.now() / 500 + i) * 3,
+          );
         }
 
         const x = i * (barWidth + 2);
@@ -87,7 +90,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
         ctx.fill();
       }
     },
-    [isActive, animState]
+    [isActive, animState],
   );
 
   /**
@@ -99,7 +102,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
       dataArray: Uint8Array,
       width: number,
       height: number,
-      color: string
+      color: string,
     ) => {
       ctx.clearRect(0, 0, width, height);
 
@@ -126,7 +129,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
       ctx.lineTo(width, height / 2);
       ctx.stroke();
     },
-    []
+    [],
   );
 
   /**
@@ -138,7 +141,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
       dataArray: Uint8Array,
       width: number,
       height: number,
-      color: string
+      color: string,
     ) => {
       ctx.clearRect(0, 0, width, height);
 
@@ -153,8 +156,11 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
         let amplitude = dataArray[dataIndex] / 255;
 
         // Add minimum for idle animation
-        if (!isActive || animState === 'Listening') {
-          amplitude = Math.max(amplitude, 0.1 + Math.sin(Date.now() / 500 + i * 0.2) * 0.05);
+        if (!isActive || animState === "Listening") {
+          amplitude = Math.max(
+            amplitude,
+            0.1 + Math.sin(Date.now() / 500 + i * 0.2) * 0.05,
+          );
         }
 
         const barLength = baseRadius * 0.5 * amplitude;
@@ -167,7 +173,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
 
         ctx.strokeStyle = color;
         ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
+        ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
@@ -180,7 +186,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
       ctx.arc(centerX, centerY, baseRadius * 0.8, 0, Math.PI * 2);
       ctx.fill();
     },
-    [isActive, animState]
+    [isActive, animState],
   );
 
   /**
@@ -190,7 +196,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     // Set canvas size
@@ -210,7 +216,7 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
       let dataArray: Uint8Array<ArrayBuffer>;
 
       if (analyserNode) {
-        if (variant === 'waveform') {
+        if (variant === "waveform") {
           const arr = new Uint8Array(analyserNode.fftSize);
           analyserNode.getByteTimeDomainData(arr);
           dataArray = arr as Uint8Array<ArrayBuffer>;
@@ -229,13 +235,13 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
       }
 
       switch (variant) {
-        case 'waveform':
+        case "waveform":
           drawWaveform(ctx, dataArray, width, height, color);
           break;
-        case 'circular':
+        case "circular":
           drawCircular(ctx, dataArray, width, height, color);
           break;
-        case 'bars':
+        case "bars":
         default:
           drawBars(ctx, dataArray, width, height, color);
           break;
@@ -247,15 +253,23 @@ export const AudioWaveVisualizer: React.FC<AudioWaveVisualizerProps> = ({
     draw();
 
     // Handle resize
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener("resize", resizeCanvas);
     };
-  }, [analyserNode, animState, variant, isActive, drawBars, drawWaveform, drawCircular]);
+  }, [
+    analyserNode,
+    animState,
+    variant,
+    isActive,
+    drawBars,
+    drawWaveform,
+    drawCircular,
+  ]);
 
   return (
     <div className="w-full h-full flex items-center justify-center">

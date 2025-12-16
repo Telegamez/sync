@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { Clock } from 'lucide-react';
-import { formatTime } from '@/lib/utils';
+import React from "react";
+import { Clock } from "lucide-react";
+import { formatTime } from "@/lib/utils";
 
 interface SessionTimerProps {
   /** Session duration in seconds */
@@ -24,8 +24,8 @@ export const SessionTimer: React.FC<SessionTimerProps> = ({
     <div
       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
         isExpiring
-          ? 'bg-orange-500/20 text-orange-300 animate-pulse'
-          : 'bg-white/10 text-white/70'
+          ? "bg-orange-500/20 text-orange-300 animate-pulse"
+          : "bg-white/10 text-white/70"
       }`}
     >
       <Clock className="w-3.5 h-3.5" />

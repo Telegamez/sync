@@ -6,13 +6,13 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-400
  */
 
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, User, ArrowRight, Github, Loader2 } from 'lucide-react';
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { Mail, Lock, User, ArrowRight, Github, Loader2 } from "lucide-react";
 
 /**
  * Sign Up Form Component (needs Suspense boundary for useSearchParams)
@@ -22,20 +22,22 @@ function SignUpForm() {
   const searchParams = useSearchParams();
   const { signUp, signInWithOAuth, state } = useAuth();
 
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(
+    null,
+  );
 
-  const returnUrl = searchParams.get('returnUrl') || '/rooms';
+  const returnUrl = searchParams.get("returnUrl") || "/rooms";
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (state === 'authenticated') {
+    if (state === "authenticated") {
       router.push(returnUrl);
     }
   }, [state, router, returnUrl]);
@@ -51,44 +53,48 @@ function SignUpForm() {
 
       // Validate passwords match
       if (password !== confirmPassword) {
-        setError('Passwords do not match');
+        setError("Passwords do not match");
         return;
       }
 
       // Validate password length
       if (password.length < 6) {
-        setError('Password must be at least 6 characters');
+        setError("Password must be at least 6 characters");
         return;
       }
 
       setIsLoading(true);
 
       try {
-        const result = await signUp({ email, password, displayName: displayName || undefined });
+        const result = await signUp({
+          email,
+          password,
+          displayName: displayName || undefined,
+        });
 
         if (!result.success) {
-          setError(result.error || 'Sign up failed');
+          setError(result.error || "Sign up failed");
         } else if (result.user) {
           // User is signed in directly
           router.push(returnUrl);
         } else {
           // Email confirmation required
-          setSuccess('Check your email to confirm your account');
+          setSuccess("Check your email to confirm your account");
         }
       } catch {
-        setError('An unexpected error occurred');
+        setError("An unexpected error occurred");
       } finally {
         setIsLoading(false);
       }
     },
-    [email, password, confirmPassword, displayName, signUp, router, returnUrl]
+    [email, password, confirmPassword, displayName, signUp, router, returnUrl],
   );
 
   /**
    * Handle OAuth sign up
    */
   const handleOAuthSignUp = useCallback(
-    async (provider: 'google' | 'github') => {
+    async (provider: "google" | "github") => {
       setError(null);
       setOauthLoading(provider);
 
@@ -99,19 +105,19 @@ function SignUpForm() {
         });
 
         if (!result.success) {
-          setError(result.error || 'OAuth sign up failed');
+          setError(result.error || "OAuth sign up failed");
           setOauthLoading(null);
         }
         // If successful, the browser will redirect to OAuth provider
       } catch {
-        setError('An unexpected error occurred');
+        setError("An unexpected error occurred");
         setOauthLoading(null);
       }
     },
-    [signInWithOAuth, returnUrl]
+    [signInWithOAuth, returnUrl],
   );
 
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -128,7 +134,7 @@ function SignUpForm() {
             Create Account
           </h1>
           <p className="text-muted-foreground">
-            Join SwenSync to collaborate with AI
+            Join Sync to collaborate with AI
           </p>
         </div>
 
@@ -138,11 +144,11 @@ function SignUpForm() {
           <div className="space-y-3 mb-6">
             <button
               type="button"
-              onClick={() => handleOAuthSignUp('google')}
+              onClick={() => handleOAuthSignUp("google")}
               disabled={!!oauthLoading}
               className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-3 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {oauthLoading === 'google' ? (
+              {oauthLoading === "google" ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -169,11 +175,11 @@ function SignUpForm() {
 
             <button
               type="button"
-              onClick={() => handleOAuthSignUp('github')}
+              onClick={() => handleOAuthSignUp("github")}
               disabled={!!oauthLoading}
               className="w-full flex items-center justify-center gap-3 bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-3 font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {oauthLoading === 'github' ? (
+              {oauthLoading === "github" ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <Github className="w-5 h-5" />
@@ -209,7 +215,10 @@ function SignUpForm() {
             )}
 
             <div className="space-y-2">
-              <label htmlFor="displayName" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="displayName"
+                className="text-sm font-medium text-foreground"
+              >
                 Display Name (optional)
               </label>
               <div className="relative">
@@ -226,7 +235,10 @@ function SignUpForm() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="email"
+                className="text-sm font-medium text-foreground"
+              >
                 Email
               </label>
               <div className="relative">
@@ -244,7 +256,10 @@ function SignUpForm() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium text-foreground"
+              >
                 Password
               </label>
               <div className="relative">
@@ -263,7 +278,10 @@ function SignUpForm() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="confirmPassword"
+                className="text-sm font-medium text-foreground"
+              >
                 Confirm Password
               </label>
               <div className="relative">
@@ -299,7 +317,7 @@ function SignUpForm() {
 
           {/* Sign In Link */}
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Link
               href={`/auth/signin?returnUrl=${encodeURIComponent(returnUrl)}`}
               className="text-primary hover:underline font-medium"

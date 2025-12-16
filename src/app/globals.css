@@ -80,7 +80,7 @@
   }
 }
 
-/* Swensync-specific animations */
+/* sync-specific animations */
 @keyframes pulse-glow {
   0%,
   100% {

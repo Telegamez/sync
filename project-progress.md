@@ -1,4 +1,4 @@
-# SwenSync Development Progress
+# sync Development Progress
 
 > **Long-Horizon Engineering Protocol**
 > This file tracks all development progress. Each entry represents a completed feature.
@@ -15,8 +15,9 @@
 | Phase 4: Shared AI Session   | **Complete** | 11/11    | 100%   |
 | Phase 5: Production Polish   | **Complete** | 18/18    | 100%   |
 | Phase 6: Transcript System   | **Complete** | 14/14    | 100%   |
+| Phase 8: Cleanup             | **Complete** | 1/1      | 100%   |
 
-**Latest:** FEAT-513 (CreateRoomForm Transcript Settings) - Room creation form with transcript configuration options.
+**Latest:** FEAT-700 (Remove Single-User Demo) - Removed "Find Out More" demo experience to eliminate developer confusion between single-user and shared room architectures.
 
 ---
 
@@ -27,12 +28,12 @@
 **Date:** 2024-12-04
 **Commit:** `90f0c4e`
 
-Established the SwenSync project with single-peer voice AI capabilities:
+Established the sync project with single-peer voice AI capabilities:
 
 - Next.js 14 with App Router and TypeScript
 - TailwindCSS styling with dark mode
 - WebRTC connection to OpenAI Realtime API
-- Full-screen voice interface (SwensyncOverlay)
+- Full-screen voice interface (syncOverlay)
 - Audio wave visualization (multiple modes)
 - Session timer with auto-disconnect
 - Turn-by-turn latency tracking
@@ -42,10 +43,10 @@ Established the SwenSync project with single-peer voice AI capabilities:
 
 **Key Files Created:**
 
-- `src/hooks/useSwensyncRealtime.ts` (923 lines)
-- `src/components/swensync/*` (6 components)
-- `src/types/swensync.ts`
-- `src/app/api/swensync-realtime-token/route.ts`
+- `src/hooks/usesyncRealtime.ts` (923 lines)
+- `src/components/sync/*` (6 components)
+- `src/types/sync.ts`
+- `src/app/api/sync-realtime-token/route.ts`
 - `src/app/api/health/route.ts`
 
 ### Branding Update
@@ -1434,7 +1435,7 @@ All 13 Phase 3 features have been implemented and tested:
 4. `FEAT-303` - useSharedAI hook ✅
 5. `FEAT-304` - Shared context management ✅
 6. `FEAT-305` - AI personality configuration ✅
-7. `FEAT-306` - Enhanced SwensyncOverlay for rooms ✅
+7. `FEAT-306` - Enhanced syncOverlay for rooms ✅
 8. `FEAT-157` - Server-side turn queue processing ✅
 9. `FEAT-158` - Interrupt handling for urgent overrides ✅
 
@@ -1762,16 +1763,16 @@ Implemented AI personality configuration manager for per-room AI customization:
 
 ---
 
-### FEAT-306: Enhanced SwensyncOverlay for Multi-Peer Rooms
+### FEAT-306: Enhanced syncOverlay for Multi-Peer Rooms
 
 **Date:** 2024-12-06
-**Test:** `tests/unit/components/SwensyncOverlay-room.test.tsx`
+**Test:** `tests/unit/components/syncOverlay-room.test.tsx`
 
 Implemented enhanced full-screen overlay for multi-peer room voice conversations:
 
 **Files Created:**
 
-- `src/components/room/SwensyncOverlayRoom.tsx` - Enhanced room overlay component
+- `src/components/room/syncOverlayRoom.tsx` - Enhanced room overlay component
 
 **Key Features:**
 
@@ -1919,7 +1920,7 @@ All 9 Phase 4 features have been implemented and tested:
 
 - AI Session: FEAT-300 (Orchestrator), FEAT-301 (Mixed input), FEAT-302 (Broadcasting), FEAT-303 (useSharedAI)
 - Context: FEAT-304 (Context manager), FEAT-305 (AI personality)
-- UI: FEAT-306 (SwensyncOverlayRoom)
+- UI: FEAT-306 (syncOverlayRoom)
 - Turn Management: FEAT-157 (Turn queue), FEAT-158 (Interrupt handler)
 
 **Total Tests in Phase 4:** 414+ tests passing
@@ -2386,7 +2387,7 @@ Connected room page PTT (Push-to-Talk) to OpenAI Realtime API for end-to-end AI 
 
 - WebSocket connection to `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`
 - Session configuration: PTT mode (turn_detection: null), PCM16 audio format, voice: marin
-- System instructions branded as "Swensync" AI facilitator
+- System instructions branded as "sync" AI facilitator
 - Automatic reconnection on connection failure
 
 **Test Results:**
@@ -2478,7 +2479,7 @@ Implemented vanity username feature allowing participants to set a custom displa
 ```
 User clicks edit → Modal opens → User enters new name → Save
     ↓
-localStorage.setItem("swensync_vanityUsername", newName)
+localStorage.setItem("sync_vanityUsername", newName)
     ↓
 signalingClient.updateDisplayName(newName)
     ↓
@@ -2577,7 +2578,7 @@ connectOpenAI() → session.update with:
   - voice: shimmer (from personality)
   - temperature: 1.0 (from personality)
   - instructions: generateInstructions() combining:
-      1. SWENSYNC_CORE_IDENTITY (base identity)
+      1. sync_CORE_IDENTITY (base identity)
       2. PERSONALITY section (brainstorm instructions)
       3. DOMAIN EXPERTISE section (real estate knowledge)
       4. CURRENT SPEAKER section (user's name)
@@ -3602,3 +3603,49 @@ const transcript = useTranscript({
 
 **Test Results:**
 ✅ 17 tests passing (toggle button, recording indicator, panel integration, panel actions, responsive behavior, error handling)
+
+---
+
+## Phase 8: Cleanup (Complete)
+
+### FEAT-700: Remove Single-User Demo Experience
+
+**Date:** 2025-12-16
+
+Removed the "Find Out More" single-user demo experience to eliminate developer confusion between single-user (direct OpenAI WebRTC) and shared room (server-mediated AI orchestrator) architectures.
+
+**Rationale:**
+
+The single-user demo used a completely different architecture than the shared rooms:
+
+- Direct client-to-OpenAI WebRTC connection vs server-side AI orchestrator
+- Different hooks (`usesyncRealtime` vs `useSharedAI`, `useRoomConnection`)
+- No multi-peer support vs full mesh WebRTC topology
+- Confusing naming similarity between `syncOverlay` and `syncOverlayRoom`
+
+Removing this code path simplifies the codebase and ensures developers only see the canonical room-based architecture.
+
+**Files Removed:**
+
+- `src/hooks/usesyncRealtime.ts` - Direct OpenAI WebRTC hook
+- `src/components/sync/syncOverlay.tsx` - Single-user demo UI
+- `src/components/sync/LatencyStopwatch.tsx` - Only used by single-user demo
+- `src/app/api/sync-realtime-token/route.ts` - Token endpoint for direct connection
+
+**Files Updated:**
+
+- `src/app/page.tsx` - Removed "Find Out More" button and overlay
+- `src/components/sync/index.ts` - Removed deleted exports
+
+**Files Kept (Shared with Rooms):**
+
+- `src/components/sync/AudioWaveVisualizer.tsx` - Used by `syncOverlayRoom`
+- `src/components/sync/VisualizerModeSwitcher.tsx` - Used by `syncOverlayRoom`
+- `src/components/sync/SessionTimer.tsx` - Used by `syncOverlayRoom`
+- `src/components/sync/ConnectionStatus.tsx` - Generic component
+- `src/hooks/useSileroVAD.ts` - Used by `useAmbientTranscription`
+
+**Verification:**
+✅ Build passes
+✅ Source files compile without TypeScript errors
+✅ Room functionality unaffected

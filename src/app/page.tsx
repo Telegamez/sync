@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SwensyncOverlay } from "@/components/swensync";
-import { Mic, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { isMobile } from "react-device-detect";
 
 export default function Home() {
   const router = useRouter();
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
@@ -72,13 +70,6 @@ export default function Home() {
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="text-center flex flex-col items-center gap-6">
           <button
-            onClick={() => setIsOverlayOpen(true)}
-            className="inline-flex items-center gap-3 px-8 py-4 bg-primary text-primary-foreground rounded-full text-lg font-semibold hover:opacity-90 transition-opacity"
-          >
-            <Mic className="w-6 h-6" />
-            Find Out More
-          </button>
-          <button
             onClick={() => router.push("/rooms")}
             className="inline-flex items-center gap-3 px-8 py-4 bg-primary text-primary-foreground rounded-full text-lg font-semibold hover:opacity-90 transition-opacity"
           >
@@ -92,7 +83,7 @@ export default function Home() {
       {isAboutOpen && (
         <div className="mt-8 max-w-3xl mx-auto text-left bg-card border border-border rounded-2xl p-8 shadow-lg">
           <h2 className="text-2xl font-bold text-foreground mb-4">
-            About Swensync
+            About sync
           </h2>
           <h3 className="text-xl font-semibold text-foreground mb-6">
             Shared Intelligence for the Next Era of Human Collaboration
@@ -107,13 +98,13 @@ export default function Home() {
                 teams rely on to make decisions.
               </p>
               <p className="mt-2">
-                Swensync was created to solve this foundational gap.
+                sync was created to solve this foundational gap.
               </p>
               <p className="mt-2">
                 We build synchronized, shared AI inference systems that allow
                 multiple humans to interact with a single, coherent AI
                 participant — together, in real time. Instead of isolated
-                outputs and fragmented insights, Swensync creates unified
+                outputs and fragmented insights, sync creates unified
                 experiences where AI listens to the group, responds to the
                 group, and evolves with the group.
               </p>
@@ -142,19 +133,17 @@ export default function Home() {
                 fragmentation, and misalignment.
               </p>
               <p className="mt-2">
-                Swensync eliminates that by enabling AI to participate in
-                multi-user environments as a synchronized, context-aware
-                teammate.
+                sync eliminates that by enabling AI to participate in multi-user
+                environments as a synchronized, context-aware teammate.
               </p>
             </div>
 
             <div className="border-t border-border pt-6">
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                What Swensync Enables
+                What sync Enables
               </h3>
               <p className="mb-4">
-                Swensync re-architects the AI experience around shared
-                intelligence:
+                sync re-architects the AI experience around shared intelligence:
               </p>
               <div className="space-y-4">
                 <div>
@@ -205,7 +194,7 @@ export default function Home() {
                 Enterprise Use Cases
               </h3>
               <p className="mb-4">
-                Swensync unlocks outcomes isolated AI can&apos;t deliver:
+                sync unlocks outcomes isolated AI can&apos;t deliver:
               </p>
               <div className="space-y-4">
                 <div>
@@ -284,7 +273,7 @@ export default function Home() {
               </p>
               <p className="mt-2">
                 Human collaboration has always produced the world&apos;s
-                greatest breakthroughs. Swensync exists to amplify that
+                greatest breakthroughs. sync exists to amplify that
                 collaborative energy by giving teams a shared AI participant
                 capable of:
               </p>
@@ -317,11 +306,6 @@ export default function Home() {
           </section>
         </div>
       )}
-
-      <SwensyncOverlay
-        isOpen={isOverlayOpen}
-        onClose={() => setIsOverlayOpen(false)}
-      />
     </main>
   );
 }

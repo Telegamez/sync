@@ -7,10 +7,10 @@
  * Part of the Long-Horizon Engineering Protocol - FEAT-401
  */
 
-import type { UserId } from '@/types/auth';
-import type { RoomId, RoomStatus, AIPersonality } from '@/types/room';
-import type { PeerId, PeerRole } from '@/types/peer';
-import type { VoiceMode } from '@/types/voice-mode';
+import type { UserId } from "@/types/auth";
+import type { RoomId, RoomStatus, AIPersonality } from "@/types/room";
+import type { PeerId, PeerRole } from "@/types/peer";
+import type { VoiceMode } from "@/types/voice-mode";
 
 // ========== Table Schemas ==========
 
@@ -101,17 +101,17 @@ export interface RoomHistoryTable {
  * Room event types for history
  */
 export type RoomEventType =
-  | 'room_created'
-  | 'room_closed'
-  | 'room_deleted'
-  | 'settings_updated'
-  | 'participant_joined'
-  | 'participant_left'
-  | 'participant_kicked'
-  | 'role_changed'
-  | 'ai_session_started'
-  | 'ai_session_ended'
-  | 'ai_interrupted';
+  | "room_created"
+  | "room_closed"
+  | "room_deleted"
+  | "settings_updated"
+  | "participant_joined"
+  | "participant_left"
+  | "participant_kicked"
+  | "role_changed"
+  | "ai_session_started"
+  | "ai_session_ended"
+  | "ai_interrupted";
 
 // ========== Insert/Update Types ==========
 
@@ -299,7 +299,7 @@ CREATE INDEX IF NOT EXISTS idx_room_history_created_at ON room_history(created_a
  * SQL for all migrations combined
  */
 export const FULL_MIGRATION = `
--- SwenSync Database Schema
+-- Sync Database Schema
 -- Part of FEAT-401: Room Persistence
 
 ${CREATE_ROOMS_TABLE}
@@ -317,7 +317,7 @@ ${CREATE_INDEXES}
  * Default voice settings JSON
  */
 export const DEFAULT_VOICE_SETTINGS_JSON = JSON.stringify({
-  mode: 'pushToTalk' as VoiceMode,
+  mode: "pushToTalk" as VoiceMode,
   lockDuringAIResponse: true,
   allowInterrupt: true,
   enablePeerAudio: true,
@@ -332,8 +332,8 @@ export const DEFAULT_VOICE_SETTINGS_JSON = JSON.stringify({
  */
 export const ROOM_DEFAULTS = {
   max_participants: 6,
-  status: 'waiting' as RoomStatus,
-  ai_personality: 'facilitator' as AIPersonality,
+  status: "waiting" as RoomStatus,
+  ai_personality: "facilitator" as AIPersonality,
   voice_settings: DEFAULT_VOICE_SETTINGS_JSON,
 };
 
@@ -342,15 +342,18 @@ export const ROOM_DEFAULTS = {
 /**
  * Validate room name
  */
-export function validateRoomName(name: string): { valid: boolean; error?: string } {
+export function validateRoomName(name: string): {
+  valid: boolean;
+  error?: string;
+} {
   if (!name || name.trim().length === 0) {
-    return { valid: false, error: 'Room name is required' };
+    return { valid: false, error: "Room name is required" };
   }
   if (name.length < 3) {
-    return { valid: false, error: 'Room name must be at least 3 characters' };
+    return { valid: false, error: "Room name must be at least 3 characters" };
   }
   if (name.length > 100) {
-    return { valid: false, error: 'Room name must be at most 100 characters' };
+    return { valid: false, error: "Room name must be at most 100 characters" };
   }
   return { valid: true };
 }
@@ -358,15 +361,18 @@ export function validateRoomName(name: string): { valid: boolean; error?: string
 /**
  * Validate max participants
  */
-export function validateMaxParticipants(max: number): { valid: boolean; error?: string } {
+export function validateMaxParticipants(max: number): {
+  valid: boolean;
+  error?: string;
+} {
   if (!Number.isInteger(max)) {
-    return { valid: false, error: 'Max participants must be an integer' };
+    return { valid: false, error: "Max participants must be an integer" };
   }
   if (max < 2) {
-    return { valid: false, error: 'Max participants must be at least 2' };
+    return { valid: false, error: "Max participants must be at least 2" };
   }
   if (max > 10) {
-    return { valid: false, error: 'Max participants must be at most 10' };
+    return { valid: false, error: "Max participants must be at most 10" };
   }
   return { valid: true };
 }
@@ -374,8 +380,17 @@ export function validateMaxParticipants(max: number): { valid: boolean; error?: 
 /**
  * Validate AI personality
  */
-export function validateAIPersonality(personality: string): { valid: boolean; error?: string } {
-  const valid: AIPersonality[] = ['facilitator', 'assistant', 'expert', 'brainstorm', 'custom'];
+export function validateAIPersonality(personality: string): {
+  valid: boolean;
+  error?: string;
+} {
+  const valid: AIPersonality[] = [
+    "facilitator",
+    "assistant",
+    "expert",
+    "brainstorm",
+    "custom",
+  ];
   if (!valid.includes(personality as AIPersonality)) {
     return { valid: false, error: `Invalid AI personality: ${personality}` };
   }
@@ -385,8 +400,11 @@ export function validateAIPersonality(personality: string): { valid: boolean; er
 /**
  * Validate room status
  */
-export function validateRoomStatus(status: string): { valid: boolean; error?: string } {
-  const valid: RoomStatus[] = ['waiting', 'active', 'full', 'closed'];
+export function validateRoomStatus(status: string): {
+  valid: boolean;
+  error?: string;
+} {
+  const valid: RoomStatus[] = ["waiting", "active", "full", "closed"];
   if (!valid.includes(status as RoomStatus)) {
     return { valid: false, error: `Invalid room status: ${status}` };
   }
@@ -396,8 +414,11 @@ export function validateRoomStatus(status: string): { valid: boolean; error?: st
 /**
  * Validate peer role
  */
-export function validatePeerRole(role: string): { valid: boolean; error?: string } {
-  const valid: PeerRole[] = ['owner', 'moderator', 'participant'];
+export function validatePeerRole(role: string): {
+  valid: boolean;
+  error?: string;
+} {
+  const valid: PeerRole[] = ["owner", "moderator", "participant"];
   if (!valid.includes(role as PeerRole)) {
     return { valid: false, error: `Invalid peer role: ${role}` };
   }
@@ -407,11 +428,22 @@ export function validatePeerRole(role: string): { valid: boolean; error?: string
 /**
  * Validate event type
  */
-export function validateEventType(eventType: string): { valid: boolean; error?: string } {
+export function validateEventType(eventType: string): {
+  valid: boolean;
+  error?: string;
+} {
   const valid: RoomEventType[] = [
-    'room_created', 'room_closed', 'room_deleted', 'settings_updated',
-    'participant_joined', 'participant_left', 'participant_kicked',
-    'role_changed', 'ai_session_started', 'ai_session_ended', 'ai_interrupted'
+    "room_created",
+    "room_closed",
+    "room_deleted",
+    "settings_updated",
+    "participant_joined",
+    "participant_left",
+    "participant_kicked",
+    "role_changed",
+    "ai_session_started",
+    "ai_session_ended",
+    "ai_interrupted",
   ];
   if (!valid.includes(eventType as RoomEventType)) {
     return { valid: false, error: `Invalid event type: ${eventType}` };
@@ -422,7 +454,10 @@ export function validateEventType(eventType: string): { valid: boolean; error?: 
 /**
  * Validate full room insert data
  */
-export function validateInsertRoom(data: InsertRoom): { valid: boolean; errors: string[] } {
+export function validateInsertRoom(data: InsertRoom): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   const nameResult = validateRoomName(data.name);
@@ -444,7 +479,7 @@ export function validateInsertRoom(data: InsertRoom): { valid: boolean; errors: 
   }
 
   if (!data.owner_id) {
-    errors.push('Owner ID is required');
+    errors.push("Owner ID is required");
   }
 
   return { valid: errors.length === 0, errors };
@@ -453,17 +488,20 @@ export function validateInsertRoom(data: InsertRoom): { valid: boolean; errors: 
 /**
  * Validate participant insert data
  */
-export function validateInsertParticipant(data: InsertParticipant): { valid: boolean; errors: string[] } {
+export function validateInsertParticipant(data: InsertParticipant): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
-  if (!data.room_id) errors.push('Room ID is required');
-  if (!data.user_id) errors.push('User ID is required');
-  if (!data.peer_id) errors.push('Peer ID is required');
+  if (!data.room_id) errors.push("Room ID is required");
+  if (!data.user_id) errors.push("User ID is required");
+  if (!data.peer_id) errors.push("Peer ID is required");
 
   if (!data.display_name || data.display_name.trim().length === 0) {
-    errors.push('Display name is required');
+    errors.push("Display name is required");
   } else if (data.display_name.length > 100) {
-    errors.push('Display name must be at most 100 characters');
+    errors.push("Display name must be at most 100 characters");
   }
 
   if (data.role !== undefined) {
@@ -480,21 +518,32 @@ export function validateInsertParticipant(data: InsertParticipant): { valid: boo
  * Check if value is a valid RoomStatus
  */
 export function isRoomStatus(value: unknown): value is RoomStatus {
-  return typeof value === 'string' && ['waiting', 'active', 'full', 'closed'].includes(value);
+  return (
+    typeof value === "string" &&
+    ["waiting", "active", "full", "closed"].includes(value)
+  );
 }
 
 /**
  * Check if value is a valid AIPersonality
  */
 export function isAIPersonality(value: unknown): value is AIPersonality {
-  return typeof value === 'string' && ['facilitator', 'assistant', 'expert', 'brainstorm', 'custom'].includes(value);
+  return (
+    typeof value === "string" &&
+    ["facilitator", "assistant", "expert", "brainstorm", "custom"].includes(
+      value,
+    )
+  );
 }
 
 /**
  * Check if value is a valid PeerRole
  */
 export function isPeerRole(value: unknown): value is PeerRole {
-  return typeof value === 'string' && ['owner', 'moderator', 'participant'].includes(value);
+  return (
+    typeof value === "string" &&
+    ["owner", "moderator", "participant"].includes(value)
+  );
 }
 
 /**
@@ -502,9 +551,17 @@ export function isPeerRole(value: unknown): value is PeerRole {
  */
 export function isRoomEventType(value: unknown): value is RoomEventType {
   const valid = [
-    'room_created', 'room_closed', 'room_deleted', 'settings_updated',
-    'participant_joined', 'participant_left', 'participant_kicked',
-    'role_changed', 'ai_session_started', 'ai_session_ended', 'ai_interrupted'
+    "room_created",
+    "room_closed",
+    "room_deleted",
+    "settings_updated",
+    "participant_joined",
+    "participant_left",
+    "participant_kicked",
+    "role_changed",
+    "ai_session_started",
+    "ai_session_ended",
+    "ai_interrupted",
   ];
-  return typeof value === 'string' && valid.includes(value);
+  return typeof value === "string" && valid.includes(value);
 }

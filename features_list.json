@@ -1,7 +1,7 @@
 {
   "$schema": "./features_list.schema.json",
   "metadata": {
-    "project": "swensync",
+    "project": "sync",
     "version": "0.4.0",
     "lastUpdated": "2025-12-16T00:00:00.000Z",
     "protocol": "Long-Horizon Engineering Protocol v1.0",
@@ -641,16 +641,16 @@
       "id": "FEAT-306",
       "phase": 4,
       "category": "components",
-      "description": "Enhanced SwensyncOverlay for multi-peer rooms",
+      "description": "Enhanced syncOverlay for multi-peer rooms",
       "priority": "high",
       "steps": [
-        "Update SwensyncOverlay for room context",
+        "Update syncOverlay for room context",
         "Display AI state with room awareness",
         "Show which peers AI is responding to",
         "Handle AI visualizer with shared state",
         "Add room-specific controls"
       ],
-      "testFile": "tests/unit/components/SwensyncOverlay-room.test.tsx",
+      "testFile": "tests/unit/components/syncOverlay-room.test.tsx",
       "dependencies": ["FEAT-303", "FEAT-205"],
       "passes": true
     },
@@ -1432,7 +1432,7 @@
       "description": "VAD-gated ambient transcription - Fix restart loop with Silero VAD",
       "priority": "critical",
       "steps": [
-        "Extract Silero VAD from useSwensyncRealtime into reusable useSileroVAD hook",
+        "Extract Silero VAD from usesyncRealtime into reusable useSileroVAD hook",
         "Refactor useAmbientTranscription to use VAD-gated recognition (no auto-restart)",
         "Add localStream prop to useAmbientTranscription for VAD monitoring",
         "Update room page to pass local audio stream to ambient transcription",
@@ -1605,6 +1605,26 @@
       "testFile": "tests/e2e/voice-search.spec.ts",
       "dependencies": ["FEAT-607"],
       "passes": true
+    },
+    {
+      "id": "FEAT-700",
+      "phase": 8,
+      "category": "cleanup",
+      "description": "Remove single-user demo experience (Find Out More) to reduce codebase confusion",
+      "priority": "high",
+      "steps": [
+        "Remove usesyncRealtime hook (src/hooks/usesyncRealtime.ts)",
+        "Remove syncOverlay component (src/components/sync/syncOverlay.tsx)",
+        "Keep SessionTimer component (used by syncOverlayRoom)",
+        "Remove LatencyStopwatch component (src/components/sync/LatencyStopwatch.tsx)",
+        "Remove sync-realtime-token API endpoint (src/app/api/sync-realtime-token/route.ts)",
+        "Update landing page to remove Find Out More button and overlay",
+        "Update src/components/sync/index.ts to remove deleted exports",
+        "Verify build passes"
+      ],
+      "testFile": "N/A - removal feature verified by successful build",
+      "dependencies": [],
+      "passes": true
     }
   ],
   "categories": {
@@ -1627,17 +1647,19 @@
     "e2e": "End-to-end testing",
     "user-experience": "User experience and personalization",
     "transcript": "Live transcript and AI context system",
-    "search": "Voice-activated web search integration"
+    "search": "Voice-activated web search integration",
+    "cleanup": "Codebase cleanup and architectural simplification"
   },
   "statistics": {
-    "total": 85,
+    "total": 86,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
     "phase5": 18,
     "phase6": 15,
     "phase7": 9,
-    "passed": 76,
+    "phase8": 1,
+    "passed": 77,
     "pending": 9
   }
 }

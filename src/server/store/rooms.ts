@@ -25,16 +25,16 @@ import { DEFAULT_TRANSCRIPT_SETTINGS } from "@/types/transcript";
  */
 declare global {
   // eslint-disable-next-line no-var
-  var __swensync_rooms: Map<RoomId, Room> | undefined;
+  var __sync_rooms: Map<RoomId, Room> | undefined;
 }
 
 // Use global store to survive HMR in development
 const rooms: Map<RoomId, Room> =
-  globalThis.__swensync_rooms ?? new Map<RoomId, Room>();
+  globalThis.__sync_rooms ?? new Map<RoomId, Room>();
 
 // Persist to global in development
 if (process.env.NODE_ENV !== "production") {
-  globalThis.__swensync_rooms = rooms;
+  globalThis.__sync_rooms = rooms;
 }
 
 /**

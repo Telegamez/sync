@@ -132,14 +132,14 @@ export default function RoomPage() {
   const [displayName, setDisplayName] = useState(() => {
     if (typeof window !== "undefined") {
       // Check localStorage first for persisted vanity username
-      const vanity = localStorage.getItem("swensync_vanityUsername");
+      const vanity = localStorage.getItem("sync_vanityUsername");
       if (vanity) return vanity;
       // Fall back to sessionStorage for temporary name
-      const stored = sessionStorage.getItem("swensync_displayName");
+      const stored = sessionStorage.getItem("sync_displayName");
       if (stored) return stored;
       // Generate new temporary name
       const newName = `User-${Math.random().toString(36).slice(2, 6)}`;
-      sessionStorage.setItem("swensync_displayName", newName);
+      sessionStorage.setItem("sync_displayName", newName);
       return newName;
     }
     return "User";
@@ -889,7 +889,7 @@ export default function RoomPage() {
     (newName: string) => {
       setDisplayName(newName);
       // Persist to localStorage for future sessions
-      localStorage.setItem("swensync_vanityUsername", newName);
+      localStorage.setItem("sync_vanityUsername", newName);
       // Update via signaling to broadcast to peers
       const client = getClient();
       if (client) {

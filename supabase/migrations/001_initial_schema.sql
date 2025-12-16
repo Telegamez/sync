@@ -1,4 +1,4 @@
--- SwenSync Database Schema
+-- Sync Database Schema
 -- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/YOUR_PROJECT/sql
 -- Part of FEAT-401: Room Persistence
 
@@ -134,5 +134,5 @@ CREATE POLICY "System can insert history" ON room_history
 -- ============================================================================
 DO $$
 BEGIN
-  RAISE NOTICE 'SwenSync schema created successfully!';
+  RAISE NOTICE 'Sync schema created successfully!';
 END $$;

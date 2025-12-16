@@ -1,5 +1,5 @@
 {
-  "name": "swensync",
+  "name": "sync",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,11 +9,11 @@
     "postbuild": "cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/ && cp server.ts .next/standalone/ && cp tsconfig.server.json .next/standalone/ && cp package.json .next/standalone/",
     "start": "tsx server.ts",
     "start:next": "next start -p 24680",
-    "start:detached": "nohup npx tsx server.ts > /tmp/swensync.log 2>&1 & echo $! > /tmp/swensync.pid && echo \"Started with PID $(cat /tmp/swensync.pid)\"",
-    "stop": "if [ -f /tmp/swensync.pid ]; then PID=$(cat /tmp/swensync.pid); kill $PID 2>/dev/null || kill -9 $PID 2>/dev/null; rm /tmp/swensync.pid 2>/dev/null; echo 'Stopped via PID file'; fi; if command -v lsof >/dev/null 2>&1; then lsof -ti:24680 | xargs -r kill -9 2>/dev/null && echo 'Killed via lsof' || true; fi; fuser -k 24680/tcp 2>/dev/null && echo 'Killed via fuser' || true; sleep 1; if lsof -i:24680 >/dev/null 2>&1 || fuser 24680/tcp >/dev/null 2>&1; then echo 'Warning: Port may still be in use'; else echo 'Port 24680 is free'; fi",
+    "start:detached": "nohup npx tsx server.ts > /tmp/sync.log 2>&1 & echo $! > /tmp/sync.pid && echo \"Started with PID $(cat /tmp/sync.pid)\"",
+    "stop": "if [ -f /tmp/sync.pid ]; then PID=$(cat /tmp/sync.pid); kill $PID 2>/dev/null || kill -9 $PID 2>/dev/null; rm /tmp/sync.pid 2>/dev/null; echo 'Stopped via PID file'; fi; if command -v lsof >/dev/null 2>&1; then lsof -ti:24680 | xargs -r kill -9 2>/dev/null && echo 'Killed via lsof' || true; fi; fuser -k 24680/tcp 2>/dev/null && echo 'Killed via fuser' || true; sleep 1; if lsof -i:24680 >/dev/null 2>&1 || fuser 24680/tcp >/dev/null 2>&1; then echo 'Warning: Port may still be in use'; else echo 'Port 24680 is free'; fi",
     "restart": "pnpm stop && pnpm dev",
     "prod": "pnpm build && PORT=24680 NODE_ENV=production pnpm start:detached",
-    "logs": "tail -f /tmp/swensync.log",
+    "logs": "tail -f /tmp/sync.log",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "test": "vitest run",

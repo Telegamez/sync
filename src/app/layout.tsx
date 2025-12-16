@@ -14,7 +14,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Swensync - The AI Collaboration Engine",
+  title: "sync - The AI Collaboration Engine",
   description: "Synchronized intelligence for teams",
   icons: {
     icon: [

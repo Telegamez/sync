@@ -2,7 +2,7 @@
  * useSileroVAD Hook
  *
  * Reusable Voice Activity Detection using Silero VAD model.
- * Extracted from useSwensyncRealtime for use in ambient transcription.
+ * Extracted from usesyncRealtime for use in ambient transcription.
  *
  * Part of the Long-Horizon Engineering Protocol - FEAT-514
  */
@@ -63,12 +63,12 @@ const VAD_BASE_PATH = "/vad/";
 
 /**
  * Default options for ambient transcription use case
- * (longer redemptionMs than useSwensyncRealtime since we don't need fast commit signals)
+ * (longer redemptionMs than usesyncRealtime since we don't need fast commit signals)
  */
 const DEFAULT_OPTIONS = {
   positiveSpeechThreshold: 0.6,
   negativeSpeechThreshold: 0.35,
-  redemptionMs: 500, // 500ms silence before triggering end (vs 200ms in useSwensyncRealtime)
+  redemptionMs: 500, // 500ms silence before triggering end (vs 200ms in usesyncRealtime)
   minSpeechMs: 150,
 };
 

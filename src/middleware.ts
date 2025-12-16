@@ -18,7 +18,7 @@ import {
 /**
  * Auth storage key (must match client)
  */
-const AUTH_STORAGE_KEY = "swensync-auth";
+const AUTH_STORAGE_KEY = "sync-auth";
 
 /**
  * Check if request has valid auth cookie/header

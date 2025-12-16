@@ -1,4 +1,4 @@
-# Swensync: Latency Innovation for Voice AI
+# sync: Latency Innovation for Voice AI
 
 ## The Problem: Voice AI Feels Slow
 
@@ -6,12 +6,12 @@ Current voice AI systems suffer from noticeable delays between when a user stops
 
 The delay comes from multiple sources:
 
-| Component | Typical Delay |
-|-----------|---------------|
-| Detecting user stopped speaking | 500-800ms |
-| Network round-trip | 50-150ms |
-| AI model processing | 200-400ms |
-| Audio streaming startup | 50-100ms |
+| Component                       | Typical Delay |
+| ------------------------------- | ------------- |
+| Detecting user stopped speaking | 500-800ms     |
+| Network round-trip              | 50-150ms      |
+| AI model processing             | 200-400ms     |
+| Audio streaming startup         | 50-100ms      |
 
 Most of these are controlled by infrastructure providers. However, **turn detection**—knowing when the user finished speaking—is where we've achieved breakthrough improvements.
 
@@ -19,7 +19,7 @@ Most of these are controlled by infrastructure providers. However, **turn detect
 
 ## Our Solution: Dual-VAD Architecture
 
-Swensync implements a **patented-pending dual voice activity detection (VAD) system** that runs client-side AI in parallel with server-side processing:
+sync implements a **patented-pending dual voice activity detection (VAD) system** that runs client-side AI in parallel with server-side processing:
 
 ```
 User Speaks → [Client VAD] → Detects end 150ms faster → Triggers AI immediately
@@ -27,6 +27,7 @@ User Speaks → [Client VAD] → Detects end 150ms faster → Triggers AI immedi
 ```
 
 **How it works:**
+
 1. **Client-side Silero VAD** runs locally in the browser using WebAssembly
 2. Detects speech-end **150ms faster** than server-side VAD
 3. Immediately sends a "commit" signal to start AI processing
@@ -38,22 +39,22 @@ This "race condition by design" means the faster detector wins—without sacrifi
 
 ## Technical Optimizations Implemented
 
-| Optimization | Latency Saved |
-|--------------|---------------|
-| Client-side VAD early commit | **~150ms** |
-| Reduced server silence threshold (500ms → 350ms) | **~150ms** |
-| Reduced prefix padding (300ms → 200ms) | **~100ms** |
-| **Total Improvement** | **~350-400ms** |
+| Optimization                                     | Latency Saved  |
+| ------------------------------------------------ | -------------- |
+| Client-side VAD early commit                     | **~150ms**     |
+| Reduced server silence threshold (500ms → 350ms) | **~150ms**     |
+| Reduced prefix padding (300ms → 200ms)           | **~100ms**     |
+| **Total Improvement**                            | **~350-400ms** |
 
 ---
 
 ## Measured Results
 
-| Scenario | Industry Standard | Swensync |
-|----------|-------------------|--------|
-| Short phrase | 800-1000ms | **450-600ms** |
-| Full sentence | 900-1200ms | **550-750ms** |
-| Paragraph | 1000-1400ms | **650-900ms** |
+| Scenario      | Industry Standard | sync          |
+| ------------- | ----------------- | ------------- |
+| Short phrase  | 800-1000ms        | **450-600ms** |
+| Full sentence | 900-1200ms        | **550-750ms** |
+| Paragraph     | 1000-1400ms       | **650-900ms** |
 
 **We've achieved 35-45% latency reduction** compared to standard implementations—bringing voice AI closer to human conversation speed.
 
@@ -79,11 +80,11 @@ This "race condition by design" means the faster detector wins—without sacrifi
 
 ## Future Roadmap
 
-| Phase | Innovation | Expected Gain |
-|-------|------------|---------------|
-| Near-term | Adaptive thresholds based on ambient noise | 30-50ms |
-| Medium-term | Predictive turn detection using prosody analysis | 100-200ms |
-| Long-term | Custom-trained VAD optimized for conversational AI | Sub-100ms detection |
+| Phase       | Innovation                                         | Expected Gain       |
+| ----------- | -------------------------------------------------- | ------------------- |
+| Near-term   | Adaptive thresholds based on ambient noise         | 30-50ms             |
+| Medium-term | Predictive turn detection using prosody analysis   | 100-200ms           |
+| Long-term   | Custom-trained VAD optimized for conversational AI | Sub-100ms detection |
 
 **Target: Sub-400ms average latency**—indistinguishable from human conversation timing.
 
@@ -91,4 +92,4 @@ This "race condition by design" means the faster detector wins—without sacrifi
 
 ## Summary
 
-Swensync has solved one of the hardest problems in voice AI: **making conversations feel instant**. Our dual-VAD architecture delivers measurable, defensible latency improvements that directly translate to better user experience and higher engagement.
+sync has solved one of the hardest problems in voice AI: **making conversations feel instant**. Our dual-VAD architecture delivers measurable, defensible latency improvements that directly translate to better user experience and higher engagement.
