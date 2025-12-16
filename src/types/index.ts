@@ -24,3 +24,6 @@ export * from "./auth";
 
 // Transcript types (FEAT-500)
 export * from "./transcript";
+
+// Search types (FEAT-600)
+export * from "./search";

@@ -10,6 +10,7 @@
 import WebSocket from "ws";
 import type { RoomId } from "@/types/room";
 import type { PeerId } from "@/types/peer";
+import type { FunctionCallEvent } from "@/types/search";
 
 /**
  * OpenAI Realtime WebSocket endpoint
@@ -68,6 +69,8 @@ export interface OpenAIRealtimeCallbacks {
   onReady?: (roomId: RoomId) => void;
   /** Called when session ends */
   onClose?: (roomId: RoomId) => void;
+  /** Called when AI invokes a function (e.g., webSearch) */
+  onFunctionCall?: (roomId: RoomId, functionCall: FunctionCallEvent) => void;
 }
 
 /**
@@ -104,7 +107,36 @@ You are Swensync's AI. Never mention OpenAI, GPT, or any third-party provider.
 - Max 4 sentences per turn — usually 2-3 is better
 - No fluff, no preamble, no "Great question!" — just answer
 - Address people by name when you know it
-- If they need more detail, they'll ask`;
+- If they need more detail, they'll ask
+
+## SEARCH CAPABILITY
+You have access to a webSearch function. Use it when users say "search", "look up", "find", "google", or ask about current events, news, or things requiring up-to-date information. After searching, briefly summarize the top results.`;
+
+/**
+ * webSearch function tool definition for OpenAI
+ */
+const WEB_SEARCH_TOOL = {
+  type: "function" as const,
+  name: "webSearch",
+  description:
+    "Search the web for current information, news, images, or videos. Use when user says 'search', 'look up', 'find', 'google', or asks about current events, news, or things that require up-to-date information.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "The search query to look up",
+      },
+      searchType: {
+        type: "string",
+        enum: ["all", "web", "images", "videos"],
+        description:
+          "Type of search. Use 'all' for general queries, 'images' when user wants pictures, 'videos' when user wants video content. Defaults to 'all'.",
+      },
+    },
+    required: ["query"],
+  },
+};
 
 /**
  * OpenAI Realtime Client for Server-Side Connections
@@ -408,6 +440,64 @@ export class OpenAIRealtimeClient {
   }
 
   /**
+   * Send function call output back to OpenAI
+   *
+   * After executing a function (e.g., webSearch), send the results back
+   * to OpenAI so it can generate a response based on the function output.
+   *
+   * @param roomId - Room ID
+   * @param callId - The call_id from the function call event
+   * @param output - The function output (will be JSON stringified)
+   * @param triggerResponse - Whether to trigger AI response after (default: true)
+   * @returns boolean - Whether output was sent successfully
+   */
+  sendFunctionOutput(
+    roomId: RoomId,
+    callId: string,
+    output: unknown,
+    triggerResponse: boolean = true,
+  ): boolean {
+    const session = this.sessions.get(roomId);
+    if (!session || !session.ws || session.ws.readyState !== WebSocket.OPEN) {
+      console.log(
+        `[OpenAI] Cannot send function output - no active session for room ${roomId}`,
+      );
+      return false;
+    }
+
+    // Send function output
+    const outputEvent = {
+      type: "conversation.item.create",
+      item: {
+        type: "function_call_output",
+        call_id: callId,
+        output: typeof output === "string" ? output : JSON.stringify(output),
+      },
+    };
+
+    session.ws.send(JSON.stringify(outputEvent));
+    console.log(
+      `[OpenAI] Room ${roomId}: Sent function output for call ${callId}`,
+    );
+
+    // Trigger AI response to summarize results
+    if (triggerResponse) {
+      const responseEvent = {
+        type: "response.create",
+        response: {
+          modalities: ["audio", "text"],
+        },
+      };
+      session.ws.send(JSON.stringify(responseEvent));
+      console.log(
+        `[OpenAI] Room ${roomId}: Triggered response after function output`,
+      );
+    }
+
+    return true;
+  }
+
+  /**
    * Get active session count
    */
   getSessionCount(): number {
@@ -517,11 +607,16 @@ export class OpenAIRealtimeClient {
         output_audio_format: "pcm16",
         temperature: this.config.temperature ?? 0.8,
         turn_detection: null, // Disable server VAD - we use PTT
+        // Function calling tools
+        tools: [WEB_SEARCH_TOOL],
+        tool_choice: "auto",
       },
     };
 
     session.ws.send(JSON.stringify(config));
-    console.log(`[OpenAI] Session configured for room ${session.roomId}`);
+    console.log(
+      `[OpenAI] Session configured for room ${session.roomId} (with webSearch tool)`,
+    );
   }
 
   /**
@@ -539,6 +634,7 @@ export class OpenAIRealtimeClient {
         "response.created",
         "response.done",
         "response.audio.done",
+        "response.output_item.done",
         "input_audio_buffer.speech_started",
         "input_audio_buffer.speech_stopped",
       ];
@@ -617,6 +713,30 @@ export class OpenAIRealtimeClient {
 
         case "input_audio_buffer.speech_stopped":
           // Server VAD detected silence
+          break;
+
+        case "response.output_item.done":
+          // Check if this is a function call
+          if (event.item?.type === "function_call") {
+            const { name, call_id, arguments: argsString } = event.item;
+            console.log(
+              `[OpenAI] Room ${session.roomId}: Function call - ${name}`,
+            );
+
+            try {
+              const args = JSON.parse(argsString || "{}");
+              this.callbacks.onFunctionCall?.(session.roomId, {
+                name,
+                callId: call_id,
+                arguments: args,
+              });
+            } catch (parseError) {
+              console.error(
+                `[OpenAI] Failed to parse function arguments for ${name}:`,
+                parseError,
+              );
+            }
+          }
           break;
       }
     } catch (error) {

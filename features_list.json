@@ -2,10 +2,10 @@
   "$schema": "./features_list.schema.json",
   "metadata": {
     "project": "swensync",
-    "version": "0.3.0",
-    "lastUpdated": "2024-12-09T00:00:00.000Z",
+    "version": "0.4.0",
+    "lastUpdated": "2025-12-16T00:00:00.000Z",
     "protocol": "Long-Horizon Engineering Protocol v1.0",
-    "currentPhase": "Phase 6: Transcript System"
+    "currentPhase": "Phase 7: Voice-Activated Search"
   },
   "phases": {
     "phase1": {
@@ -35,8 +35,13 @@
     },
     "phase6": {
       "name": "Transcript System",
-      "status": "in_progress",
+      "status": "complete",
       "description": "Dual-track unified transcript with AI context awareness"
+    },
+    "phase7": {
+      "name": "Voice-Activated Search",
+      "status": "complete",
+      "description": "Keyword-triggered web, image, and video search via OpenAI function calling and Serper API"
     }
   },
   "features": [
@@ -1437,6 +1442,169 @@
       "testFile": "tests/unit/hooks/useAmbientTranscription-vad.test.ts",
       "dependencies": ["FEAT-502"],
       "passes": true
+    },
+    {
+      "id": "FEAT-600",
+      "phase": 7,
+      "category": "types",
+      "description": "Search result types and interfaces for Serper API integration",
+      "priority": "critical",
+      "steps": [
+        "Create src/types/search.ts with SerperWebResult interface",
+        "Define SerperImageResult interface with imageUrl, thumbnailUrl, dimensions",
+        "Define SerperVideoResult interface with duration, channel, source",
+        "Define SearchResults aggregate interface with web, images, videos arrays",
+        "Define SearchState interface for client-side state management",
+        "Export all types from central index"
+      ],
+      "testFile": "tests/unit/types/search.test.ts",
+      "dependencies": [],
+      "passes": true
+    },
+    {
+      "id": "FEAT-601",
+      "phase": 7,
+      "category": "api",
+      "description": "Serper API service for web, image, and video search",
+      "priority": "critical",
+      "steps": [
+        "Create src/server/signaling/serper-service.ts",
+        "Implement searchWeb() method calling google.serper.dev/search",
+        "Implement searchImages() method calling google.serper.dev/images",
+        "Implement searchVideos() method calling google.serper.dev/videos",
+        "Implement searchAll() method for parallel multi-type search",
+        "Add error handling with exponential backoff for rate limits",
+        "Add response parsing and type validation"
+      ],
+      "testFile": "tests/unit/api/serper-service.test.ts",
+      "dependencies": ["FEAT-600"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-602",
+      "phase": 7,
+      "category": "ai",
+      "description": "OpenAI Realtime API function calling for webSearch tool",
+      "priority": "critical",
+      "steps": [
+        "Add tools array to session.update config in openai-realtime-client.ts",
+        "Define webSearch function with query and searchType parameters",
+        "Handle response.output_item.done event for function_call type",
+        "Add onFunctionCall callback to OpenAIRealtimeCallbacks interface",
+        "Implement sendFunctionOutput() method for conversation.item.create",
+        "Trigger response.create after function output to get AI summary"
+      ],
+      "testFile": "tests/unit/ai/function-calling.test.ts",
+      "dependencies": ["FEAT-601", "FEAT-300"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-603",
+      "phase": 7,
+      "category": "signaling",
+      "description": "Socket.io search events for broadcasting results to room",
+      "priority": "critical",
+      "steps": [
+        "Add search:started event emission when function call received",
+        "Add search:results event emission with SearchResults payload",
+        "Add search:error event emission for failed searches",
+        "Add search:clear handler for client-initiated clear",
+        "Integrate SerperService calls in server.ts onFunctionCall handler",
+        "Broadcast results to all room participants"
+      ],
+      "testFile": "tests/unit/signaling/search-events.test.ts",
+      "dependencies": ["FEAT-602", "FEAT-104"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-604",
+      "phase": 7,
+      "category": "hooks",
+      "description": "useSearch hook for client-side search state management",
+      "priority": "critical",
+      "steps": [
+        "Create src/hooks/useSearch.ts",
+        "Subscribe to search:started, search:results, search:error events",
+        "Manage results, isLoading, error, and query state",
+        "Implement activeTab state for Web/Images/Videos selection",
+        "Implement clearResults() action method",
+        "Handle late-joiner state synchronization"
+      ],
+      "testFile": "tests/unit/hooks/useSearch.test.ts",
+      "dependencies": ["FEAT-603", "FEAT-108"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-605",
+      "phase": 7,
+      "category": "components",
+      "description": "SearchPanel component with tabbed Web/Images/Videos interface",
+      "priority": "critical",
+      "steps": [
+        "Create src/components/room/SearchPanel.tsx",
+        "Implement header with search query and close button",
+        "Implement tab navigation for Web, Images, Videos",
+        "Implement scrollable results area with loading state",
+        "Add empty state and error state displays",
+        "Support mobile bottom sheet variant like TranscriptPanel"
+      ],
+      "testFile": "tests/unit/components/SearchPanel.test.tsx",
+      "dependencies": ["FEAT-604", "FEAT-600"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-606",
+      "phase": 7,
+      "category": "components",
+      "description": "Search result card components for web, image, and video results",
+      "priority": "high",
+      "steps": [
+        "Create src/components/room/WebResultCard.tsx with title, snippet, link",
+        "Create src/components/room/ImageResultCard.tsx with thumbnail grid layout",
+        "Create src/components/room/VideoResultCard.tsx with thumbnail, duration, source",
+        "Add click handlers to open results in new tab",
+        "Add hover states and accessibility attributes",
+        "Implement responsive layouts for mobile"
+      ],
+      "testFile": "tests/unit/components/SearchResultCards.test.tsx",
+      "dependencies": ["FEAT-600"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-607",
+      "phase": 7,
+      "category": "pages",
+      "description": "Room page search panel integration",
+      "priority": "critical",
+      "steps": [
+        "Add SearchPanel to room page layout alongside TranscriptPanel",
+        "Initialize useSearch hook in room page",
+        "Add search indicator to room header when results available",
+        "Add mobile search toggle button",
+        "Handle panel visibility state (show when results, hide on clear)",
+        "Implement responsive layout for desktop and mobile"
+      ],
+      "testFile": "tests/unit/pages/room-search-integration.test.tsx",
+      "dependencies": ["FEAT-605", "FEAT-606", "FEAT-119"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-608",
+      "phase": 7,
+      "category": "e2e",
+      "description": "E2E tests for voice-activated search flow",
+      "priority": "high",
+      "steps": [
+        "Test search trigger via mocked PTT with search phrase",
+        "Test search results appearing in SearchPanel",
+        "Test tab switching between Web, Images, Videos",
+        "Test result card clicks opening new tabs",
+        "Test search clear functionality",
+        "Test error handling and retry behavior"
+      ],
+      "testFile": "tests/e2e/voice-search.spec.ts",
+      "dependencies": ["FEAT-607"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1458,16 +1626,18 @@
     "quality": "Code quality tools",
     "e2e": "End-to-end testing",
     "user-experience": "User experience and personalization",
-    "transcript": "Live transcript and AI context system"
+    "transcript": "Live transcript and AI context system",
+    "search": "Voice-activated web search integration"
   },
   "statistics": {
-    "total": 76,
+    "total": 85,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
     "phase5": 18,
     "phase6": 15,
-    "passed": 74,
-    "pending": 2
+    "phase7": 9,
+    "passed": 76,
+    "pending": 9
   }
 }

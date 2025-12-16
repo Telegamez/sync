@@ -26,6 +26,7 @@ import {
   FileText,
   X,
   Mic,
+  Search,
 } from "lucide-react";
 import {
   ParticipantList,
@@ -33,6 +34,7 @@ import {
   UsernameModal,
   ParticipantModal,
   TranscriptPanel,
+  SearchPanel,
 } from "@/components/room";
 import type { ParticipantInfo } from "@/components/room";
 import type { Room } from "@/types/room";
@@ -43,6 +45,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useSharedAI } from "@/hooks/useSharedAI";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useAmbientTranscription } from "@/hooks/useAmbientTranscription";
+import { useSearch } from "@/hooks/useSearch";
 import type { AIResponseState } from "@/types/voice-mode";
 
 /**
@@ -156,6 +159,9 @@ export default function RoomPage() {
   // Transcript panel state
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptionPaused, setTranscriptionPaused] = useState(false);
+
+  // Search panel state
+  const [showSearch, setShowSearch] = useState(false);
 
   // Local media stream ref and state (state triggers re-renders for hooks)
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -283,6 +289,25 @@ export default function RoomPage() {
     roomId,
     client: isInRoom ? getClient() : null,
   });
+
+  // Search hook - manages voice-activated search results (FEAT-604)
+  const search = useSearch({
+    roomId,
+    client: isInRoom ? getClient() : null,
+  });
+
+  // Auto-show search panel when new results arrive
+  useEffect(() => {
+    if (
+      search.results &&
+      search.results.web.length +
+        search.results.images.length +
+        search.results.videos.length >
+        0
+    ) {
+      setShowSearch(true);
+    }
+  }, [search.results]);
 
   // Check if transcript is enabled for this room
   const isTranscriptEnabled = room?.transcriptSettings?.enabled ?? false;
@@ -1018,6 +1043,23 @@ export default function RoomPage() {
 
             {/* Header right actions */}
             <div className="flex items-center gap-2">
+              {/* Search toggle button - shows when search results exist */}
+              {search.results && (
+                <button
+                  onClick={() => setShowSearch(!showSearch)}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg transition-colors ${
+                    showSearch
+                      ? "bg-primary/10 text-primary border-primary/50"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                  aria-label={showSearch ? "Hide search" : "Show search"}
+                  aria-pressed={showSearch}
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="hidden sm:inline">Search</span>
+                </button>
+              )}
+
               {/* Transcript toggle button - only show if transcript is enabled for room */}
               {isTranscriptEnabled && (
                 <button
@@ -1235,6 +1277,42 @@ export default function RoomPage() {
                 ambientTranscription.transcriptionState
               }
               title="Transcript"
+              mobileSheet
+            />
+          </div>
+        )}
+
+        {/* Desktop search panel - side panel */}
+        {showSearch && (
+          <aside className="hidden lg:flex flex-col fixed right-0 top-[calc(theme(spacing.16)+3rem)] bottom-40 w-80 xl:w-96 border-l border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <SearchPanel
+              results={search.results}
+              isLoading={search.isLoading}
+              error={search.error}
+              query={search.query}
+              activeTab={search.activeTab}
+              onTabChange={search.setActiveTab}
+              onClose={() => setShowSearch(false)}
+              onClearError={search.clearError}
+              title="Search Results"
+              className="h-full"
+            />
+          </aside>
+        )}
+
+        {/* Mobile search panel - bottom sheet */}
+        {showSearch && (
+          <div className="lg:hidden">
+            <SearchPanel
+              results={search.results}
+              isLoading={search.isLoading}
+              error={search.error}
+              query={search.query}
+              activeTab={search.activeTab}
+              onTabChange={search.setActiveTab}
+              onClose={() => setShowSearch(false)}
+              onClearError={search.clearError}
+              title="Search Results"
               mobileSheet
             />
           </div>

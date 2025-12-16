@@ -122,3 +122,6 @@ export type {
   TranscriptDownloadModalProps,
   DownloadOptions,
 } from "./TranscriptDownloadModal";
+
+export { SearchPanel } from "./SearchPanel";
+export type { SearchPanelProps } from "./SearchPanel";

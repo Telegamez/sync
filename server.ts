@@ -133,6 +133,39 @@ console.log(
   `[Server] OpenAI API key configured: ${OPENAI_API_KEY ? "Yes" : "No"}`,
 );
 
+/** Serper API key for web search */
+const SERPER_API_KEY = process.env.SERPER_API_KEY;
+console.log(
+  `[Server] Serper API key configured: ${SERPER_API_KEY ? "Yes" : "No"}`,
+);
+
+/**
+ * webSearch function tool definition for OpenAI
+ * FEAT-602: Voice-activated search via function calling
+ */
+const WEB_SEARCH_TOOL = {
+  type: "function" as const,
+  name: "webSearch",
+  description:
+    "Search the web for current information, news, images, or videos. Use when user says 'search', 'look up', 'find', 'google', or asks about current events, news, or things that require up-to-date information.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "The search query to look up",
+      },
+      searchType: {
+        type: "string",
+        enum: ["all", "web", "images", "videos"],
+        description:
+          "Type of search. Use 'all' for general queries, 'images' when user wants pictures, 'videos' when user wants video content. Defaults to 'all'.",
+      },
+    },
+    required: ["query"],
+  },
+};
+
 /**
  * Personality preset instructions
  */
@@ -819,11 +852,14 @@ function connectOpenAI(
           input_audio_transcription: {
             model: "whisper-1",
           },
+          // FEAT-602: Function calling tools for voice-activated search
+          tools: SERPER_API_KEY ? [WEB_SEARCH_TOOL] : [],
+          tool_choice: SERPER_API_KEY ? "auto" : "none",
         },
       };
       ws.send(JSON.stringify(config));
       console.log(
-        `[OpenAI] Session configured with personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}`,
+        `[OpenAI] Session configured with personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, tools: ${SERPER_API_KEY ? "webSearch" : "none"}`,
       );
 
       resolve();
@@ -1050,6 +1086,26 @@ function handleOpenAIMessage(
         broadcastAIState(io, session);
         break;
 
+      // FEAT-602/603: Handle function calls from OpenAI (e.g., webSearch)
+      case "response.output_item.done":
+        if (event.item?.type === "function_call") {
+          const { name, call_id, arguments: argsString } = event.item;
+          console.log(
+            `[OpenAI] Room ${session.roomId}: Function call - ${name}`,
+          );
+
+          if (name === "webSearch" && SERPER_API_KEY) {
+            handleWebSearch(io, session, call_id, argsString);
+          } else {
+            console.log(`[OpenAI] Unknown function or no API key: ${name}`);
+            // Send empty result back to OpenAI
+            sendFunctionOutput(session, call_id, {
+              error: "Function not available",
+            });
+          }
+        }
+        break;
+
       case "error":
         console.error(
           `[OpenAI] Error for room ${session.roomId}:`,
@@ -1084,6 +1140,336 @@ function broadcastAIState(io: SocketIOServer, session: RoomAISession): void {
   };
   io.to(session.roomId).emit("ai:state", stateEvent);
   console.log(`[Socket.io] Broadcast AI state: ${session.state}`);
+}
+
+// ============================================================================
+// FEAT-603: Voice-Activated Search Functions
+// ============================================================================
+
+/**
+ * Send function call output back to OpenAI
+ */
+function sendFunctionOutput(
+  session: RoomAISession,
+  callId: string,
+  output: unknown,
+): void {
+  if (!session.ws || session.ws.readyState !== WebSocket.OPEN) {
+    console.log(
+      `[OpenAI] Cannot send function output - no connection for room ${session.roomId}`,
+    );
+    return;
+  }
+
+  // Send function output
+  const outputEvent = {
+    type: "conversation.item.create",
+    item: {
+      type: "function_call_output",
+      call_id: callId,
+      output: typeof output === "string" ? output : JSON.stringify(output),
+    },
+  };
+  session.ws.send(JSON.stringify(outputEvent));
+  console.log(
+    `[OpenAI] Room ${session.roomId}: Sent function output for call ${callId}`,
+  );
+
+  // Trigger AI response to summarize results
+  const responseEvent = {
+    type: "response.create",
+    response: {
+      modalities: ["audio", "text"],
+    },
+  };
+  session.ws.send(JSON.stringify(responseEvent));
+  console.log(
+    `[OpenAI] Room ${session.roomId}: Triggered response after function output`,
+  );
+}
+
+/**
+ * Handle webSearch function call from OpenAI
+ */
+async function handleWebSearch(
+  io: SocketIOServer,
+  session: RoomAISession,
+  callId: string,
+  argsString: string,
+): Promise<void> {
+  const roomId = session.roomId;
+  const searchId = `search_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  try {
+    // Parse arguments
+    const args = JSON.parse(argsString || "{}");
+    const query = args.query?.trim();
+    const searchType = args.searchType || "all";
+
+    if (!query) {
+      console.log(`[Search] Empty query for room ${roomId}`);
+      sendFunctionOutput(session, callId, { error: "Empty search query" });
+      return;
+    }
+
+    console.log(
+      `[Search] Room ${roomId}: Starting search "${query}" (${searchType})`,
+    );
+
+    // Broadcast search:started to room
+    io.to(roomId).emit("search:started", {
+      roomId,
+      query,
+      searchType,
+      searchId,
+    });
+
+    // Execute parallel searches to Serper API
+    const results = await executeSerperSearch(
+      roomId,
+      query,
+      searchType,
+      searchId,
+    );
+
+    // Broadcast search:results to room
+    io.to(roomId).emit("search:results", {
+      roomId,
+      results,
+    });
+
+    console.log(
+      `[Search] Room ${roomId}: Complete - ${results.web.length} web, ${results.images.length} images, ${results.videos.length} videos`,
+    );
+
+    // Format results for AI summary and send back to OpenAI
+    const aiSummary = formatSearchForAI(results);
+    sendFunctionOutput(session, callId, aiSummary);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Search failed";
+    console.error(`[Search] Room ${roomId}: Error - ${errorMessage}`);
+
+    // Broadcast search:error to room
+    io.to(roomId).emit("search:error", {
+      roomId,
+      searchId,
+      query: "",
+      error: errorMessage,
+    });
+
+    // Send error to OpenAI
+    sendFunctionOutput(session, callId, {
+      error: `Search failed: ${errorMessage}`,
+    });
+  }
+}
+
+/**
+ * Execute search to Serper API
+ */
+async function executeSerperSearch(
+  roomId: string,
+  query: string,
+  searchType: string,
+  searchId: string,
+): Promise<{
+  id: string;
+  query: string;
+  searchType: string;
+  timestamp: Date;
+  roomId: string;
+  web: Array<{
+    title: string;
+    link: string;
+    snippet: string;
+    date?: string;
+    position: number;
+  }>;
+  images: Array<{
+    title: string;
+    imageUrl: string;
+    thumbnailUrl: string;
+    link: string;
+    source: string;
+    position: number;
+  }>;
+  videos: Array<{
+    title: string;
+    link: string;
+    snippet: string;
+    imageUrl: string;
+    duration?: string;
+    source: string;
+    channel?: string;
+    date?: string;
+    position: number;
+  }>;
+  topStories?: Array<{
+    title: string;
+    link: string;
+    source: string;
+    date?: string;
+    imageUrl?: string;
+  }>;
+  relatedSearches?: string[];
+  creditsUsed: number;
+}> {
+  const timestamp = new Date();
+  const shouldSearchWeb = searchType === "all" || searchType === "web";
+  const shouldSearchImages = searchType === "all" || searchType === "images";
+  const shouldSearchVideos = searchType === "all" || searchType === "videos";
+
+  let webResults: any[] = [];
+  let imageResults: any[] = [];
+  let videoResults: any[] = [];
+  let topStories: any[] = [];
+  let relatedSearches: string[] = [];
+  let totalCredits = 0;
+
+  const baseRequest = {
+    q: query,
+    location: "United States",
+    gl: "us",
+    hl: "en",
+    num: 10,
+  };
+
+  const headers = {
+    "X-API-KEY": SERPER_API_KEY!,
+    "Content-Type": "application/json",
+  };
+
+  // Run searches in parallel
+  const promises: Promise<void>[] = [];
+
+  if (shouldSearchWeb) {
+    promises.push(
+      fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(baseRequest),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          webResults = data.organic || [];
+          topStories = data.topStories || [];
+          relatedSearches =
+            data.relatedSearches?.map((r: any) => r.query) || [];
+          totalCredits += data.credits || 1;
+        })
+        .catch((err) =>
+          console.error(`[Serper] Web search error: ${err.message}`),
+        ),
+    );
+  }
+
+  if (shouldSearchImages) {
+    promises.push(
+      fetch("https://google.serper.dev/images", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(baseRequest),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          imageResults = data.images || [];
+          totalCredits += data.credits || 1;
+        })
+        .catch((err) =>
+          console.error(`[Serper] Image search error: ${err.message}`),
+        ),
+    );
+  }
+
+  if (shouldSearchVideos) {
+    promises.push(
+      fetch("https://google.serper.dev/videos", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(baseRequest),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          videoResults = data.videos || [];
+          totalCredits += data.credits || 1;
+        })
+        .catch((err) =>
+          console.error(`[Serper] Video search error: ${err.message}`),
+        ),
+    );
+  }
+
+  await Promise.all(promises);
+
+  return {
+    id: searchId,
+    query,
+    searchType,
+    timestamp,
+    roomId,
+    web: webResults,
+    images: imageResults,
+    videos: videoResults,
+    topStories: topStories.length > 0 ? topStories : undefined,
+    relatedSearches: relatedSearches.length > 0 ? relatedSearches : undefined,
+    creditsUsed: totalCredits,
+  };
+}
+
+/**
+ * Format search results for AI to summarize
+ */
+function formatSearchForAI(
+  results: {
+    web: any[];
+    images: any[];
+    videos: any[];
+    topStories?: any[];
+    query: string;
+  },
+  maxResults: number = 3,
+): string {
+  const parts: string[] = [];
+
+  if (results.web.length > 0) {
+    const webSummary = results.web
+      .slice(0, maxResults)
+      .map((r, i) => `${i + 1}. "${r.title}" - ${r.snippet}`)
+      .join("\n");
+    parts.push(`Web Results:\n${webSummary}`);
+  }
+
+  if (results.topStories && results.topStories.length > 0) {
+    const newsSummary = results.topStories
+      .slice(0, maxResults)
+      .map((r: any, i: number) => `${i + 1}. "${r.title}" (${r.source})`)
+      .join("\n");
+    parts.push(`Top Stories:\n${newsSummary}`);
+  }
+
+  if (results.videos.length > 0) {
+    const videoSummary = results.videos
+      .slice(0, maxResults)
+      .map(
+        (r, i) =>
+          `${i + 1}. "${r.title}" (${r.source}${r.duration ? `, ${r.duration}` : ""})`,
+      )
+      .join("\n");
+    parts.push(`Videos:\n${videoSummary}`);
+  }
+
+  if (results.images.length > 0) {
+    parts.push(
+      `Found ${results.images.length} images related to "${results.query}".`,
+    );
+  }
+
+  if (parts.length === 0) {
+    return `No results found for "${results.query}".`;
+  }
+
+  return parts.join("\n\n");
 }
 
 /**
