@@ -59,6 +59,8 @@ export class SignalingClient {
   private socket: Socket | null = null;
   private options: Required<SignalingClientOptions>;
   private handlers: Partial<SignalingEventHandlers> = {};
+  // Multi-handler support: stores arrays of handlers per event
+  private multiHandlers: Map<string, Set<Function>> = new Map();
   private connectionState: SocketConnectionState = "disconnected";
 
   constructor(options?: SignalingClientOptions) {
@@ -173,15 +175,24 @@ export class SignalingClient {
 
     // Peer events
     this.socket.on("peer:joined", (peer: PeerSummary) => {
-      this.handlers.onPeerJoined?.(peer);
+      this.callHandlers("onPeerJoined", peer);
     });
 
     this.socket.on("peer:left", (peerId: PeerId) => {
-      this.handlers.onPeerLeft?.(peerId);
+      this.callHandlers("onPeerLeft", peerId);
     });
 
     this.socket.on("peer:updated", (peer: PeerSummary) => {
-      this.handlers.onPeerUpdated?.(peer);
+      console.log(
+        "[SignalingClient] peer:updated received:",
+        peer.id,
+        peer.displayName,
+      );
+      console.log(
+        "[SignalingClient] onPeerUpdated handlers count:",
+        this.multiHandlers.get("onPeerUpdated")?.size ?? 0,
+      );
+      this.callHandlers("onPeerUpdated", peer);
     });
 
     // Signaling events
@@ -208,7 +219,7 @@ export class SignalingClient {
 
     // Presence events
     this.socket.on("presence:update", (peer: PeerSummary) => {
-      this.handlers.onPresenceUpdate?.(peer);
+      this.callHandlers("onPresenceUpdate", peer);
     });
 
     // Transcript events
@@ -466,12 +477,21 @@ export class SignalingClient {
   }
 
   /**
-   * Register event handler
+   * Register event handler (supports multiple handlers per event)
    */
   public on<K extends keyof SignalingEventHandlers>(
     event: K,
     handler: SignalingEventHandlers[K],
   ): void {
+    if (!handler) return;
+
+    // Get or create handler set for this event
+    if (!this.multiHandlers.has(event)) {
+      this.multiHandlers.set(event, new Set());
+    }
+    this.multiHandlers.get(event)!.add(handler as Function);
+
+    // Also set on handlers for backward compatibility with internal calls
     this.handlers[event] = handler;
   }
 
@@ -482,8 +502,35 @@ export class SignalingClient {
     event: K,
     handler?: SignalingEventHandlers[K],
   ): void {
+    if (handler) {
+      // Remove specific handler from multi-handlers
+      const handlers = this.multiHandlers.get(event);
+      if (handlers) {
+        handlers.delete(handler as Function);
+      }
+    }
+    // Keep backward compatibility
     if (!handler || this.handlers[event] === handler) {
       delete this.handlers[event];
+    }
+  }
+
+  /**
+   * Call all registered handlers for an event
+   */
+  private callHandlers<K extends keyof SignalingEventHandlers>(
+    event: K,
+    ...args: Parameters<NonNullable<SignalingEventHandlers[K]>>
+  ): void {
+    const handlers = this.multiHandlers.get(event);
+    if (handlers) {
+      handlers.forEach((handler) => {
+        try {
+          (handler as Function)(...args);
+        } catch (err) {
+          console.error(`[SignalingClient] Error in ${event} handler:`, err);
+        }
+      });
     }
   }
 

@@ -390,21 +390,48 @@ export function useRoomConnection(
       });
 
       client.on("onPeerUpdated", (peer) => {
+        console.log(
+          "[useRoomConnection] onPeerUpdated received:",
+          peer.id,
+          peer.displayName,
+        );
         setState((prev) => {
           // Check if this is the local peer being updated (e.g., name change)
           const isLocalPeer = prev.localPeer?.id === peer.id;
+          console.log(
+            "[useRoomConnection] isLocalPeer:",
+            isLocalPeer,
+            "localPeer.id:",
+            prev.localPeer?.id,
+            "peer.id:",
+            peer.id,
+          );
+
+          // Update savedRoomStateRef if this is the local peer's name change
+          // This ensures reconnects use the updated name
+          if (isLocalPeer && savedRoomStateRef.current) {
+            savedRoomStateRef.current.displayName = peer.displayName;
+          }
+
+          const newLocalPeer =
+            isLocalPeer && prev.localPeer
+              ? {
+                  ...prev.localPeer,
+                  displayName: peer.displayName,
+                  avatarUrl: peer.avatarUrl,
+                }
+              : prev.localPeer;
+
+          console.log("[useRoomConnection] Updating localPeer:", {
+            wasLocalPeer: isLocalPeer,
+            oldDisplayName: prev.localPeer?.displayName,
+            newDisplayName: newLocalPeer?.displayName,
+          });
 
           return {
             ...prev,
             // Update localPeer if it's us
-            localPeer:
-              isLocalPeer && prev.localPeer
-                ? {
-                    ...prev.localPeer,
-                    displayName: peer.displayName,
-                    avatarUrl: peer.avatarUrl,
-                  }
-                : prev.localPeer,
+            localPeer: newLocalPeer,
             // Update in peers array (for remote peers)
             peers: prev.peers.map((p) => (p.id === peer.id ? peer : p)),
           };

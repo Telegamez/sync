@@ -27,11 +27,11 @@ import type { Peer, PeerId, PeerSummary, PeerPresence } from "@/types/peer";
 import type { Room, RoomId } from "@/types/room";
 import {
   getRoom,
+  toRoomSummary,
   addParticipant,
   removeParticipant,
-  roomExists,
 } from "@/server/store/rooms";
-import { DEFAULT_VOICE_SETTINGS } from "@/types/voice-mode";
+import type { RoomSummary } from "@/types/room";
 
 /**
  * Socket data stored per connection
@@ -145,6 +145,11 @@ export function getRoomPeerSummaries(roomId: RoomId): PeerSummary[] {
 }
 
 /**
+ * Lobby namespace room for broadcasting room updates
+ */
+const LOBBY_ROOM = "lobby";
+
+/**
  * SignalingServer class
  */
 export class SignalingServer {
@@ -167,6 +172,32 @@ export class SignalingServer {
     });
 
     this.setupHandlers();
+    this.setupLobbyNamespace();
+  }
+
+  /**
+   * Setup lobby namespace for real-time room updates
+   */
+  private setupLobbyNamespace(): void {
+    const lobbyNsp = this.io.of("/lobby");
+
+    lobbyNsp.on("connection", (socket) => {
+      console.log(`[Lobby] Client connected: ${socket.id}`);
+
+      // Auto-join the lobby room to receive room updates
+      socket.join(LOBBY_ROOM);
+
+      socket.on("disconnect", () => {
+        console.log(`[Lobby] Client disconnected: ${socket.id}`);
+      });
+    });
+  }
+
+  /**
+   * Broadcast room update to lobby subscribers
+   */
+  private broadcastRoomUpdate(room: RoomSummary): void {
+    this.io.of("/lobby").to(LOBBY_ROOM).emit("room:updated", room);
   }
 
   /**
@@ -333,6 +364,9 @@ export class SignalingServer {
     // Broadcast peer:joined to others in room
     socket.to(roomId).emit("peer:joined", toPeerSummary(peer));
 
+    // Broadcast room update to lobby subscribers
+    this.broadcastRoomUpdate(toRoomSummary(updatedRoom));
+
     console.log(
       `[Signaling] Peer ${peerId} joined room ${roomId}. Total: ${updatedRoom.participantCount}`,
     );
@@ -374,7 +408,7 @@ export class SignalingServer {
     socketToPeer.delete(socket.id);
 
     // Remove from room store
-    removeParticipant(roomId, peerId);
+    const updatedRoom = removeParticipant(roomId, peerId);
 
     // Leave Socket.io room
     socket.leave(roomId);
@@ -387,6 +421,11 @@ export class SignalingServer {
 
     // Broadcast peer:left to others
     socket.to(roomId).emit("peer:left", peerId);
+
+    // Broadcast room update to lobby subscribers
+    if (updatedRoom) {
+      this.broadcastRoomUpdate(toRoomSummary(updatedRoom));
+    }
   }
 
   /**

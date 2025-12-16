@@ -336,6 +336,14 @@ export default function RoomPage() {
 
   // Auto-start ambient transcription when joining room (if unmuted, not paused, and room has transcript enabled)
   // NOTE: Do NOT auto-start when AI is speaking or PTT is active - the hook handles pause/resume internally
+  // Destructure stable refs to avoid dependency array issues
+  const {
+    isSupported: isAmbientSupported,
+    isActive: isAmbientActive,
+    start: startAmbient,
+    stop: stopAmbient,
+  } = ambientTranscription;
+
   useEffect(() => {
     const shouldBeEnabled =
       isInRoom &&
@@ -345,21 +353,17 @@ export default function RoomPage() {
       !isAIActuallySpeaking && // Don't start during AI playback
       !isAddressingAI; // Don't start during PTT
 
-    if (
-      shouldBeEnabled &&
-      ambientTranscription.isSupported &&
-      !ambientTranscription.isActive
-    ) {
-      ambientTranscription.start();
+    if (shouldBeEnabled && isAmbientSupported && !isAmbientActive) {
+      startAmbient();
     } else if (
       (!isInRoom ||
         localIsMuted ||
         transcriptionPaused ||
         !isTranscriptEnabled) &&
-      ambientTranscription.isActive
+      isAmbientActive
     ) {
       // Only stop for actual disable conditions, not for AI speaking/PTT (hook handles those)
-      ambientTranscription.stop();
+      stopAmbient();
     }
   }, [
     isInRoom,
@@ -368,7 +372,10 @@ export default function RoomPage() {
     isTranscriptEnabled,
     isAIActuallySpeaking,
     isAddressingAI,
-    ambientTranscription,
+    isAmbientSupported,
+    isAmbientActive,
+    startAmbient,
+    stopAmbient,
   ]);
 
   // Convert signaling peers to ParticipantInfo format
@@ -493,6 +500,9 @@ export default function RoomPage() {
   const initializeMicrophoneRef = useRef(initializeMicrophone);
   const stopMicrophoneRef = useRef(stopMicrophone);
   const setLocalStreamRef = useRef(setLocalStream);
+  // Use ref for displayName to avoid re-joining room when name changes
+  // Name updates are handled separately via peer:update_name event
+  const displayNameRef = useRef(displayName);
 
   // Keep refs updated
   useEffect(() => {
@@ -502,6 +512,7 @@ export default function RoomPage() {
     initializeMicrophoneRef.current = initializeMicrophone;
     stopMicrophoneRef.current = stopMicrophone;
     setLocalStreamRef.current = setLocalStream;
+    displayNameRef.current = displayName;
   }, [
     connect,
     joinRoom,
@@ -509,6 +520,7 @@ export default function RoomPage() {
     initializeMicrophone,
     stopMicrophone,
     setLocalStream,
+    displayName,
   ]);
 
   useEffect(() => {
@@ -542,9 +554,10 @@ export default function RoomPage() {
 
         setRoomState("joining");
 
-        // Join the room
+        // Join the room with current display name from ref
+        // Using ref to avoid re-joining when displayName changes (handled by peer:update_name)
         console.log("[Room] Joining room:", roomId);
-        await joinRoomRef.current(roomId, displayName);
+        await joinRoomRef.current(roomId, displayNameRef.current);
         hasJoined = true;
 
         if (!mounted) {
@@ -615,7 +628,9 @@ export default function RoomPage() {
         audioContextRef.current = null;
       }
     };
-  }, [roomId, displayName]); // Only depend on roomId and displayName
+    // Only depend on roomId - displayName changes are handled via peer:update_name event
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId]);
 
   // Set up local audio stream for VAD analysis once we have peer ID and stream
   useEffect(() => {

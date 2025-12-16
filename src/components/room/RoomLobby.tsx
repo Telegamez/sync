@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import type { RoomSummary, RoomStatus } from "@/types/room";
+import { useLobbySocket } from "@/hooks/useLobbySocket";
 
 /**
  * Props for the RoomLobby component
@@ -134,7 +135,70 @@ export function RoomLobby({
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
 
   /**
+   * Handle real-time room updates from lobby socket
+   */
+  const handleRoomUpdated = useCallback((updatedRoom: RoomSummary) => {
+    console.log(
+      "[RoomLobby] Updating room state:",
+      updatedRoom.id,
+      "participants:",
+      updatedRoom.participantCount,
+    );
+    setRooms((prev) => {
+      const existingIndex = prev.findIndex((r) => r.id === updatedRoom.id);
+      if (existingIndex >= 0) {
+        // Update existing room
+        const newRooms = [...prev];
+        newRooms[existingIndex] = updatedRoom;
+        console.log(
+          "[RoomLobby] Updated existing room at index",
+          existingIndex,
+        );
+        return newRooms;
+      }
+      // Room not in list - could be a new room, add it
+      console.log("[RoomLobby] Adding new room to list");
+      return [...prev, updatedRoom];
+    });
+  }, []);
+
+  /**
+   * Handle initial room list from socket server on connect
+   * This gets room state from server.ts memory, not the API
+   */
+  const handleRoomsLoaded = useCallback((serverRooms: RoomSummary[]) => {
+    console.log(
+      "[RoomLobby] Received initial rooms from socket server:",
+      serverRooms.length,
+    );
+    setRooms((prev) => {
+      // Merge server rooms with any existing rooms from API
+      // Server rooms take priority since they have accurate participant counts
+      const merged = new Map<string, RoomSummary>();
+
+      // Add existing rooms first
+      prev.forEach((room) => merged.set(room.id, room));
+
+      // Override with server rooms (they have accurate state)
+      serverRooms.forEach((room) => merged.set(room.id, room));
+
+      return Array.from(merged.values());
+    });
+    setIsLoading(false);
+  }, []);
+
+  // Connect to lobby socket for real-time updates
+  useLobbySocket({
+    autoConnect: true,
+    onRoomUpdated: handleRoomUpdated,
+    onRoomsLoaded: handleRoomsLoaded,
+  });
+
+  /**
    * Load rooms from API
+   * NOTE: API data has stale participant counts (Next.js process doesn't track participants).
+   * Socket data from server.ts is the source of truth for participant counts.
+   * This function merges API data with existing socket data, preserving socket participant counts.
    */
   const loadRooms = useCallback(
     async (showRefreshing = false) => {
@@ -148,7 +212,35 @@ export function RoomLobby({
       try {
         const status = statusFilter === "all" ? undefined : statusFilter;
         const result = await fetchRooms(status);
-        setRooms(result.rooms);
+
+        // Merge API rooms with existing socket data
+        // API data is used for room metadata (name, description, etc.)
+        // Socket data is authoritative for participant counts and status
+        setRooms((prev) => {
+          const merged = new Map<string, RoomSummary>();
+
+          // Add API rooms first (may have stale participant counts)
+          result.rooms.forEach((room) => merged.set(room.id, room));
+
+          // Override with existing socket data (accurate participant counts)
+          // This preserves real-time state from socket updates
+          prev.forEach((room) => {
+            const existing = merged.get(room.id);
+            if (existing) {
+              // Merge: use API metadata but socket participant data
+              merged.set(room.id, {
+                ...existing,
+                participantCount: room.participantCount,
+                status: room.status,
+              });
+            } else {
+              // Room exists in socket data but not API (shouldn't happen, but keep it)
+              merged.set(room.id, room);
+            }
+          });
+
+          return Array.from(merged.values());
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load rooms");
       } finally {
@@ -164,16 +256,35 @@ export function RoomLobby({
     loadRooms();
   }, [loadRooms]);
 
-  // Auto-refresh
+  // Auto-refresh - disabled since socket provides real-time updates
+  // Keeping the interval logic but with longer interval as fallback
   useEffect(() => {
     if (refreshInterval <= 0) return;
 
+    // Use longer interval since socket provides real-time updates
+    // This is just a fallback in case socket misses something
+    const fallbackInterval = Math.max(refreshInterval, 60000); // At least 60s
     const intervalId = setInterval(() => {
       loadRooms(true);
-    }, refreshInterval);
+    }, fallbackInterval);
 
     return () => clearInterval(intervalId);
   }, [refreshInterval, loadRooms]);
+
+  // Refresh when page becomes visible (user returns to tab/page)
+  // This helps sync state after user was away
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadRooms(true);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadRooms]);
 
   /**
    * Filter rooms by search query
@@ -392,9 +503,18 @@ export function RoomLobby({
 
                 {/* Description */}
                 {room.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                     {room.description}
                   </p>
+                )}
+
+                {/* AI Topic Badge */}
+                {room.aiTopic && (
+                  <div className="mb-3">
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-primary/10 text-primary border border-primary/20 rounded-md">
+                      🤖 {room.aiTopic}
+                    </span>
+                  </div>
                 )}
 
                 {/* Room Info */}

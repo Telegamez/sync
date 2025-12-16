@@ -406,6 +406,7 @@ export function useAmbientTranscription(
    */
   const start = useCallback(() => {
     if (!isSupported || !enabled) return;
+    if (shouldBeActiveRef.current) return; // Already active, don't log again
 
     shouldBeActiveRef.current = true;
     setError(null);

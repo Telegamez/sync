@@ -82,7 +82,8 @@ const DEFAULT_TRANSCRIPT_SETTINGS: RoomTranscriptSettings = {
 interface Room {
   id: string;
   name: string;
-  status: "waiting" | "active" | "closed";
+  description?: string;
+  status: "waiting" | "active" | "full" | "closed";
   participantCount: number;
   maxParticipants: number;
   createdAt: Date;
@@ -91,6 +92,37 @@ interface Room {
   customInstructions?: string;
   transcriptSettings: RoomTranscriptSettings;
 }
+
+/** Room summary for lobby broadcasts */
+interface RoomSummary {
+  id: string;
+  name: string;
+  description?: string;
+  maxParticipants: number;
+  participantCount: number;
+  status: "waiting" | "active" | "full" | "closed";
+  aiPersonality: AIPersonality;
+  aiTopic?: string;
+  createdAt: Date;
+}
+
+/** Convert room to summary format */
+function toRoomSummary(room: Room): RoomSummary {
+  return {
+    id: room.id,
+    name: room.name,
+    description: room.description,
+    participantCount: room.participantCount,
+    maxParticipants: room.maxParticipants,
+    status: room.status,
+    aiPersonality: room.aiPersonality,
+    aiTopic: room.aiTopic,
+    createdAt: room.createdAt,
+  };
+}
+
+/** Lobby room name for broadcasting */
+const LOBBY_ROOM = "lobby";
 
 // ============================================================
 // OPENAI REALTIME API TYPES AND CONFIG
@@ -723,13 +755,16 @@ function createRoom(
   aiTopic?: string,
   customInstructions?: string,
   transcriptSettings?: Partial<RoomTranscriptSettings>,
+  description?: string,
+  maxParticipants?: number,
 ): Room {
   const room: Room = {
     id: roomId,
     name: name || `Room ${roomId}`,
+    description,
     status: "waiting",
     participantCount: 0,
-    maxParticipants: 10,
+    maxParticipants: maxParticipants || 10,
     createdAt: new Date(),
     aiPersonality,
     aiTopic,
@@ -1515,10 +1550,19 @@ function removePeerFromRoom(
   // Remove socket -> peer mapping
   socketToPeer.delete(socket.id);
 
-  // Update room participant count
+  // Update room participant count and status
   const room = rooms.get(roomId);
   if (room) {
     room.participantCount = Math.max(0, room.participantCount - 1);
+    // Update status based on capacity
+    if (room.participantCount === 0) {
+      room.status = "waiting";
+    } else if (
+      room.participantCount < room.maxParticipants &&
+      room.status === "full"
+    ) {
+      room.status = "active";
+    }
   }
 
   // Leave Socket.io room
@@ -1529,6 +1573,15 @@ function removePeerFromRoom(
 
   // Broadcast peer:left to others
   socket.to(roomId).emit("peer:left", peerId);
+
+  // Broadcast room update to lobby subscribers
+  if (room) {
+    const summary = toRoomSummary(room);
+    console.log(
+      `[Lobby] Broadcasting room update (leave): ${room.id} - status: ${summary.status}, participants: ${summary.participantCount}/${summary.maxParticipants}`,
+    );
+    io.of("/lobby").to(LOBBY_ROOM).emit("room:updated", summary);
+  }
 }
 
 // Start the server
@@ -1558,6 +1611,39 @@ app
     socketIO = io;
 
     console.log("[Socket.io] Server initialized");
+
+    // Setup lobby namespace for real-time room updates
+    const lobbyNsp = io.of("/lobby");
+    lobbyNsp.on("connection", (socket) => {
+      console.log(`[Lobby] Client connected: ${socket.id}`);
+      socket.join(LOBBY_ROOM);
+
+      // Handle request for current room list (initial fetch from server memory)
+      socket.on("lobby:get-rooms", (callback) => {
+        const roomList = Array.from(rooms.values()).map(toRoomSummary);
+        console.log(
+          `[Lobby] Sending ${roomList.length} rooms to client ${socket.id}`,
+        );
+        if (typeof callback === "function") {
+          callback({ rooms: roomList, total: roomList.length });
+        }
+      });
+
+      socket.on("disconnect", () => {
+        console.log(`[Lobby] Client disconnected: ${socket.id}`);
+      });
+    });
+
+    /** Broadcast room update to lobby subscribers */
+    function broadcastRoomUpdate(room: Room): void {
+      const summary = toRoomSummary(room);
+      const lobbyRoom = io.of("/lobby").adapter.rooms.get(LOBBY_ROOM);
+      const clientCount = lobbyRoom ? lobbyRoom.size : 0;
+      console.log(
+        `[Lobby] Broadcasting room update: ${room.id} - status: ${summary.status}, participants: ${summary.participantCount}/${summary.maxParticipants} (${clientCount} lobby clients)`,
+      );
+      io.of("/lobby").to(LOBBY_ROOM).emit("room:updated", summary);
+    }
 
     // Socket.io connection handler
     io.on("connection", (socket) => {
@@ -1597,6 +1683,8 @@ app
                 apiRoom.aiTopic,
                 apiRoom.customInstructions,
                 apiRoom.transcriptSettings,
+                apiRoom.description,
+                apiRoom.maxParticipants,
               );
               console.log(
                 `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, topic: ${apiRoom.aiTopic || "none"}, transcript: ${apiRoom.transcriptSettings?.enabled ?? true}`,
@@ -1655,7 +1743,9 @@ app
 
         // Update room participant count and status
         room.participantCount++;
-        if (room.status === "waiting" && room.participantCount > 0) {
+        if (room.participantCount >= room.maxParticipants) {
+          room.status = "full";
+        } else if (room.status === "waiting" && room.participantCount > 0) {
           room.status = "active";
         }
 
@@ -1689,6 +1779,9 @@ app
 
         // Broadcast peer:joined to others in room
         socket.to(roomId).emit("peer:joined", toPeerSummary(peer));
+
+        // Broadcast room update to lobby subscribers
+        broadcastRoomUpdate(room);
 
         console.log(
           `[Socket.io] Peer ${peerId} joined room ${roomId}. Total: ${room.participantCount}, Existing peers: ${existingPeers.length}`,

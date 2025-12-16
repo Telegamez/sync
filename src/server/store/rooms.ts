@@ -124,11 +124,10 @@ export function getRoomsByStatus(status?: RoomStatus): Room[] {
 }
 
 /**
- * Get room summaries for listing
+ * Convert a room to summary format
  */
-export function getRoomSummaries(status?: RoomStatus): RoomSummary[] {
-  const filteredRooms = getRoomsByStatus(status);
-  return filteredRooms.map((room) => ({
+export function toRoomSummary(room: Room): RoomSummary {
+  return {
     id: room.id,
     name: room.name,
     description: room.description,
@@ -136,8 +135,17 @@ export function getRoomSummaries(status?: RoomStatus): RoomSummary[] {
     maxParticipants: room.maxParticipants,
     status: room.status,
     aiPersonality: room.aiPersonality,
+    aiTopic: room.aiTopic,
     createdAt: room.createdAt,
-  }));
+  };
+}
+
+/**
+ * Get room summaries for listing
+ */
+export function getRoomSummaries(status?: RoomStatus): RoomSummary[] {
+  const filteredRooms = getRoomsByStatus(status);
+  return filteredRooms.map(toRoomSummary);
 }
 
 /**

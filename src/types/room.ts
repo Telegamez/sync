@@ -98,6 +98,8 @@ export interface RoomSummary {
   participantCount: number;
   status: RoomStatus;
   aiPersonality: AIPersonality;
+  /** Topic/domain for AI expertise (e.g., "real estate broker", "software engineering") */
+  aiTopic?: string;
   createdAt: Date;
 }
 
