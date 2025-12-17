@@ -294,6 +294,32 @@ export function useVideo(options: UseVideoOptions): UseVideoReturn {
     };
   }, [client, roomId]);
 
+  // Request video state sync when client connects
+  // This ensures clients are synced if they join late or reconnect
+  useEffect(() => {
+    if (!client || !peerId) return;
+
+    const socket = client.getSocket();
+    if (!socket) return;
+
+    // Request current video state from server
+    console.log(`[useVideo] Requesting video state sync on connect`);
+    socket.emit(
+      "video:sync",
+      { roomId },
+      (response: { state: VideoPlaybackState | null; error?: string }) => {
+        if (response.state && response.state.isOpen) {
+          console.log(
+            `[useVideo] Sync response: video is ${response.state.isPlaying ? "playing" : "paused"}`,
+          );
+          setPlaybackState(response.state);
+        } else {
+          console.log(`[useVideo] Sync response: no active video`);
+        }
+      },
+    );
+  }, [client, peerId, roomId]);
+
   // Action: Pause
   // Note: We don't guard on playbackState.isPlaying because the local YouTube player
   // state may differ from server state. Trust user intent and let server validate.

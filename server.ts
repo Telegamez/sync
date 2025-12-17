@@ -1780,6 +1780,34 @@ function handleVideoPlay(
   session: RoomAISession,
   callId: string,
 ): void {
+  // If video is already playing, re-sync clients instead of starting fresh
+  if (videoState.isPlaying && videoState.playlist) {
+    console.log(
+      `[Video] Room ${roomId}: Video already playing - re-syncing clients`,
+    );
+
+    // Calculate current playback time
+    const elapsedMs = Date.now() - videoState.syncedStartTime;
+    const currentTime = videoState.currentTime + elapsedMs / 1000;
+
+    // Re-broadcast video:play with current state to sync all clients
+    io.to(roomId).emit("video:play", {
+      roomId,
+      playlist: videoState.playlist,
+      currentIndex: videoState.currentIndex,
+      syncedStartTime: Date.now() - currentTime * 1000, // Adjusted for current position
+      triggeredBy: session.activeSpeakerId || "ai",
+    });
+
+    const currentVideo = videoState.playlist.videos[videoState.currentIndex];
+    sendFunctionOutput(
+      session,
+      callId,
+      `Video is already playing: "${currentVideo?.title || "Unknown"}". Syncing all viewers now.`,
+    );
+    return;
+  }
+
   // Get stored search results
   const searchResults = roomSearchResults.get(roomId);
 
@@ -1925,10 +1953,44 @@ function handleVideoResume(
   callId: string,
 ): void {
   if (!videoState.isPaused) {
-    if (videoState.isPlaying) {
-      sendFunctionOutput(session, callId, "Video is already playing.");
+    if (videoState.isPlaying && videoState.playlist) {
+      // Video is playing on server but client may be desynced
+      // Re-broadcast video:play to ensure all clients are synced
+      console.log(
+        `[Video] Room ${roomId}: Video already playing - re-syncing clients`,
+      );
+
+      // Calculate current playback time
+      const elapsedMs = Date.now() - videoState.syncedStartTime;
+      const currentTime = videoState.currentTime + elapsedMs / 1000;
+
+      // Re-broadcast video:play with current state to sync all clients
+      io.to(roomId).emit("video:play", {
+        roomId,
+        playlist: videoState.playlist,
+        currentIndex: videoState.currentIndex,
+        syncedStartTime: Date.now() - currentTime * 1000, // Adjusted for current position
+        triggeredBy: session.activeSpeakerId || "ai",
+      });
+
+      const currentVideo = videoState.playlist.videos[videoState.currentIndex];
+      sendFunctionOutput(
+        session,
+        callId,
+        `Video is already playing: "${currentVideo?.title || "Unknown"}". Syncing all viewers now.`,
+      );
     } else {
-      sendFunctionOutput(session, callId, "No video to resume.");
+      // No video to resume - try to start fresh from search results
+      // This handles the case where user says "play videos" after stopping
+      const searchResults = roomSearchResults.get(roomId);
+      if (searchResults && searchResults.videos.length > 0) {
+        console.log(
+          `[Video] Room ${roomId}: No video to resume, starting fresh from search results`,
+        );
+        handleVideoPlay(io, roomId, videoState, session, callId);
+      } else {
+        sendFunctionOutput(session, callId, "No video to resume.");
+      }
     }
     return;
   }
