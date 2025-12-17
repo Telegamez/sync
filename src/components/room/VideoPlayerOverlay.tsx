@@ -435,11 +435,17 @@ export function VideoPlayerOverlay({
       startSeconds = currentTime;
     }
 
-    // Check if we need to start muted for mobile autoplay
-    // Use ref to get latest interaction state (avoids stale closures and unnecessary re-renders)
-    const shouldStartMuted = isMobileDevice() && !hasUserInteractedRef.current;
+    // MOBILE AUTOPLAY FIX:
+    // iOS Safari requires a direct user gesture to enable audio, even if user
+    // previously interacted. The browser's autoplay policy resets for each new
+    // media element. Therefore:
+    // 1. ALWAYS start muted on mobile for autoplay compliance
+    // 2. Show a minimal unmute indicator (not blocking banner) if user previously interacted
+    // 3. Unmute happens on first user tap (which we capture via click handlers)
+    const isMobile = isMobileDevice();
+    const userPreviouslyInteracted = hasUserInteractedRef.current;
     console.log(
-      `[VideoPlayer] Creating player for video ${videoId}: isMobile=${isMobileDevice()}, hasUserInteracted=${hasUserInteractedRef.current}, shouldStartMuted=${shouldStartMuted}`,
+      `[VideoPlayer] Creating player for video ${videoId}: isMobile=${isMobile}, hasUserInteracted=${userPreviouslyInteracted}, willStartMuted=${isMobile}`,
     );
 
     // Create new player
@@ -456,40 +462,42 @@ export function VideoPlayerOverlay({
         rel: 0,
         playsinline: 1,
         origin: window.location.origin,
-        // Mute on mobile for autoplay compliance
-        mute: shouldStartMuted ? 1 : 0,
+        // ALWAYS mute on mobile for autoplay compliance (iOS requirement)
+        mute: isMobile ? 1 : 0,
       },
       events: {
         onReady: (event: any) => {
           const player = event.target as YTPlayer;
           setDuration(player.getDuration());
 
-          // Check CURRENT interaction state (not stale closure value)
-          // User may have interacted while player was being created
-          const currentlyNeedsMute =
-            isMobileDevice() && !hasUserInteractedRef.current;
+          // On mobile, we ALWAYS start muted (iOS autoplay requirement)
+          // The difference is UI: show banner for first-time, just indicator for returning
+          const isMobileNow = isMobileDevice();
+          const hasInteractedNow = hasUserInteractedRef.current;
           console.log(
-            `[VideoPlayer] onReady: isMobile=${isMobileDevice()}, hasUserInteracted=${hasUserInteractedRef.current}, needsMute=${currentlyNeedsMute}`,
+            `[VideoPlayer] onReady: isMobile=${isMobileNow}, hasUserInteracted=${hasInteractedNow}`,
           );
 
-          if (currentlyNeedsMute) {
-            // Mobile user hasn't interacted yet - keep muted for autoplay compliance
+          if (isMobileNow) {
+            // Always ensure muted state on mobile
             player.mute();
             setIsMuted(true);
             mobileAutoMutedRef.current = true;
-            setShowUnmuteBanner(true);
-            console.log(
-              "[VideoPlayer] Player ready - muted for mobile autoplay",
-            );
-          } else if (isMobileDevice() && hasUserInteractedRef.current) {
-            // Mobile user already interacted - unmute immediately
-            player.unMute();
-            setIsMuted(false);
-            mobileAutoMutedRef.current = false;
-            setShowUnmuteBanner(false);
-            console.log(
-              "[VideoPlayer] Player ready - unmuted (user previously interacted)",
-            );
+
+            if (hasInteractedNow) {
+              // User previously interacted - don't show blocking banner
+              // Just show the small indicator in header, they know to tap
+              setShowUnmuteBanner(false);
+              console.log(
+                "[VideoPlayer] Player ready - muted (mobile), user knows to tap unmute",
+              );
+            } else {
+              // First time - show the full banner
+              setShowUnmuteBanner(true);
+              console.log(
+                "[VideoPlayer] Player ready - muted (mobile), showing unmute banner",
+              );
+            }
           }
 
           // Seek to correct position
@@ -796,8 +804,9 @@ export function VideoPlayerOverlay({
               style={{ aspectRatio: "16/9" }}
             />
 
-            {/* Mobile tap-to-unmute banner */}
-            {showUnmuteBanner && (
+            {/* Mobile tap-to-unmute overlays */}
+            {showUnmuteBanner ? (
+              // First-time user: show prominent banner
               <button
                 onClick={handleUserInteraction}
                 className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-300"
@@ -817,7 +826,20 @@ export function VideoPlayerOverlay({
                   </div>
                 </div>
               </button>
-            )}
+            ) : isMobile && isMuted && mobileAutoMutedRef.current ? (
+              // Returning user: transparent overlay + small corner indicator
+              <button
+                onClick={handleUserInteraction}
+                className="absolute inset-0 z-10 flex items-end justify-end p-4"
+                aria-label="Tap anywhere to unmute video"
+              >
+                {/* Small floating unmute indicator in corner */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/90 text-black rounded-full text-sm font-medium shadow-lg animate-bounce">
+                  <VolumeX className="w-4 h-4" />
+                  <span>Tap to unmute</span>
+                </div>
+              </button>
+            ) : null}
           </div>
 
           {/* Controls */}
