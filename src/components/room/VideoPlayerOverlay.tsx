@@ -36,6 +36,51 @@ import type { SerperVideoResult } from "@/types/search";
 import type { VideoPlaylist, YouTubeVideoId } from "@/types/video";
 import { extractYouTubeVideoId, formatSecondsToDuration } from "@/types/video";
 
+// Module-level variable to persist user interaction state even if sessionStorage fails
+// This survives component remounts within the same page session
+let moduleUserInteracted = false;
+
+/**
+ * Get persisted user interaction state from sessionStorage or module variable
+ */
+function getPersistedInteraction(): boolean {
+  // First check module-level variable (most reliable within session)
+  if (moduleUserInteracted) {
+    console.log("[VideoPlayer] User interaction found in module variable");
+    return true;
+  }
+  // Then check sessionStorage
+  if (typeof window !== "undefined") {
+    try {
+      const stored = sessionStorage.getItem("videoPlayerUserInteracted");
+      if (stored === "true") {
+        moduleUserInteracted = true; // Sync to module var
+        console.log("[VideoPlayer] User interaction found in sessionStorage");
+        return true;
+      }
+    } catch (e) {
+      console.warn("[VideoPlayer] sessionStorage read error:", e);
+    }
+  }
+  return false;
+}
+
+/**
+ * Persist user interaction state to both sessionStorage and module variable
+ */
+function persistInteraction(): void {
+  moduleUserInteracted = true;
+  console.log("[VideoPlayer] Persisting user interaction to module variable");
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem("videoPlayerUserInteracted", "true");
+      console.log("[VideoPlayer] Persisted user interaction to sessionStorage");
+    } catch (e) {
+      console.warn("[VideoPlayer] sessionStorage write error:", e);
+    }
+  }
+}
+
 /**
  * Detect if the current device is mobile
  * Uses a combination of user agent and touch capability detection
@@ -251,21 +296,19 @@ export function VideoPlayerOverlay({
   const timeUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const lastVideoIdRef = useRef<string | null>(null);
 
+  // Refs to track play state for use in YouTube event closures
+  const isPlayingRef = useRef(isPlaying);
+  const isPausedRef = useRef(isPaused);
+
   // Mobile autoplay handling state
   // Note: hasUserInteracted is initialized from sessionStorage to persist across player open/close
   // Once a user unmutes, they shouldn't have to do it again for the session
   const [isMobile, setIsMobile] = useState(false);
   const [showUnmuteBanner, setShowUnmuteBanner] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored =
-        sessionStorage.getItem("videoPlayerUserInteracted") === "true";
-      console.log(
-        `[VideoPlayer] Initialized hasUserInteracted from sessionStorage: ${stored}`,
-      );
-      return stored;
-    }
-    return false;
+    const persisted = getPersistedInteraction();
+    console.log(`[VideoPlayer] Initialized hasUserInteracted: ${persisted}`);
+    return persisted;
   });
   const mobileAutoMutedRef = useRef(false);
   // Use a ref to track interaction state for player creation (avoids stale closures)
@@ -277,10 +320,16 @@ export function VideoPlayerOverlay({
     ? extractYouTubeVideoId(currentVideo.link)
     : null;
 
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => {
     hasUserInteractedRef.current = hasUserInteracted;
   }, [hasUserInteracted]);
+
+  // Keep play state refs in sync for YouTube event closures
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    isPausedRef.current = isPaused;
+  }, [isPlaying, isPaused]);
 
   // Detect mobile device and set initial muted state
   useEffect(() => {
@@ -312,12 +361,8 @@ export function VideoPlayerOverlay({
       hasUserInteractedRef.current = true;
       setShowUnmuteBanner(false);
 
-      // Persist to sessionStorage so subsequent videos play with audio
-      try {
-        sessionStorage.setItem("videoPlayerUserInteracted", "true");
-      } catch (e) {
-        // sessionStorage might not be available
-      }
+      // Persist to both module variable and sessionStorage
+      persistInteraction();
 
       // Unmute the player
       if (playerRef.current) {
@@ -451,13 +496,34 @@ export function VideoPlayerOverlay({
         },
         onStateChange: (event: any) => {
           const state = event.data;
+          const player = event.target as YTPlayer;
 
           if (state === YT_STATE.ENDED) {
             onVideoEnd(currentIndex);
           }
 
           if (state === YT_STATE.PLAYING) {
-            setDuration(event.target.getDuration());
+            setDuration(player.getDuration());
+            // If React state says paused but YouTube is playing, user clicked YouTube's play button
+            // Sync this to other participants (use refs for current state, not stale closure)
+            if (isPausedRef.current) {
+              console.log(
+                "[VideoPlayer] YouTube iframe play detected - syncing to room",
+              );
+              onResume();
+            }
+          }
+
+          if (state === YT_STATE.PAUSED) {
+            // If React state says playing but YouTube is paused, user clicked YouTube's pause button
+            // Sync this to other participants (use refs for current state, not stale closure)
+            if (isPlayingRef.current && !isPausedRef.current) {
+              const currentTime = player.getCurrentTime();
+              console.log(
+                `[VideoPlayer] YouTube iframe pause detected at ${currentTime.toFixed(1)}s - syncing to room`,
+              );
+              onPause(currentTime);
+            }
           }
         },
         onError: (event: any) => {
