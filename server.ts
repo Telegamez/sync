@@ -3464,7 +3464,12 @@ app
         }
 
         const videoState = roomVideoStates.get(roomId);
-        if (!videoState) return;
+        if (!videoState || !videoState.playlist) {
+          console.log(
+            `[Video] Room ${roomId}: UI control ${action} rejected - no active video`,
+          );
+          return;
+        }
 
         console.log(
           `[Video] Room ${roomId}: UI control - ${action} from ${peerId}`,
@@ -3472,32 +3477,37 @@ app
 
         switch (action) {
           case "pause":
-            if (videoState.isPlaying && !videoState.isPaused) {
-              videoState.isPaused = true;
-              videoState.isPlaying = false;
-              videoState.currentTime = clientTime || 0;
+            // Always process pause request - client may have different state than server
+            // This ensures state synchronization even when YouTube player is controlled directly
+            videoState.isPaused = true;
+            videoState.isPlaying = false;
+            videoState.currentTime = clientTime || 0;
 
-              io.to(roomId).emit("video:pause", {
-                roomId,
-                currentTime: videoState.currentTime,
-                triggeredBy: peerId,
-              });
-            }
+            io.to(roomId).emit("video:pause", {
+              roomId,
+              currentTime: videoState.currentTime,
+              triggeredBy: peerId,
+            });
+            console.log(
+              `[Video] Room ${roomId}: Pause broadcast at ${videoState.currentTime.toFixed(1)}s`,
+            );
             break;
 
           case "resume":
-            if (videoState.isPaused) {
-              videoState.isPaused = false;
-              videoState.isPlaying = true;
-              videoState.syncedStartTime = Date.now();
+            // Always process resume request - ensures state sync across all clients
+            videoState.isPaused = false;
+            videoState.isPlaying = true;
+            videoState.syncedStartTime = Date.now();
 
-              io.to(roomId).emit("video:resume", {
-                roomId,
-                syncedStartTime: videoState.syncedStartTime,
-                currentTime: videoState.currentTime,
-                triggeredBy: peerId,
-              });
-            }
+            io.to(roomId).emit("video:resume", {
+              roomId,
+              syncedStartTime: videoState.syncedStartTime,
+              currentTime: videoState.currentTime,
+              triggeredBy: peerId,
+            });
+            console.log(
+              `[Video] Room ${roomId}: Resume broadcast from ${videoState.currentTime.toFixed(1)}s`,
+            );
             break;
 
           case "next":
@@ -3554,16 +3564,18 @@ app
             break;
 
           case "seek":
-            if (videoState.isPlaying || videoState.isPaused) {
-              videoState.currentTime = clientTime || 0;
-              videoState.syncedStartTime = Date.now();
+            // Always process seek request - ensures all clients sync to same position
+            videoState.currentTime = clientTime || 0;
+            videoState.syncedStartTime = Date.now();
 
-              io.to(roomId).emit("video:seek", {
-                roomId,
-                time: videoState.currentTime,
-                triggeredBy: peerId,
-              });
-            }
+            io.to(roomId).emit("video:seek", {
+              roomId,
+              time: videoState.currentTime,
+              triggeredBy: peerId,
+            });
+            console.log(
+              `[Video] Room ${roomId}: Seek broadcast to ${videoState.currentTime.toFixed(1)}s`,
+            );
             break;
         }
       });

@@ -532,9 +532,14 @@ export function VideoPlayerOverlay({
 
   // Handle play/pause toggle
   const handlePlayPause = useCallback(() => {
+    console.log(
+      `[VideoPlayerOverlay] handlePlayPause called: isPlaying=${isPlaying}, isPaused=${isPaused}, localTime=${localTime}`,
+    );
     if (isPlaying && !isPaused) {
+      console.log(`[VideoPlayerOverlay] Calling onPause(${localTime})`);
       onPause(localTime);
     } else {
+      console.log(`[VideoPlayerOverlay] Calling onResume()`);
       onResume();
     }
   }, [isPlaying, isPaused, localTime, onPause, onResume]);
