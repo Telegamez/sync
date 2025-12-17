@@ -5,7 +5,7 @@
     "version": "0.4.0",
     "lastUpdated": "2025-12-16T00:00:00.000Z",
     "protocol": "Long-Horizon Engineering Protocol v1.0",
-    "currentPhase": "Phase 7: Voice-Activated Search"
+    "currentPhase": "Phase 8: Video Player"
   },
   "phases": {
     "phase1": {
@@ -42,6 +42,11 @@
       "name": "Voice-Activated Search",
       "status": "complete",
       "description": "Keyword-triggered web, image, and video search via OpenAI function calling and Serper API"
+    },
+    "phase8": {
+      "name": "Video Player",
+      "status": "complete",
+      "description": "Voice-activated synchronized YouTube video playback with playlist support"
     }
   },
   "features": [
@@ -1625,6 +1630,129 @@
       "testFile": "N/A - removal feature verified by successful build",
       "dependencies": [],
       "passes": true
+    },
+    {
+      "id": "FEAT-800",
+      "phase": 8,
+      "category": "types",
+      "description": "Video playback types and interfaces for synchronized YouTube player",
+      "priority": "critical",
+      "steps": [
+        "Create src/types/video.ts with VideoPlaylist interface",
+        "Define VideoPlaybackState interface for synchronized state management",
+        "Define Socket.io payload types for video events",
+        "Add YouTube URL utility functions (extractYouTubeVideoId, isYouTubeUrl)",
+        "Define PlaylistId and YouTubeVideoId branded types",
+        "Export all types from central index"
+      ],
+      "testFile": "tests/unit/types/video.test.ts",
+      "dependencies": ["FEAT-600"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-801",
+      "phase": 8,
+      "category": "hooks",
+      "description": "useVideo hook for client-side synchronized video state management",
+      "priority": "critical",
+      "steps": [
+        "Create src/hooks/useVideo.ts",
+        "Subscribe to video:play, video:stop, video:pause, video:resume events",
+        "Subscribe to video:seek, video:next, video:previous, video:state events",
+        "Manage VideoPlaybackState with isOpen, isPlaying, isPaused, currentIndex",
+        "Implement action methods (pause, resume, stop, next, previous, seek)",
+        "Implement onVideoEnd and requestSync callbacks for YouTube player"
+      ],
+      "testFile": "tests/unit/hooks/useVideo.test.ts",
+      "dependencies": ["FEAT-800", "FEAT-108"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-802",
+      "phase": 8,
+      "category": "components",
+      "description": "VideoPlayerOverlay component with YouTube embed and playlist sidebar",
+      "priority": "critical",
+      "steps": [
+        "Create src/components/room/VideoPlayerOverlay.tsx",
+        "Implement YouTube IFrame Player API integration",
+        "Create playlist sidebar with video thumbnails and current indicator",
+        "Add playback controls (play/pause, next, previous, close)",
+        "Implement synchronized playback using syncedStartTime protocol",
+        "Add responsive layout for mobile and desktop"
+      ],
+      "testFile": "tests/unit/components/VideoPlayerOverlay.test.tsx",
+      "dependencies": ["FEAT-800"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-803",
+      "phase": 8,
+      "category": "signaling",
+      "description": "Server-side video state management and Socket.io handlers",
+      "priority": "critical",
+      "steps": [
+        "Add roomVideoStates Map for per-room video state storage",
+        "Add roomSearchResults Map to store YouTube videos for playlist creation",
+        "Implement video:control event handler for play, pause, resume, stop, seek, next, previous",
+        "Implement video:ended event handler for auto-advance to next video",
+        "Implement video:sync event handler for late-joiner synchronization",
+        "Broadcast video state changes to all room participants"
+      ],
+      "testFile": "tests/unit/signaling/video-events.test.ts",
+      "dependencies": ["FEAT-800", "FEAT-104"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-804",
+      "phase": 8,
+      "category": "pages",
+      "description": "Room page video player integration",
+      "priority": "critical",
+      "steps": [
+        "Add useVideo hook to room page",
+        "Add VideoPlayerOverlay component to room page layout",
+        "Auto-hide search and transcript panels when video opens",
+        "Wire video control callbacks from overlay to useVideo hook",
+        "Handle late-joiner video state synchronization on room join"
+      ],
+      "testFile": "tests/unit/pages/room-video-integration.test.tsx",
+      "dependencies": ["FEAT-801", "FEAT-802", "FEAT-119"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-805",
+      "phase": 8,
+      "category": "ai",
+      "description": "OpenAI function calling for playVideo voice command",
+      "priority": "critical",
+      "steps": [
+        "Add PLAY_VIDEO_TOOL function definition to OpenAI session tools",
+        "Define playVideo function with action parameter (play, stop, pause, resume, next, previous)",
+        "Implement handleVideoCommand dispatcher for function call responses",
+        "Wire function call handler to SerperService for playlist creation",
+        "Broadcast video events to room on successful command execution"
+      ],
+      "testFile": "tests/unit/ai/video-function-calling.test.ts",
+      "dependencies": ["FEAT-803", "FEAT-602"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-806",
+      "phase": 8,
+      "category": "ai",
+      "description": "Voice-activated playback controls (pause, resume, next, previous, stop)",
+      "priority": "high",
+      "steps": [
+        "Extend playVideo function to support all playback actions",
+        "Implement voice command detection for 'pause video', 'resume video'",
+        "Implement voice command detection for 'next video', 'previous video'",
+        "Implement voice command detection for 'stop video', 'close video'",
+        "Add AI response confirmation for each video control action"
+      ],
+      "testFile": "tests/unit/ai/voice-video-controls.test.ts",
+      "dependencies": ["FEAT-805"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1648,18 +1776,19 @@
     "user-experience": "User experience and personalization",
     "transcript": "Live transcript and AI context system",
     "search": "Voice-activated web search integration",
-    "cleanup": "Codebase cleanup and architectural simplification"
+    "cleanup": "Codebase cleanup and architectural simplification",
+    "video": "Synchronized video playback and playlist management"
   },
   "statistics": {
-    "total": 86,
+    "total": 93,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
     "phase5": 18,
     "phase6": 15,
     "phase7": 9,
-    "phase8": 1,
-    "passed": 77,
+    "phase8": 8,
+    "passed": 84,
     "pending": 9
   }
 }

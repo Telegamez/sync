@@ -199,6 +199,50 @@ const WEB_SEARCH_TOOL = {
 };
 
 /**
+ * playVideo function tool definition for OpenAI
+ * FEAT-803: Voice-activated video playback via function calling
+ */
+const PLAY_VIDEO_TOOL = {
+  type: "function" as const,
+  name: "playVideo",
+  description:
+    "Control video playback from search results. Use when user says 'play videos', 'watch videos', 'show videos', 'stop video', 'pause video', 'next video', 'previous video', 'replay', 'rewind', 'fast forward', 'play video 3', 'go to video 5', or similar video playback commands. For rewind/fastforward, extract any time amount mentioned (e.g., '30 seconds', '1 minute', '2 minutes'). For specific video requests like 'play video 3', use action='goto' with videoIndex=3.",
+  parameters: {
+    type: "object",
+    properties: {
+      action: {
+        type: "string",
+        enum: [
+          "play",
+          "stop",
+          "pause",
+          "resume",
+          "next",
+          "previous",
+          "replay",
+          "rewind",
+          "fastforward",
+          "goto",
+        ],
+        description:
+          "The video playback action. 'play' starts the video playlist, 'stop' closes the player, 'pause'/'resume' control playback, 'next'/'previous' navigate the playlist, 'replay' restarts the current video from the beginning, 'rewind' goes back in time (default 15 seconds), 'fastforward' skips ahead in time (default 15 seconds), 'goto' jumps to a specific video by number (requires videoIndex).",
+      },
+      seconds: {
+        type: "number",
+        description:
+          "Optional: Number of seconds to rewind or fast forward. Only used with 'rewind' and 'fastforward' actions. Default is 15 seconds if not specified. Parse time phrases like '30 seconds' as 30, '1 minute' as 60, '2 minutes' as 120.",
+      },
+      videoIndex: {
+        type: "number",
+        description:
+          "Optional: The video number to jump to (1-indexed, so 'video 3' = videoIndex 3). Only used with 'goto' action. Extract numbers from phrases like 'play video 3', 'go to video 5', 'skip to video 2', 'jump to the third video'.",
+      },
+    },
+    required: ["action"],
+  },
+};
+
+/**
  * Personality preset instructions
  */
 const PERSONALITY_INSTRUCTIONS: Record<
@@ -338,6 +382,113 @@ const rooms = new Map<string, Room>();
 const roomPeers = new Map<string, Map<string, Peer>>();
 const socketToPeer = new Map<string, { peerId: string; roomId: string }>();
 const roomAISessions = new Map<string, RoomAISession>();
+
+// ============================================================
+// VIDEO PLAYBACK STATE (FEAT-803)
+// ============================================================
+
+/** Video result from search (simplified for playlist) */
+interface VideoResult {
+  title: string;
+  link: string;
+  snippet: string;
+  imageUrl: string;
+  duration?: string;
+  source: string;
+  channel?: string;
+  date?: string;
+  position: number;
+}
+
+/** Video playlist state */
+interface VideoPlaylist {
+  id: string;
+  roomId: string;
+  videos: VideoResult[];
+  currentIndex: number;
+  createdAt: Date;
+  query: string;
+}
+
+/** Room video playback state */
+interface RoomVideoState {
+  roomId: string;
+  playlist: VideoPlaylist | null;
+  isPlaying: boolean;
+  isPaused: boolean;
+  currentIndex: number;
+  currentTime: number;
+  syncedStartTime: number;
+  triggeredBy: string | null;
+}
+
+/** Room search results storage (for video playlist creation) */
+interface RoomSearchResults {
+  roomId: string;
+  query: string;
+  videos: VideoResult[];
+  timestamp: Date;
+}
+
+/** In-memory video state and search results stores */
+const roomVideoStates = new Map<string, RoomVideoState>();
+const roomSearchResults = new Map<string, RoomSearchResults>();
+
+/**
+ * Extract YouTube video ID from URL
+ */
+function extractYouTubeVideoId(url: string): string | null {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+    /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube-nocookie\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+  return null;
+}
+
+/**
+ * Filter videos to only include valid YouTube videos
+ */
+function filterYouTubeVideos(videos: VideoResult[]): VideoResult[] {
+  return videos.filter((video) => extractYouTubeVideoId(video.link) !== null);
+}
+
+/**
+ * Get or create video state for a room
+ */
+function getOrCreateVideoState(roomId: string): RoomVideoState {
+  let state = roomVideoStates.get(roomId);
+  if (!state) {
+    state = {
+      roomId,
+      playlist: null,
+      isPlaying: false,
+      isPaused: false,
+      currentIndex: 0,
+      currentTime: 0,
+      syncedStartTime: 0,
+      triggeredBy: null,
+    };
+    roomVideoStates.set(roomId, state);
+  }
+  return state;
+}
+
+/**
+ * Clean up video state for a room
+ */
+function cleanupVideoState(roomId: string): void {
+  roomVideoStates.delete(roomId);
+  roomSearchResults.delete(roomId);
+  console.log(`[Video] Cleaned up video state for room ${roomId}`);
+}
 
 // ============================================================
 // CONTEXT MANAGER FOR TRANSCRIPT AND AI MEMORY (FEAT-501)
@@ -888,7 +1039,8 @@ function connectOpenAI(
             model: "whisper-1",
           },
           // FEAT-602: Function calling tools for voice-activated search
-          tools: SERPER_API_KEY ? [WEB_SEARCH_TOOL] : [],
+          // FEAT-803: Add video playback control tool
+          tools: SERPER_API_KEY ? [WEB_SEARCH_TOOL, PLAY_VIDEO_TOOL] : [],
           tool_choice: SERPER_API_KEY ? "auto" : "none",
         },
       };
@@ -1131,6 +1283,9 @@ function handleOpenAIMessage(
 
           if (name === "webSearch" && SERPER_API_KEY) {
             handleWebSearch(io, session, call_id, argsString);
+          } else if (name === "playVideo") {
+            // FEAT-803: Handle video playback commands
+            handleVideoCommand(io, session, call_id, argsString);
           } else {
             console.log(`[OpenAI] Unknown function or no API key: ${name}`);
             // Send empty result back to OpenAI
@@ -1272,6 +1427,22 @@ async function handleWebSearch(
       roomId,
       results,
     });
+
+    // FEAT-803: Store search results for video playlist creation
+    if (results.videos && results.videos.length > 0) {
+      const youtubeVideos = filterYouTubeVideos(results.videos);
+      if (youtubeVideos.length > 0) {
+        roomSearchResults.set(roomId, {
+          roomId,
+          query,
+          videos: youtubeVideos,
+          timestamp: new Date(),
+        });
+        console.log(
+          `[Search] Room ${roomId}: Stored ${youtubeVideos.length} YouTube videos for playlist`,
+        );
+      }
+    }
 
     console.log(
       `[Search] Room ${roomId}: Complete - ${results.web.length} web, ${results.images.length} images, ${results.videos.length} videos`,
@@ -1507,6 +1678,618 @@ function formatSearchForAI(
   return parts.join("\n\n");
 }
 
+// ============================================================================
+// FEAT-803: Voice-Activated Video Playback Functions
+// ============================================================================
+
+/**
+ * Handle playVideo function call from OpenAI
+ */
+function handleVideoCommand(
+  io: SocketIOServer,
+  session: RoomAISession,
+  callId: string,
+  argsString: string,
+): void {
+  const roomId = session.roomId;
+
+  try {
+    // Parse arguments
+    const args = JSON.parse(argsString || "{}");
+    const action = args.action?.toLowerCase() || "play";
+    const seconds = typeof args.seconds === "number" ? args.seconds : 15;
+    const videoIndex =
+      typeof args.videoIndex === "number" ? args.videoIndex : null;
+
+    console.log(
+      `[Video] Room ${roomId}: Video command - ${action}${seconds !== 15 ? ` (${seconds}s)` : ""}${videoIndex ? ` (video ${videoIndex})` : ""}`,
+    );
+
+    const videoState = getOrCreateVideoState(roomId);
+
+    switch (action) {
+      case "play":
+        handleVideoPlay(io, roomId, videoState, session, callId);
+        break;
+
+      case "stop":
+        handleVideoStop(io, roomId, videoState, session, callId);
+        break;
+
+      case "pause":
+        handleVideoPause(io, roomId, videoState, session, callId);
+        break;
+
+      case "resume":
+        handleVideoResume(io, roomId, videoState, session, callId);
+        break;
+
+      case "next":
+        handleVideoNext(io, roomId, videoState, session, callId);
+        break;
+
+      case "previous":
+        handleVideoPrevious(io, roomId, videoState, session, callId);
+        break;
+
+      case "replay":
+        handleVideoReplay(io, roomId, videoState, session, callId);
+        break;
+
+      case "rewind":
+        handleVideoRewind(io, roomId, videoState, session, callId, seconds);
+        break;
+
+      case "fastforward":
+        handleVideoFastForward(
+          io,
+          roomId,
+          videoState,
+          session,
+          callId,
+          seconds,
+        );
+        break;
+
+      case "goto":
+        handleVideoGoto(io, roomId, videoState, session, callId, videoIndex);
+        break;
+
+      default:
+        sendFunctionOutput(session, callId, {
+          error: `Unknown video action: ${action}`,
+        });
+    }
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Video command failed";
+    console.error(`[Video] Room ${roomId}: Error - ${errorMessage}`);
+    sendFunctionOutput(session, callId, {
+      error: `Video command failed: ${errorMessage}`,
+    });
+  }
+}
+
+/**
+ * Handle play video command - start playlist from search results
+ */
+function handleVideoPlay(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+): void {
+  // Get stored search results
+  const searchResults = roomSearchResults.get(roomId);
+
+  if (!searchResults || searchResults.videos.length === 0) {
+    console.log(`[Video] Room ${roomId}: No videos available to play`);
+    sendFunctionOutput(
+      session,
+      callId,
+      "No videos available. Please search for videos first by saying something like 'search for music videos' or 'find cooking tutorials'.",
+    );
+    return;
+  }
+
+  // Create playlist from search results
+  const playlist: VideoPlaylist = {
+    id: `playlist_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    roomId,
+    videos: searchResults.videos,
+    currentIndex: 0,
+    createdAt: new Date(),
+    query: searchResults.query,
+  };
+
+  // Update video state
+  videoState.playlist = playlist;
+  videoState.isPlaying = true;
+  videoState.isPaused = false;
+  videoState.currentIndex = 0;
+  videoState.currentTime = 0;
+  videoState.syncedStartTime = Date.now();
+  videoState.triggeredBy = session.activeSpeakerId;
+
+  // Broadcast video:play to all clients in room
+  const payload = {
+    roomId,
+    playlist,
+    currentIndex: 0,
+    syncedStartTime: videoState.syncedStartTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  };
+  io.to(roomId).emit("video:play", payload);
+
+  console.log(
+    `[Video] Room ${roomId}: Started playlist with ${playlist.videos.length} videos`,
+  );
+
+  // Send response to OpenAI
+  const firstVideo = playlist.videos[0];
+  sendFunctionOutput(
+    session,
+    callId,
+    `Now playing "${firstVideo.title}"${firstVideo.channel ? ` by ${firstVideo.channel}` : ""}. There are ${playlist.videos.length} videos in the playlist.`,
+  );
+}
+
+/**
+ * Handle stop video command
+ */
+function handleVideoStop(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+): void {
+  if (!videoState.isPlaying && !videoState.isPaused) {
+    sendFunctionOutput(session, callId, "No video is currently playing.");
+    return;
+  }
+
+  // Reset video state
+  videoState.playlist = null;
+  videoState.isPlaying = false;
+  videoState.isPaused = false;
+  videoState.currentIndex = 0;
+  videoState.currentTime = 0;
+  videoState.syncedStartTime = 0;
+  videoState.triggeredBy = null;
+
+  // Broadcast video:stop to all clients
+  io.to(roomId).emit("video:stop", {
+    roomId,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  console.log(`[Video] Room ${roomId}: Stopped video playback`);
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle pause video command
+ */
+function handleVideoPause(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+): void {
+  if (!videoState.isPlaying) {
+    sendFunctionOutput(session, callId, "No video is currently playing.");
+    return;
+  }
+
+  if (videoState.isPaused) {
+    sendFunctionOutput(session, callId, "Video is already paused.");
+    return;
+  }
+
+  // Calculate approximate current time based on elapsed time
+  const elapsedMs = Date.now() - videoState.syncedStartTime;
+  const currentTime = videoState.currentTime + elapsedMs / 1000;
+
+  videoState.isPaused = true;
+  videoState.isPlaying = false;
+  videoState.currentTime = currentTime;
+
+  // Broadcast video:pause to all clients
+  io.to(roomId).emit("video:pause", {
+    roomId,
+    currentTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  console.log(`[Video] Room ${roomId}: Paused at ${currentTime.toFixed(1)}s`);
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle resume video command
+ */
+function handleVideoResume(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+): void {
+  if (!videoState.isPaused) {
+    if (videoState.isPlaying) {
+      sendFunctionOutput(session, callId, "Video is already playing.");
+    } else {
+      sendFunctionOutput(session, callId, "No video to resume.");
+    }
+    return;
+  }
+
+  videoState.isPaused = false;
+  videoState.isPlaying = true;
+  videoState.syncedStartTime = Date.now();
+
+  // Broadcast video:resume to all clients
+  io.to(roomId).emit("video:resume", {
+    roomId,
+    syncedStartTime: videoState.syncedStartTime,
+    currentTime: videoState.currentTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  console.log(
+    `[Video] Room ${roomId}: Resumed from ${videoState.currentTime.toFixed(1)}s`,
+  );
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle next video command
+ */
+function handleVideoNext(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+): void {
+  if (!videoState.playlist) {
+    sendFunctionOutput(session, callId, "No playlist is currently playing.");
+    return;
+  }
+
+  const nextIndex = videoState.currentIndex + 1;
+
+  if (nextIndex >= videoState.playlist.videos.length) {
+    // End of playlist - stop playback
+    handleVideoStop(io, roomId, videoState, session, callId);
+    return;
+  }
+
+  // Advance to next video
+  videoState.currentIndex = nextIndex;
+  videoState.currentTime = 0;
+  videoState.syncedStartTime = Date.now();
+  videoState.isPlaying = true;
+  videoState.isPaused = false;
+
+  // Broadcast video:next to all clients
+  io.to(roomId).emit("video:next", {
+    roomId,
+    currentIndex: nextIndex,
+    syncedStartTime: videoState.syncedStartTime,
+    triggeredBy: session.activeSpeakerId || "auto",
+  });
+
+  const nextVideo = videoState.playlist.videos[nextIndex];
+  console.log(`[Video] Room ${roomId}: Playing next video: ${nextVideo.title}`);
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle previous video command
+ * Always goes to the previous video in the playlist regardless of current playback position
+ */
+function handleVideoPrevious(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+): void {
+  if (!videoState.playlist) {
+    sendFunctionOutput(session, callId, "No playlist is currently playing.");
+    return;
+  }
+
+  // Check if already at first video
+  if (videoState.currentIndex === 0) {
+    sendFunctionOutput(
+      session,
+      callId,
+      "Already at the first video in the playlist.",
+    );
+    return;
+  }
+
+  // Go to previous video
+  videoState.currentIndex = videoState.currentIndex - 1;
+  videoState.currentTime = 0;
+  videoState.syncedStartTime = Date.now();
+  videoState.isPlaying = true;
+  videoState.isPaused = false;
+
+  // Broadcast video:previous to all clients
+  io.to(roomId).emit("video:previous", {
+    roomId,
+    currentIndex: videoState.currentIndex,
+    syncedStartTime: videoState.syncedStartTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  const currentVideo = videoState.playlist.videos[videoState.currentIndex];
+  console.log(
+    `[Video] Room ${roomId}: Playing previous video: ${currentVideo.title}`,
+  );
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle replay command - restart current video from beginning
+ */
+function handleVideoReplay(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+): void {
+  if (!videoState.playlist) {
+    sendFunctionOutput(session, callId, "No video is currently playing.");
+    return;
+  }
+
+  // Reset to beginning of current video
+  videoState.currentTime = 0;
+  videoState.syncedStartTime = Date.now();
+  videoState.isPlaying = true;
+  videoState.isPaused = false;
+
+  // Broadcast video:seek to restart from beginning
+  io.to(roomId).emit("video:seek", {
+    roomId,
+    time: 0,
+    syncedStartTime: videoState.syncedStartTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  const currentVideo = videoState.playlist.videos[videoState.currentIndex];
+  console.log(`[Video] Room ${roomId}: Replaying "${currentVideo.title}"`);
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle rewind command - go back in time (default 15 seconds)
+ */
+function handleVideoRewind(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+  seconds: number = 15,
+): void {
+  if (!videoState.playlist) {
+    sendFunctionOutput(session, callId, "No video is currently playing.");
+    return;
+  }
+
+  // Calculate current playback time
+  let currentTime = videoState.currentTime;
+  if (videoState.isPlaying && !videoState.isPaused) {
+    const elapsedMs = Date.now() - videoState.syncedStartTime;
+    currentTime = videoState.currentTime + elapsedMs / 1000;
+  }
+
+  // Calculate new time (don't go below 0)
+  const newTime = Math.max(0, currentTime - seconds);
+
+  // Update state
+  videoState.currentTime = newTime;
+  videoState.syncedStartTime = Date.now();
+
+  // Broadcast video:seek to all clients
+  io.to(roomId).emit("video:seek", {
+    roomId,
+    time: newTime,
+    syncedStartTime: videoState.syncedStartTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  console.log(
+    `[Video] Room ${roomId}: Rewound ${seconds}s to ${newTime.toFixed(1)}s`,
+  );
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle fast forward command - skip ahead in time (default 15 seconds)
+ */
+function handleVideoFastForward(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+  seconds: number = 15,
+): void {
+  if (!videoState.playlist) {
+    sendFunctionOutput(session, callId, "No video is currently playing.");
+    return;
+  }
+
+  // Calculate current playback time
+  let currentTime = videoState.currentTime;
+  if (videoState.isPlaying && !videoState.isPaused) {
+    const elapsedMs = Date.now() - videoState.syncedStartTime;
+    currentTime = videoState.currentTime + elapsedMs / 1000;
+  }
+
+  // Calculate new time (no upper bound - YouTube will handle end of video)
+  const newTime = currentTime + seconds;
+
+  // Update state
+  videoState.currentTime = newTime;
+  videoState.syncedStartTime = Date.now();
+
+  // Broadcast video:seek to all clients
+  io.to(roomId).emit("video:seek", {
+    roomId,
+    time: newTime,
+    syncedStartTime: videoState.syncedStartTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  console.log(
+    `[Video] Room ${roomId}: Fast forwarded ${seconds}s to ${newTime.toFixed(1)}s`,
+  );
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Handle goto command - jump to a specific video by index
+ */
+function handleVideoGoto(
+  io: SocketIOServer,
+  roomId: string,
+  videoState: RoomVideoState,
+  session: RoomAISession,
+  callId: string,
+  videoIndex: number | null,
+): void {
+  if (!videoState.playlist) {
+    sendFunctionOutput(session, callId, "No playlist is currently playing.");
+    return;
+  }
+
+  if (videoIndex === null || videoIndex < 1) {
+    sendFunctionOutput(
+      session,
+      callId,
+      "Please specify which video number to play (e.g., 'play video 3').",
+    );
+    return;
+  }
+
+  // Convert 1-indexed user input to 0-indexed array
+  const targetIndex = videoIndex - 1;
+  const playlistLength = videoState.playlist.videos.length;
+
+  if (targetIndex >= playlistLength) {
+    sendFunctionOutput(
+      session,
+      callId,
+      `Video ${videoIndex} doesn't exist. The playlist only has ${playlistLength} videos.`,
+    );
+    return;
+  }
+
+  // Check if already playing this video
+  if (targetIndex === videoState.currentIndex) {
+    const currentVideo = videoState.playlist.videos[targetIndex];
+    sendFunctionOutput(
+      session,
+      callId,
+      `Already playing video ${videoIndex}: "${currentVideo.title}".`,
+    );
+    return;
+  }
+
+  // Jump to the specified video
+  videoState.currentIndex = targetIndex;
+  videoState.currentTime = 0;
+  videoState.syncedStartTime = Date.now();
+  videoState.isPlaying = true;
+  videoState.isPaused = false;
+
+  // Broadcast video:goto to all clients (using video:seek with index change)
+  io.to(roomId).emit("video:goto", {
+    roomId,
+    currentIndex: videoState.currentIndex,
+    syncedStartTime: videoState.syncedStartTime,
+    triggeredBy: session.activeSpeakerId || "ai",
+  });
+
+  const targetVideo = videoState.playlist.videos[targetIndex];
+  console.log(
+    `[Video] Room ${roomId}: Jumping to video ${videoIndex}: ${targetVideo.title}`,
+  );
+  const response = session.activeSpeakerName
+    ? `Done ${session.activeSpeakerName}!`
+    : "Did that!";
+  sendFunctionOutput(session, callId, response);
+}
+
+/**
+ * Broadcast current video state to a specific socket (for late joiners)
+ */
+function broadcastVideoState(socket: any, roomId: string): void {
+  const videoState = roomVideoStates.get(roomId);
+  if (!videoState || (!videoState.isPlaying && !videoState.isPaused)) {
+    return;
+  }
+
+  // Calculate current time for playing videos
+  let currentTime = videoState.currentTime;
+  if (videoState.isPlaying && !videoState.isPaused) {
+    const elapsedMs = Date.now() - videoState.syncedStartTime;
+    currentTime = videoState.currentTime + elapsedMs / 1000;
+  }
+
+  socket.emit("video:state", {
+    roomId,
+    state: {
+      isOpen: true,
+      isPlaying: videoState.isPlaying,
+      isPaused: videoState.isPaused,
+      currentIndex: videoState.currentIndex,
+      currentTime,
+      playlist: videoState.playlist,
+      syncedStartTime: videoState.syncedStartTime,
+      triggeredBy: videoState.triggeredBy,
+      lastSyncAt: Date.now(),
+    },
+  });
+
+  console.log(`[Video] Sent video state to late joiner for room ${roomId}`);
+}
+
 /**
  * Clean up AI session for a room
  */
@@ -1544,6 +2327,8 @@ function removePeerFromRoom(
       roomPeers.delete(roomId);
       // Clean up AI session when room becomes empty
       cleanupAISession(roomId);
+      // FEAT-803: Clean up video state when room becomes empty
+      cleanupVideoState(roomId);
     }
   }
 
@@ -1779,6 +2564,9 @@ app
 
         // Broadcast peer:joined to others in room
         socket.to(roomId).emit("peer:joined", toPeerSummary(peer));
+
+        // FEAT-803: Send current video state to late joiner
+        broadcastVideoState(socket, roomId);
 
         // Broadcast room update to lobby subscribers
         broadcastRoomUpdate(room);
@@ -2549,6 +3337,234 @@ app
         } finally {
           // Clear in-progress flag
           summaryInProgress.delete(roomId);
+        }
+      });
+
+      // ============================================================
+      // VIDEO PLAYBACK EVENTS (FEAT-803)
+      // ============================================================
+
+      // Handle video:ended event from client when a video finishes
+      socket.on("video:ended", (payload) => {
+        const { roomId, videoIndex, peerId: reportingPeerId } = payload;
+        const socketRoomId = (socket as any).roomId;
+
+        if (socketRoomId !== roomId) {
+          console.log(`[Video] video:ended rejected - room mismatch`);
+          return;
+        }
+
+        const videoState = roomVideoStates.get(roomId);
+        if (!videoState || !videoState.playlist) {
+          return;
+        }
+
+        // Only process if this is for the current video
+        if (videoIndex !== videoState.currentIndex) {
+          console.log(
+            `[Video] video:ended ignored - index mismatch (got ${videoIndex}, current ${videoState.currentIndex})`,
+          );
+          return;
+        }
+
+        console.log(
+          `[Video] Room ${roomId}: Video ${videoIndex} ended, reported by ${reportingPeerId}`,
+        );
+
+        // Auto-advance to next video
+        const nextIndex = videoState.currentIndex + 1;
+
+        if (nextIndex >= videoState.playlist.videos.length) {
+          // End of playlist - stop playback
+          videoState.playlist = null;
+          videoState.isPlaying = false;
+          videoState.isPaused = false;
+          videoState.currentIndex = 0;
+          videoState.currentTime = 0;
+          videoState.syncedStartTime = 0;
+          videoState.triggeredBy = null;
+
+          io.to(roomId).emit("video:stop", {
+            roomId,
+            triggeredBy: "auto",
+          });
+
+          console.log(`[Video] Room ${roomId}: Playlist ended`);
+        } else {
+          // Advance to next video
+          videoState.currentIndex = nextIndex;
+          videoState.currentTime = 0;
+          videoState.syncedStartTime = Date.now();
+          videoState.isPlaying = true;
+          videoState.isPaused = false;
+
+          io.to(roomId).emit("video:next", {
+            roomId,
+            currentIndex: nextIndex,
+            syncedStartTime: videoState.syncedStartTime,
+            triggeredBy: "auto",
+          });
+
+          const nextVideo = videoState.playlist.videos[nextIndex];
+          console.log(
+            `[Video] Room ${roomId}: Auto-advanced to video ${nextIndex}: ${nextVideo.title}`,
+          );
+        }
+      });
+
+      // Handle video:sync request from client
+      socket.on("video:sync", (payload, callback) => {
+        const { roomId } = payload;
+        const socketRoomId = (socket as any).roomId;
+
+        if (socketRoomId !== roomId) {
+          if (callback) callback({ error: "Room mismatch" });
+          return;
+        }
+
+        const videoState = roomVideoStates.get(roomId);
+        if (!videoState || (!videoState.isPlaying && !videoState.isPaused)) {
+          if (callback) callback({ state: null });
+          return;
+        }
+
+        // Calculate current time
+        let currentTime = videoState.currentTime;
+        if (videoState.isPlaying && !videoState.isPaused) {
+          const elapsedMs = Date.now() - videoState.syncedStartTime;
+          currentTime = videoState.currentTime + elapsedMs / 1000;
+        }
+
+        if (callback) {
+          callback({
+            state: {
+              isOpen: true,
+              isPlaying: videoState.isPlaying,
+              isPaused: videoState.isPaused,
+              currentIndex: videoState.currentIndex,
+              currentTime,
+              playlist: videoState.playlist,
+              syncedStartTime: videoState.syncedStartTime,
+              triggeredBy: videoState.triggeredBy,
+              lastSyncAt: Date.now(),
+            },
+          });
+        }
+      });
+
+      // Handle client-initiated video control (UI buttons)
+      socket.on("video:control", (payload) => {
+        const { roomId, action, currentTime: clientTime } = payload;
+        const socketRoomId = (socket as any).roomId;
+        const peerId = (socket as any).peerId;
+
+        if (socketRoomId !== roomId) {
+          console.log(`[Video] video:control rejected - room mismatch`);
+          return;
+        }
+
+        const videoState = roomVideoStates.get(roomId);
+        if (!videoState) return;
+
+        console.log(
+          `[Video] Room ${roomId}: UI control - ${action} from ${peerId}`,
+        );
+
+        switch (action) {
+          case "pause":
+            if (videoState.isPlaying && !videoState.isPaused) {
+              videoState.isPaused = true;
+              videoState.isPlaying = false;
+              videoState.currentTime = clientTime || 0;
+
+              io.to(roomId).emit("video:pause", {
+                roomId,
+                currentTime: videoState.currentTime,
+                triggeredBy: peerId,
+              });
+            }
+            break;
+
+          case "resume":
+            if (videoState.isPaused) {
+              videoState.isPaused = false;
+              videoState.isPlaying = true;
+              videoState.syncedStartTime = Date.now();
+
+              io.to(roomId).emit("video:resume", {
+                roomId,
+                syncedStartTime: videoState.syncedStartTime,
+                currentTime: videoState.currentTime,
+                triggeredBy: peerId,
+              });
+            }
+            break;
+
+          case "next":
+            if (videoState.playlist) {
+              const nextIndex = videoState.currentIndex + 1;
+              if (nextIndex < videoState.playlist.videos.length) {
+                videoState.currentIndex = nextIndex;
+                videoState.currentTime = 0;
+                videoState.syncedStartTime = Date.now();
+                videoState.isPlaying = true;
+                videoState.isPaused = false;
+
+                io.to(roomId).emit("video:next", {
+                  roomId,
+                  currentIndex: nextIndex,
+                  syncedStartTime: videoState.syncedStartTime,
+                  triggeredBy: peerId,
+                });
+              }
+            }
+            break;
+
+          case "previous":
+            if (videoState.playlist && videoState.currentIndex > 0) {
+              // Always go to previous video regardless of current playback position
+              videoState.currentIndex = videoState.currentIndex - 1;
+              videoState.currentTime = 0;
+              videoState.syncedStartTime = Date.now();
+              videoState.isPlaying = true;
+              videoState.isPaused = false;
+
+              io.to(roomId).emit("video:previous", {
+                roomId,
+                currentIndex: videoState.currentIndex,
+                syncedStartTime: videoState.syncedStartTime,
+                triggeredBy: peerId,
+              });
+            }
+            break;
+
+          case "stop":
+            videoState.playlist = null;
+            videoState.isPlaying = false;
+            videoState.isPaused = false;
+            videoState.currentIndex = 0;
+            videoState.currentTime = 0;
+            videoState.syncedStartTime = 0;
+            videoState.triggeredBy = null;
+
+            io.to(roomId).emit("video:stop", {
+              roomId,
+              triggeredBy: peerId,
+            });
+            break;
+
+          case "seek":
+            if (videoState.isPlaying || videoState.isPaused) {
+              videoState.currentTime = clientTime || 0;
+              videoState.syncedStartTime = Date.now();
+
+              io.to(roomId).emit("video:seek", {
+                roomId,
+                time: videoState.currentTime,
+                triggeredBy: peerId,
+              });
+            }
+            break;
         }
       });
 

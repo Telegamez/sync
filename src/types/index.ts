@@ -27,3 +27,6 @@ export * from "./transcript";
 
 // Search types (FEAT-600)
 export * from "./search";
+
+// Video player types (FEAT-800)
+export * from "./video";

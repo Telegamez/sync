@@ -35,6 +35,7 @@ import {
   ParticipantModal,
   TranscriptPanel,
   SearchPanel,
+  VideoPlayerOverlay,
 } from "@/components/room";
 import type { ParticipantInfo } from "@/components/room";
 import type { Room } from "@/types/room";
@@ -46,6 +47,7 @@ import { useSharedAI } from "@/hooks/useSharedAI";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useAmbientTranscription } from "@/hooks/useAmbientTranscription";
 import { useSearch } from "@/hooks/useSearch";
+import { useVideo } from "@/hooks/useVideo";
 import type { AIResponseState } from "@/types/voice-mode";
 
 /**
@@ -296,6 +298,13 @@ export default function RoomPage() {
     client: isInRoom ? getClient() : null,
   });
 
+  // Video hook - manages synchronized video playback (FEAT-801)
+  const video = useVideo({
+    roomId,
+    client: isInRoom ? getClient() : null,
+    peerId: localPeer?.id || null,
+  });
+
   // Auto-show search panel when new results arrive
   useEffect(() => {
     if (
@@ -308,6 +317,14 @@ export default function RoomPage() {
       setShowSearch(true);
     }
   }, [search.results]);
+
+  // Auto-hide panels when video player opens
+  useEffect(() => {
+    if (video.isPlayerOpen) {
+      setShowSearch(false);
+      setShowTranscript(false);
+    }
+  }, [video.isPlayerOpen]);
 
   // Check if transcript is enabled for this room
   const isTranscriptEnabled = room?.transcriptSettings?.enabled ?? false;
@@ -1346,6 +1363,25 @@ export default function RoomPage() {
           />
         </div>
       </footer>
+
+      {/* Video player overlay (FEAT-802) */}
+      <VideoPlayerOverlay
+        isOpen={video.isPlayerOpen}
+        playlist={video.playlist}
+        currentIndex={video.currentIndex}
+        currentTime={video.currentTime}
+        isPlaying={video.isPlaying}
+        isPaused={video.isPaused}
+        syncedStartTime={video.syncedStartTime}
+        onClose={video.closePlayer}
+        onPause={video.pause}
+        onResume={video.resume}
+        onSeek={video.seek}
+        onNext={video.next}
+        onPrevious={video.previous}
+        onVideoEnd={video.onVideoEnd}
+        onTimeUpdate={video.onTimeUpdate}
+      />
 
       {/* Username edit modal */}
       <UsernameModal

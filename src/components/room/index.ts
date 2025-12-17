@@ -125,3 +125,6 @@ export type {
 
 export { SearchPanel } from "./SearchPanel";
 export type { SearchPanelProps } from "./SearchPanel";
+
+export { VideoPlayerOverlay } from "./VideoPlayerOverlay";
+export type { VideoPlayerOverlayProps } from "./VideoPlayerOverlay";
