@@ -263,6 +263,8 @@ export function VideoPlayerOverlay({
     return false;
   });
   const mobileAutoMutedRef = useRef(false);
+  // Use a ref to track interaction state for player creation (avoids stale closures)
+  const hasUserInteractedRef = useRef(hasUserInteracted);
 
   // Get current video
   const currentVideo = playlist?.videos[currentIndex] || null;
@@ -270,13 +272,18 @@ export function VideoPlayerOverlay({
     ? extractYouTubeVideoId(currentVideo.link)
     : null;
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    hasUserInteractedRef.current = hasUserInteracted;
+  }, [hasUserInteracted]);
+
   // Detect mobile device and set initial muted state
   useEffect(() => {
     if (isOpen) {
       const mobile = isMobileDevice();
       setIsMobile(mobile);
 
-      if (mobile && !hasUserInteracted) {
+      if (mobile && !hasUserInteractedRef.current) {
         // Mobile: start muted for autoplay compliance
         setIsMuted(true);
         setShowUnmuteBanner(true);
@@ -286,13 +293,18 @@ export function VideoPlayerOverlay({
         );
       }
     }
-  }, [isOpen, hasUserInteracted]);
+  }, [isOpen]);
 
   // Handle user interaction to enable sound on mobile
   const handleUserInteraction = useCallback(() => {
-    if (isMobile && !hasUserInteracted && mobileAutoMutedRef.current) {
+    if (
+      isMobile &&
+      !hasUserInteractedRef.current &&
+      mobileAutoMutedRef.current
+    ) {
       console.log("[VideoPlayer] User interaction detected - unmuting");
       setHasUserInteracted(true);
+      hasUserInteractedRef.current = true;
       setShowUnmuteBanner(false);
 
       // Persist to sessionStorage so subsequent videos play with audio
@@ -313,7 +325,7 @@ export function VideoPlayerOverlay({
         }
       }
     }
-  }, [isMobile, hasUserInteracted]);
+  }, [isMobile]);
 
   // Load YouTube API
   useEffect(() => {
@@ -364,7 +376,8 @@ export function VideoPlayerOverlay({
     }
 
     // Check if we need to start muted for mobile autoplay
-    const shouldStartMuted = isMobileDevice() && !hasUserInteracted;
+    // Use ref to get latest interaction state (avoids stale closures and unnecessary re-renders)
+    const shouldStartMuted = isMobileDevice() && !hasUserInteractedRef.current;
 
     // Create new player
     const YT = (window as any).YT;
@@ -439,7 +452,8 @@ export function VideoPlayerOverlay({
     isApiReady,
     videoId,
     currentIndex,
-    hasUserInteracted, // Include so new videos respect the unmute state
+    // Note: hasUserInteracted is accessed via ref (hasUserInteractedRef) to avoid
+    // recreating player when user unmutes. The ref is updated synchronously.
     // Don't re-create player on these changes:
     // isPlaying, isPaused, currentTime, syncedStartTime
   ]);

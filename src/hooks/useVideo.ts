@@ -295,18 +295,14 @@ export function useVideo(options: UseVideoOptions): UseVideoReturn {
   }, [client, roomId]);
 
   // Action: Pause
+  // Note: We don't guard on playbackState.isPlaying because the local YouTube player
+  // state may differ from server state. Trust user intent and let server validate.
   const pause = useCallback(
     (currentTime: number) => {
-      console.log(
-        `[useVideo] Pause requested: isPlaying=${playbackState.isPlaying}, isPaused=${playbackState.isPaused}, time=${currentTime}`,
-      );
+      console.log(`[useVideo] Pause requested: time=${currentTime}`);
 
       if (!client) {
         console.log("[useVideo] Pause blocked: no client");
-        return;
-      }
-      if (!playbackState.isPlaying) {
-        console.log("[useVideo] Pause blocked: not playing");
         return;
       }
 
@@ -323,21 +319,17 @@ export function useVideo(options: UseVideoOptions): UseVideoReturn {
         currentTime,
       });
     },
-    [client, roomId, playbackState.isPlaying, playbackState.isPaused],
+    [client, roomId],
   );
 
   // Action: Resume
+  // Note: We don't guard on playbackState.isPaused because the local YouTube player
+  // state may differ from server state. Trust user intent and let server validate.
   const resume = useCallback(() => {
-    console.log(
-      `[useVideo] Resume requested: isPlaying=${playbackState.isPlaying}, isPaused=${playbackState.isPaused}`,
-    );
+    console.log(`[useVideo] Resume requested`);
 
     if (!client) {
       console.log("[useVideo] Resume blocked: no client");
-      return;
-    }
-    if (!playbackState.isPaused) {
-      console.log("[useVideo] Resume blocked: not paused");
       return;
     }
 
@@ -352,7 +344,7 @@ export function useVideo(options: UseVideoOptions): UseVideoReturn {
       roomId,
       action: "resume",
     });
-  }, [client, roomId, playbackState.isPlaying, playbackState.isPaused]);
+  }, [client, roomId]);
 
   // Action: Stop
   const stop = useCallback(() => {
