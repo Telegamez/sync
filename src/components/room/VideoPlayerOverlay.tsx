@@ -296,6 +296,11 @@ export function VideoPlayerOverlay({
   const timeUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const lastVideoIdRef = useRef<string | null>(null);
 
+  // Refs for seek detection - track last known time to detect YouTube iframe seek bar usage
+  const lastKnownTimeRef = useRef<number>(0);
+  const lastSeekEmittedRef = useRef<number>(0); // Prevent duplicate seek events
+  const isInternalSeekRef = useRef<boolean>(false); // Flag to ignore our own seeks
+
   // Refs to track play state for use in YouTube event closures
   const isPlayingRef = useRef(isPlaying);
   const isPausedRef = useRef(isPaused);
@@ -408,6 +413,11 @@ export function VideoPlayerOverlay({
     }
 
     lastVideoIdRef.current = videoId;
+
+    // Reset seek detection refs for new video
+    lastKnownTimeRef.current = 0;
+    lastSeekEmittedRef.current = 0;
+    isInternalSeekRef.current = false;
 
     // Create container
     const containerId = "youtube-player-" + Date.now();
@@ -564,7 +574,7 @@ export function VideoPlayerOverlay({
     }
   }, [isPlaying, isPaused]);
 
-  // Handle external seek (from sync)
+  // Handle external seek (from sync - receiving seek from another participant)
   useEffect(() => {
     if (!playerRef.current || !isOpen) return;
 
@@ -582,8 +592,14 @@ export function VideoPlayerOverlay({
 
       if (drift > 2) {
         console.log(
-          `[VideoPlayer] Syncing: drift ${drift.toFixed(1)}s, seeking to ${expectedTime.toFixed(1)}s`,
+          `[VideoPlayer] Syncing from server: drift ${drift.toFixed(1)}s, seeking to ${expectedTime.toFixed(1)}s`,
         );
+
+        // Mark this as an internal seek to prevent detection loop
+        isInternalSeekRef.current = true;
+        lastKnownTimeRef.current = expectedTime;
+        lastSeekEmittedRef.current = Date.now();
+
         playerRef.current.seekTo(expectedTime, true);
       }
     } catch (e) {
@@ -591,7 +607,8 @@ export function VideoPlayerOverlay({
     }
   }, [currentTime, syncedStartTime]);
 
-  // Time update interval
+  // Time update interval with seek detection
+  // Detects when user interacts with YouTube iframe's seek bar by monitoring time jumps
   useEffect(() => {
     if (!isOpen) {
       if (timeUpdateRef.current) {
@@ -605,13 +622,38 @@ export function VideoPlayerOverlay({
       if (playerRef.current) {
         try {
           const time = playerRef.current.getCurrentTime();
+          const lastTime = lastKnownTimeRef.current;
+          const timeDiff = Math.abs(time - lastTime);
+
+          // Detect YouTube iframe seek bar usage:
+          // - Time jump of more than 2 seconds (not normal playback progression)
+          // - Not caused by our own seek (isInternalSeekRef flag)
+          // - Enough time since last seek event (debounce)
+          const isLikelyUserSeek =
+            timeDiff > 2 &&
+            !isInternalSeekRef.current &&
+            Date.now() - lastSeekEmittedRef.current > 1000;
+
+          if (isLikelyUserSeek && lastTime > 0) {
+            console.log(
+              `[VideoPlayer] YouTube iframe seek detected: ${lastTime.toFixed(1)}s -> ${time.toFixed(1)}s (jump: ${timeDiff.toFixed(1)}s) - syncing to room`,
+            );
+            lastSeekEmittedRef.current = Date.now();
+            onSeek(time);
+          }
+
+          // Reset internal seek flag after processing
+          isInternalSeekRef.current = false;
+
+          // Update tracking
+          lastKnownTimeRef.current = time;
           setLocalTime(time);
           onTimeUpdate(time);
         } catch (e) {
           // Player not ready
         }
       }
-    }, 500);
+    }, 250); // Faster polling for better seek detection
 
     return () => {
       if (timeUpdateRef.current) {
@@ -619,7 +661,7 @@ export function VideoPlayerOverlay({
         timeUpdateRef.current = null;
       }
     };
-  }, [isOpen, onTimeUpdate]);
+  }, [isOpen, onTimeUpdate, onSeek]);
 
   // Handle play/pause toggle
   const handlePlayPause = useCallback(() => {
@@ -657,10 +699,16 @@ export function VideoPlayerOverlay({
     }
   }, [isMuted]);
 
-  // Handle seek via progress bar
+  // Handle seek via progress bar (our custom seek bar, not YouTube's)
   const handleSeek = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const time = parseFloat(e.target.value);
+
+      // Mark this as an internal seek to prevent detection loop
+      isInternalSeekRef.current = true;
+      lastKnownTimeRef.current = time;
+      lastSeekEmittedRef.current = Date.now();
+
       onSeek(time);
       setLocalTime(time);
 
