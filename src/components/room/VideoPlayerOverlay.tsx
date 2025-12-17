@@ -258,7 +258,12 @@ export function VideoPlayerOverlay({
   const [showUnmuteBanner, setShowUnmuteBanner] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(() => {
     if (typeof window !== "undefined") {
-      return sessionStorage.getItem("videoPlayerUserInteracted") === "true";
+      const stored =
+        sessionStorage.getItem("videoPlayerUserInteracted") === "true";
+      console.log(
+        `[VideoPlayer] Initialized hasUserInteracted from sessionStorage: ${stored}`,
+      );
+      return stored;
     }
     return false;
   });
@@ -378,6 +383,9 @@ export function VideoPlayerOverlay({
     // Check if we need to start muted for mobile autoplay
     // Use ref to get latest interaction state (avoids stale closures and unnecessary re-renders)
     const shouldStartMuted = isMobileDevice() && !hasUserInteractedRef.current;
+    console.log(
+      `[VideoPlayer] Creating player for video ${videoId}: isMobile=${isMobileDevice()}, hasUserInteracted=${hasUserInteractedRef.current}, shouldStartMuted=${shouldStartMuted}`,
+    );
 
     // Create new player
     const YT = (window as any).YT;
@@ -401,14 +409,31 @@ export function VideoPlayerOverlay({
           const player = event.target as YTPlayer;
           setDuration(player.getDuration());
 
-          // Ensure muted state for mobile autoplay
-          if (shouldStartMuted) {
+          // Check CURRENT interaction state (not stale closure value)
+          // User may have interacted while player was being created
+          const currentlyNeedsMute =
+            isMobileDevice() && !hasUserInteractedRef.current;
+          console.log(
+            `[VideoPlayer] onReady: isMobile=${isMobileDevice()}, hasUserInteracted=${hasUserInteractedRef.current}, needsMute=${currentlyNeedsMute}`,
+          );
+
+          if (currentlyNeedsMute) {
+            // Mobile user hasn't interacted yet - keep muted for autoplay compliance
             player.mute();
             setIsMuted(true);
             mobileAutoMutedRef.current = true;
             setShowUnmuteBanner(true);
             console.log(
               "[VideoPlayer] Player ready - muted for mobile autoplay",
+            );
+          } else if (isMobileDevice() && hasUserInteractedRef.current) {
+            // Mobile user already interacted - unmute immediately
+            player.unMute();
+            setIsMuted(false);
+            mobileAutoMutedRef.current = false;
+            setShowUnmuteBanner(false);
+            console.log(
+              "[VideoPlayer] Player ready - unmuted (user previously interacted)",
             );
           }
 
