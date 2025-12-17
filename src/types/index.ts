@@ -30,3 +30,6 @@ export * from "./search";
 
 // Video player types (FEAT-800)
 export * from "./video";
+
+// Video summary types (FEAT-901)
+export * from "./video-summary";

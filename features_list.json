@@ -2,10 +2,10 @@
   "$schema": "./features_list.schema.json",
   "metadata": {
     "project": "sync",
-    "version": "0.4.0",
-    "lastUpdated": "2025-12-16T00:00:00.000Z",
+    "version": "0.5.0",
+    "lastUpdated": "2025-12-17T00:00:00.000Z",
     "protocol": "Long-Horizon Engineering Protocol v1.0",
-    "currentPhase": "Phase 8: Video Player"
+    "currentPhase": "Phase 9: Video Intelligence"
   },
   "phases": {
     "phase1": {
@@ -47,6 +47,11 @@
       "name": "Video Player",
       "status": "complete",
       "description": "Voice-activated synchronized YouTube video playback with playlist support"
+    },
+    "phase9": {
+      "name": "Video Intelligence",
+      "status": "in-progress",
+      "description": "Dual-mode voice-activated video summaries using YouTube API and transcript analysis"
     }
   },
   "features": [
@@ -1753,6 +1758,205 @@
       "testFile": "tests/unit/ai/voice-video-controls.test.ts",
       "dependencies": ["FEAT-805"],
       "passes": true
+    },
+    {
+      "id": "FEAT-901",
+      "phase": 9,
+      "category": "types",
+      "description": "Video summary types and interfaces for dual-mode video intelligence",
+      "priority": "critical",
+      "steps": [
+        "Create src/types/video-summary.ts with YouTubeVideoMetadata interface",
+        "Define VideoSummaryRequest interface with mode parameter (default/deep)",
+        "Define VideoSummaryResponse interface with structured summary",
+        "Define SummaryMode enum (default, deep)",
+        "Define TranscriptSegment interface for timestamped captions",
+        "Export all types from central index"
+      ],
+      "testFile": "tests/unit/types/video-summary.test.ts",
+      "dependencies": [],
+      "passes": true
+    },
+    {
+      "id": "FEAT-900",
+      "phase": 9,
+      "category": "api",
+      "description": "YouTube Data API v3 service for video metadata retrieval",
+      "priority": "critical",
+      "steps": [
+        "Create src/server/signaling/youtube-service.ts",
+        "Implement getVideoMetadata(videoId) method using YouTube Data API v3",
+        "Parse and type response with YouTubeVideoMetadata interface",
+        "Handle API errors, rate limits, and invalid video IDs",
+        "Add response caching with 15-minute TTL",
+        "Add YOUTUBE_API_KEY environment variable validation"
+      ],
+      "testFile": "tests/unit/api/youtube-service.test.ts",
+      "dependencies": ["FEAT-901"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-904",
+      "phase": 9,
+      "category": "ai",
+      "description": "LLM summary enhancement service for conversational video summaries",
+      "priority": "high",
+      "steps": [
+        "Create src/server/signaling/summary-llm-service.ts",
+        "Implement generateVideoSummary(metadata: YouTubeVideoMetadata) method",
+        "Use gpt-4o-mini with structured prompt for voice-friendly output",
+        "Format summary to include: title, creator, topic, key points (2-3)",
+        "Keep response concise (<100 words) for natural spoken delivery",
+        "Handle rate limits with fallback to raw metadata"
+      ],
+      "testFile": "tests/unit/ai/summary-llm-service.test.ts",
+      "dependencies": ["FEAT-901"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-902",
+      "phase": 9,
+      "category": "ai",
+      "description": "OpenAI Realtime API function calling for getVideoSummary tool",
+      "priority": "critical",
+      "steps": [
+        "Add GET_VIDEO_SUMMARY_TOOL function definition to openai-realtime-client.ts",
+        "Define getVideoSummary function with mode parameter (default/deep)",
+        "Add tool to session.update tools array alongside webSearch/playVideo",
+        "Handle response.output_item.done for getVideoSummary function_call type",
+        "Add onVideoSummary callback to OpenAIRealtimeCallbacks interface",
+        "Add to handleFunctionCall dispatcher in server.ts"
+      ],
+      "testFile": "tests/unit/ai/video-summary-function.test.ts",
+      "dependencies": ["FEAT-900", "FEAT-901"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-903",
+      "phase": 9,
+      "category": "signaling",
+      "description": "Video summary handler for default mode (YouTube API + LLM)",
+      "priority": "critical",
+      "steps": [
+        "Create handleVideoSummary function in server.ts",
+        "Extract current video ID from roomVideoStates[roomId]",
+        "Call YouTubeService.getVideoMetadata(videoId)",
+        "Call SummaryLLMService.generateVideoSummary(metadata)",
+        "Return structured summary for AI voice response",
+        "Handle errors gracefully with user-friendly messages"
+      ],
+      "testFile": "tests/unit/signaling/video-summary-handler.test.ts",
+      "dependencies": ["FEAT-900", "FEAT-902", "FEAT-904", "FEAT-803"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-907",
+      "phase": 9,
+      "category": "api",
+      "description": "YouTube transcript service for deep analysis mode",
+      "priority": "high",
+      "steps": [
+        "Create src/server/signaling/youtube-transcript-service.ts",
+        "Install youtube-transcript npm package for caption retrieval",
+        "Implement getTranscript(videoId) method returning timestamped segments",
+        "Handle videos without captions gracefully (return null)",
+        "Implement getTranscriptText(videoId) for plain text concatenation",
+        "Add language detection and preference handling",
+        "Cache transcripts with 1-hour TTL"
+      ],
+      "testFile": "tests/unit/api/youtube-transcript-service.test.ts",
+      "dependencies": ["FEAT-901"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-908",
+      "phase": 9,
+      "category": "ai",
+      "description": "Deep analysis LLM service for transcript-based video analysis",
+      "priority": "high",
+      "steps": [
+        "Create src/server/signaling/deep-analysis-service.ts",
+        "Implement analyzeTranscript(transcript, metadata) method",
+        "Use gpt-4o-mini with structured prompt for deep analysis",
+        "Extract: main topics, key points, speaker insights, timestamps",
+        "Format response for natural spoken delivery (~150 words max)",
+        "Handle long transcripts with chunking/summarization",
+        "Graceful fallback if transcript unavailable"
+      ],
+      "testFile": "tests/unit/ai/deep-analysis-service.test.ts",
+      "dependencies": ["FEAT-907", "FEAT-901"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-909",
+      "phase": 9,
+      "category": "signaling",
+      "description": "Dual-mode summary handler supporting default and deep modes",
+      "priority": "critical",
+      "steps": [
+        "Update getVideoSummary function tool with mode parameter detection",
+        "Modify handleVideoSummary to route based on mode",
+        "Default mode: YouTube API + LLM enhancement (~1-2s)",
+        "Deep mode: Fetch transcript + deep analysis (~3-10s)",
+        "Return structured response with mode indicator",
+        "Handle graceful fallback (deep → default if no transcript)"
+      ],
+      "testFile": "tests/unit/signaling/dual-mode-summary.test.ts",
+      "dependencies": ["FEAT-903", "FEAT-907", "FEAT-908"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-905",
+      "phase": 9,
+      "category": "signaling",
+      "description": "Socket.io video summary events for broadcasting to room",
+      "priority": "high",
+      "steps": [
+        "Add video:summary event emission with summary payload",
+        "Add video:summary-error event for error feedback",
+        "Broadcast summary to all room participants on success",
+        "Include metadata for optional future UI display",
+        "Handle late-joiner state (include last summary in video:state)"
+      ],
+      "testFile": "tests/unit/signaling/video-summary-events.test.ts",
+      "dependencies": ["FEAT-909", "FEAT-104"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-906",
+      "phase": 9,
+      "category": "hooks",
+      "description": "useVideoSummary hook for client-side summary state management",
+      "priority": "high",
+      "steps": [
+        "Create src/hooks/useVideoSummary.ts",
+        "Subscribe to video:summary and video:summary-error events",
+        "Manage summary state (current summary, loading, error)",
+        "Expose lastSummary with timestamp for recency tracking",
+        "Clear summary on video change or stop"
+      ],
+      "testFile": "tests/unit/hooks/useVideoSummary.test.ts",
+      "dependencies": ["FEAT-905", "FEAT-108"],
+      "passes": false
+    },
+    {
+      "id": "FEAT-910",
+      "phase": 9,
+      "category": "e2e",
+      "description": "E2E tests for voice-activated video summary flow",
+      "priority": "high",
+      "steps": [
+        "Test default mode trigger (what are we watching) via mocked PTT",
+        "Test deep mode trigger (analyze this video) via mocked PTT",
+        "Test summary appearing in AI voice response",
+        "Test deep analysis with transcript content",
+        "Test fallback when transcript unavailable",
+        "Test error handling for invalid/unavailable videos",
+        "Test summary when no video is playing"
+      ],
+      "testFile": "tests/e2e/video-summary.spec.ts",
+      "dependencies": ["FEAT-909"],
+      "passes": false
     }
   ],
   "categories": {
@@ -1777,10 +1981,11 @@
     "transcript": "Live transcript and AI context system",
     "search": "Voice-activated web search integration",
     "cleanup": "Codebase cleanup and architectural simplification",
-    "video": "Synchronized video playback and playlist management"
+    "video": "Synchronized video playback and playlist management",
+    "video-intelligence": "Voice-activated video summaries and transcript analysis"
   },
   "statistics": {
-    "total": 93,
+    "total": 104,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
@@ -1788,7 +1993,8 @@
     "phase6": 15,
     "phase7": 9,
     "phase8": 8,
+    "phase9": 11,
     "passed": 84,
-    "pending": 9
+    "pending": 20
   }
 }

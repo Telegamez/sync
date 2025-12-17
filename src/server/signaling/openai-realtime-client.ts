@@ -11,6 +11,7 @@ import WebSocket from "ws";
 import type { RoomId } from "@/types/room";
 import type { PeerId } from "@/types/peer";
 import type { FunctionCallEvent } from "@/types/search";
+import type { SummaryMode } from "@/types/video-summary";
 
 /**
  * OpenAI Realtime WebSocket endpoint
@@ -110,7 +111,13 @@ You are Telly. Always refer to yourself as "Telly". Never mention OpenAI, GPT, o
 - If they need more detail, they'll ask
 
 ## SEARCH CAPABILITY
-You have access to a webSearch function. Use it when users say "search", "look up", "find", "google", or ask about current events, news, or things requiring up-to-date information. After searching, briefly summarize the top results.`;
+You have access to a webSearch function. Use it when users say "search", "look up", "find", "google", or ask about current events, news, or things requiring up-to-date information. After searching, briefly summarize the top results.
+
+## VIDEO SUMMARY CAPABILITY
+You have access to a getVideoSummary function. Use it when users ask about the video they're watching:
+- For quick summaries ("what are we watching", "what is this", "quick summary") → use mode: "default"
+- For deep analysis ("analyze this video", "deep dive", "what topics are covered") → use mode: "deep"
+After getting the summary, naturally relay the information to the group.`;
 
 /**
  * webSearch function tool definition for OpenAI
@@ -137,6 +144,43 @@ const WEB_SEARCH_TOOL = {
     required: ["query"],
   },
 };
+
+/**
+ * getVideoSummary function tool definition for OpenAI
+ *
+ * Enables voice-activated video summaries during shared YouTube viewing.
+ * Supports two modes:
+ * - default: Quick summary (~1-2s) using YouTube metadata + LLM
+ * - deep: Comprehensive analysis (~3-10s) using transcript
+ *
+ * Part of the Long-Horizon Engineering Protocol - FEAT-902
+ */
+const GET_VIDEO_SUMMARY_TOOL = {
+  type: "function" as const,
+  name: "getVideoSummary",
+  description:
+    "Get a summary of the YouTube video currently playing in the room. Use 'default' mode for quick summaries when users say 'what are we watching', 'what is this video', 'quick summary'. Use 'deep' mode for comprehensive transcript analysis when users say 'analyze this video', 'deep dive', 'what topics are covered', 'give me a detailed breakdown'.",
+  parameters: {
+    type: "object",
+    properties: {
+      mode: {
+        type: "string",
+        enum: ["default", "deep"],
+        description:
+          "Summary mode. 'default' for quick metadata-based summary (~1-2s), 'deep' for comprehensive transcript-based analysis (~3-10s). Defaults to 'default'.",
+      },
+    },
+    required: [],
+  },
+};
+
+/**
+ * Arguments for getVideoSummary function call
+ */
+export interface VideoSummaryFunctionArgs {
+  /** Summary mode (default/deep) */
+  mode?: SummaryMode;
+}
 
 /**
  * OpenAI Realtime Client for Server-Side Connections
@@ -608,14 +652,14 @@ export class OpenAIRealtimeClient {
         temperature: this.config.temperature ?? 0.8,
         turn_detection: null, // Disable server VAD - we use PTT
         // Function calling tools
-        tools: [WEB_SEARCH_TOOL],
+        tools: [WEB_SEARCH_TOOL, GET_VIDEO_SUMMARY_TOOL],
         tool_choice: "auto",
       },
     };
 
     session.ws.send(JSON.stringify(config));
     console.log(
-      `[OpenAI] Session configured for room ${session.roomId} (with webSearch tool)`,
+      `[OpenAI] Session configured for room ${session.roomId} (with webSearch and getVideoSummary tools)`,
     );
   }
 
