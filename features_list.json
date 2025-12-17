@@ -1847,7 +1847,7 @@
       ],
       "testFile": "tests/unit/signaling/video-summary-handler.test.ts",
       "dependencies": ["FEAT-900", "FEAT-902", "FEAT-904", "FEAT-803"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FEAT-907",
