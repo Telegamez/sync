@@ -355,29 +355,33 @@ export function VideoPlayerOverlay({
   }, [isOpen]);
 
   // Handle user interaction to enable sound on mobile
+  // This is called when user taps the unmute banner/button
   const handleUserInteraction = useCallback(() => {
-    if (
-      isMobile &&
-      !hasUserInteractedRef.current &&
-      mobileAutoMutedRef.current
-    ) {
-      console.log("[VideoPlayer] User interaction detected - unmuting");
+    if (!isMobile || !mobileAutoMutedRef.current) {
+      return; // Not mobile or not in auto-muted state
+    }
+
+    console.log("[VideoPlayer] User interaction detected - unmuting");
+
+    // Mark as interacted (for future videos in session)
+    if (!hasUserInteractedRef.current) {
       setHasUserInteracted(true);
       hasUserInteractedRef.current = true;
-      setShowUnmuteBanner(false);
-
-      // Persist to both module variable and sessionStorage
       persistInteraction();
+    }
 
-      // Unmute the player
-      if (playerRef.current) {
-        try {
-          playerRef.current.unMute();
-          setIsMuted(false);
-          mobileAutoMutedRef.current = false;
-        } catch (e) {
-          console.warn("[VideoPlayer] Could not unmute:", e);
-        }
+    // Hide banner and unmute
+    setShowUnmuteBanner(false);
+
+    // Unmute the player
+    if (playerRef.current) {
+      try {
+        playerRef.current.unMute();
+        setIsMuted(false);
+        mobileAutoMutedRef.current = false;
+        console.log("[VideoPlayer] Player unmuted successfully");
+      } catch (e) {
+        console.warn("[VideoPlayer] Could not unmute:", e);
       }
     }
   }, [isMobile]);
@@ -759,16 +763,6 @@ export function VideoPlayerOverlay({
           <h2 className="text-sm font-medium text-gray-200 truncate">
             {currentVideo?.title || "Loading..."}
           </h2>
-          {/* Muted indicator badge - shown when muted but banner dismissed */}
-          {isMuted && !showUnmuteBanner && isMobile && (
-            <button
-              onClick={handleUserInteraction}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-amber-400 bg-amber-500/20 rounded-full hover:bg-amber-500/30 transition-colors animate-pulse"
-            >
-              <VolumeX className="w-3 h-3" />
-              <span>Tap to unmute</span>
-            </button>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -804,9 +798,9 @@ export function VideoPlayerOverlay({
               style={{ aspectRatio: "16/9" }}
             />
 
-            {/* Mobile tap-to-unmute overlays */}
-            {showUnmuteBanner ? (
-              // First-time user: show prominent banner
+            {/* Mobile tap-to-unmute overlay - ONLY for first-time users */}
+            {/* Returning users (hasUserInteracted=true) just use the mute button in controls */}
+            {showUnmuteBanner && (
               <button
                 onClick={handleUserInteraction}
                 className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-300"
@@ -826,20 +820,7 @@ export function VideoPlayerOverlay({
                   </div>
                 </div>
               </button>
-            ) : isMobile && isMuted && mobileAutoMutedRef.current ? (
-              // Returning user: transparent overlay + small corner indicator
-              <button
-                onClick={handleUserInteraction}
-                className="absolute inset-0 z-10 flex items-end justify-end p-4"
-                aria-label="Tap anywhere to unmute video"
-              >
-                {/* Small floating unmute indicator in corner */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/90 text-black rounded-full text-sm font-medium shadow-lg animate-bounce">
-                  <VolumeX className="w-4 h-4" />
-                  <span>Tap to unmute</span>
-                </div>
-              </button>
-            ) : null}
+            )}
           </div>
 
           {/* Controls */}
