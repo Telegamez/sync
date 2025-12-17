@@ -48,6 +48,7 @@ import { useTranscript } from "@/hooks/useTranscript";
 import { useAmbientTranscription } from "@/hooks/useAmbientTranscription";
 import { useSearch } from "@/hooks/useSearch";
 import { useVideo } from "@/hooks/useVideo";
+import { useAuth } from "@/contexts/AuthContext";
 import type { AIResponseState } from "@/types/voice-mode";
 
 /**
@@ -126,6 +127,9 @@ export default function RoomPage() {
   const roomId = params.roomId;
   const router = useRouter();
 
+  // Auth state - for getting user's first name as default username
+  const { user, state: authState } = useAuth();
+
   // Room state
   const [roomState, setRoomState] = useState<RoomState>("loading");
   const [error, setError] = useState<RoomError | null>(null);
@@ -146,6 +150,23 @@ export default function RoomPage() {
     }
     return "User";
   });
+
+  // Set displayName from authenticated user's profile (first name) if no vanity name is set
+  useEffect(() => {
+    if (authState !== "authenticated" || !user?.displayName) return;
+
+    // Don't override if user has a vanity username set
+    const vanity = localStorage.getItem("sync_vanityUsername");
+    if (vanity) return;
+
+    // Extract first name from user's displayName (could be "John Doe" from OAuth)
+    const firstName = user.displayName.split(" ")[0];
+    if (firstName && firstName !== "User") {
+      setDisplayName(firstName);
+      sessionStorage.setItem("sync_displayName", firstName);
+    }
+  }, [authState, user?.displayName]);
+
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [showParticipantModal, setShowParticipantModal] = useState(false);
   const [selectedParticipant, setSelectedParticipant] =
@@ -305,22 +326,67 @@ export default function RoomPage() {
     peerId: localPeer?.id || null,
   });
 
-  // Auto-show search panel when new results arrive
+  // Track previous search results to only auto-show on NEW results
+  const prevSearchResultsRef = useRef<typeof search.results>(null);
+
+  // Panel toggle handlers - ensure only one overlay is visible at a time
+  // When opening a panel, close all others first (Transcript, Search, Videos)
+  const toggleTranscriptPanel = useCallback(
+    (forceOpen?: boolean) => {
+      const shouldOpen = forceOpen !== undefined ? forceOpen : !showTranscript;
+      if (shouldOpen) {
+        // Close other panels before opening transcript
+        setShowSearch(false);
+        // Close video player if open
+        if (video.isPlayerOpen) {
+          video.closePlayer();
+        }
+      }
+      setShowTranscript(shouldOpen);
+    },
+    [showTranscript, video],
+  );
+
+  const toggleSearchPanel = useCallback(
+    (forceOpen?: boolean) => {
+      const shouldOpen = forceOpen !== undefined ? forceOpen : !showSearch;
+      if (shouldOpen) {
+        // Close other panels before opening search
+        setShowTranscript(false);
+        // Close video player if open
+        if (video.isPlayerOpen) {
+          video.closePlayer();
+        }
+      }
+      setShowSearch(shouldOpen);
+    },
+    [showSearch, video],
+  );
+
+  // Auto-show search panel when NEW results arrive (not on re-renders)
+  // Only trigger when search.results reference changes to a new non-null value
   useEffect(() => {
-    if (
+    const hasResults =
       search.results &&
       search.results.web.length +
         search.results.images.length +
         search.results.videos.length >
-        0
-    ) {
+        0;
+    const isNewResults = search.results !== prevSearchResultsRef.current;
+
+    if (hasResults && isNewResults && !video.isPlayerOpen) {
+      // New search results arrived and video isn't playing - show search panel
+      setShowTranscript(false);
       setShowSearch(true);
     }
-  }, [search.results]);
 
-  // Auto-hide panels when video player opens
+    prevSearchResultsRef.current = search.results;
+  }, [search.results, video.isPlayerOpen]);
+
+  // Auto-hide other panels when video player opens
   useEffect(() => {
     if (video.isPlayerOpen) {
+      // Video player is opening - close other panels
       setShowSearch(false);
       setShowTranscript(false);
     }
@@ -1074,7 +1140,7 @@ export default function RoomPage() {
               {/* Search toggle button - shows when search results exist */}
               {search.results && (
                 <button
-                  onClick={() => setShowSearch(!showSearch)}
+                  onClick={() => toggleSearchPanel()}
                   className={`flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg transition-colors ${
                     showSearch
                       ? "bg-primary/10 text-primary border-primary/50"
@@ -1091,7 +1157,7 @@ export default function RoomPage() {
               {/* Transcript toggle button - only show if transcript is enabled for room */}
               {isTranscriptEnabled && (
                 <button
-                  onClick={() => setShowTranscript(!showTranscript)}
+                  onClick={() => toggleTranscriptPanel()}
                   className={`flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg transition-colors ${
                     showTranscript
                       ? "bg-primary/10 text-primary border-primary/50"
