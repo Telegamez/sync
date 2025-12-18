@@ -10,7 +10,12 @@
  */
 
 // Load environment variables from .env file
-import "dotenv/config";
+import dotenv from "dotenv";
+
+const dotenvResult = dotenv.config();
+if (dotenvResult.parsed?.XAI_API_KEY) {
+  process.env.XAI_API_KEY = dotenvResult.parsed.XAI_API_KEY;
+}
 
 import { createServer } from "http";
 import { parse } from "url";

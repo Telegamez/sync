@@ -59,6 +59,59 @@ const OPENAI_REALTIME_MODEL = "gpt-4o-realtime-preview-2024-12-17";
 
 // XAI Realtime API configuration
 const XAI_REALTIME_URL = "wss://api.x.ai/v1/realtime";
+const XAI_REALTIME_CLIENT_SECRETS_URL =
+  "https://api.x.ai/v1/realtime/client_secrets";
+
+const createXaiRealtimeClientSecret = async (): Promise<string> => {
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("XAI API key not configured");
+  }
+
+  const response = await fetch(XAI_REALTIME_CLIENT_SECRETS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      expires_after: { seconds: 300 },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Failed to create XAI realtime client secret: ${response.status} ${errorText}`,
+    );
+  }
+
+  const data = (await response.json()) as Record<string, unknown>;
+  const clientSecretCandidate = data.client_secret;
+
+  const clientSecret =
+    (typeof clientSecretCandidate === "string"
+      ? clientSecretCandidate
+      : typeof clientSecretCandidate === "object" &&
+          clientSecretCandidate !== null &&
+          "value" in clientSecretCandidate &&
+          typeof (clientSecretCandidate as { value?: unknown }).value ===
+            "string"
+        ? (clientSecretCandidate as { value: string }).value
+        : null) ||
+    (typeof data.value === "string" ? data.value : null) ||
+    (typeof data.token === "string" ? data.token : null) ||
+    (typeof data.secret === "string" ? data.secret : null) ||
+    (typeof data.access_token === "string" ? data.access_token : null);
+
+  if (!clientSecret) {
+    throw new Error(
+      `XAI realtime client secret response did not include a usable token`,
+    );
+  }
+
+  return clientSecret;
+};
 
 /**
  * Generate preview using OpenAI Realtime API via WebSocket
@@ -238,15 +291,13 @@ async function generateXAIPreview(
   voiceId: string,
   text: string,
 ): Promise<ArrayBuffer> {
-  const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("XAI API key not configured");
-  }
+  const clientSecret = await createXaiRealtimeClientSecret();
 
   console.log(`[Voice Preview] Generating XAI preview for ${voiceId}`);
 
   return new Promise((resolve, reject) => {
     const audioChunks: Buffer[] = [];
+    let sessionConfigSent = false;
     let sessionConfigured = false;
     let responseStarted = false;
     const timeout = setTimeout(() => {
@@ -256,29 +307,37 @@ async function generateXAIPreview(
 
     const ws = new WebSocket(XAI_REALTIME_URL, {
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${clientSecret}`,
         "Content-Type": "application/json",
       },
     });
 
+    ws.on("unexpected-response", (_, response) => {
+      const statusCode = response.statusCode || 0;
+      const chunks: Buffer[] = [];
+
+      response.on("data", (chunk) => {
+        if (chunks.reduce((sum, b) => sum + b.length, 0) < 4096) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        }
+      });
+
+      response.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8").slice(0, 4096);
+        console.error(
+          `[Voice Preview] XAI WebSocket unexpected response: ${statusCode} ${body}`,
+        );
+        clearTimeout(timeout);
+        reject(
+          new Error(
+            `XAI WebSocket unexpected response: ${statusCode}${body ? ` ${body}` : ""}`,
+          ),
+        );
+      });
+    });
+
     ws.on("open", () => {
       console.log(`[Voice Preview] XAI WebSocket connected for ${voiceId}`);
-
-      // Configure session with the selected voice
-      const sessionUpdate = {
-        type: "session.update",
-        session: {
-          modalities: ["text", "audio"],
-          voice: voiceId,
-          instructions: `You are a voice assistant. When asked to speak, say exactly what is requested without any additional commentary. Speak naturally and expressively.`,
-          input_audio_format: "pcm16",
-          output_audio_format: "pcm16",
-          input_audio_transcription: null,
-          turn_detection: null, // Manual mode - we control when to respond
-        },
-      };
-
-      ws.send(JSON.stringify(sessionUpdate));
     });
 
     ws.on("message", (data: Buffer) => {
@@ -286,6 +345,39 @@ async function generateXAIPreview(
         const message = JSON.parse(data.toString());
 
         switch (message.type) {
+          case "conversation.created":
+          case "session.created":
+            if (!sessionConfigSent) {
+              sessionConfigSent = true;
+
+              // Configure session with the selected voice (cookbook-compatible shape)
+              const sessionUpdate = {
+                type: "session.update",
+                session: {
+                  instructions: `You are a voice assistant. When asked to speak, say exactly what is requested without any additional commentary. Speak naturally and expressively.`,
+                  voice: voiceId,
+                  audio: {
+                    input: {
+                      format: {
+                        type: "audio/pcm",
+                        rate: 24000,
+                      },
+                    },
+                    output: {
+                      format: {
+                        type: "audio/pcm",
+                        rate: 24000,
+                      },
+                    },
+                  },
+                  turn_detection: null,
+                },
+              };
+
+              ws.send(JSON.stringify(sessionUpdate));
+            }
+            break;
+
           case "session.created":
           case "session.updated":
             if (!sessionConfigured) {
@@ -311,17 +403,13 @@ async function generateXAIPreview(
               ws.send(JSON.stringify(conversationItem));
 
               // Trigger the response - must include both audio and text modalities
-              const responseCreate = {
-                type: "response.create",
-                response: {
-                  modalities: ["audio", "text"],
-                },
-              };
+              const responseCreate = { type: "response.create" };
               ws.send(JSON.stringify(responseCreate));
             }
             break;
 
           case "response.audio.delta":
+          case "response.output_audio.delta":
             // Collect audio chunks
             if (message.delta) {
               responseStarted = true;
@@ -331,6 +419,7 @@ async function generateXAIPreview(
             break;
 
           case "response.audio.done":
+          case "response.output_audio.done":
           case "response.done":
             if (responseStarted && audioChunks.length > 0) {
               clearTimeout(timeout);
