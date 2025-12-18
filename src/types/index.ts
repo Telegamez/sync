@@ -33,3 +33,6 @@ export * from "./video";
 
 // Video summary types (FEAT-901)
 export * from "./video-summary";
+
+// Voice AI provider types (FEAT-1000)
+export * from "./voice-ai-provider";

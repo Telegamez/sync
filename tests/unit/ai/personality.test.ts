@@ -239,7 +239,7 @@ describe("AIPersonalityManager", () => {
 
     it("should get suggested voice from preset", () => {
       manager.setPersonality(roomId, "facilitator");
-      expect(manager.getSuggestedVoice(roomId)).toBe("coral");
+      expect(manager.getSuggestedVoice(roomId)).toBe("marin");
     });
 
     it("should prefer voice override over preset", () => {

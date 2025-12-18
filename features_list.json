@@ -52,6 +52,11 @@
       "name": "Video Intelligence",
       "status": "in-progress",
       "description": "Dual-mode voice-activated video summaries using YouTube API and transcript analysis"
+    },
+    "phase10": {
+      "name": "Multi-Provider Voice AI",
+      "status": "in-progress",
+      "description": "Switchable voice-to-voice AI providers (OpenAI Realtime / XAI Grok Voice) via environment configuration"
     }
   },
   "features": [
@@ -1957,6 +1962,144 @@
       "testFile": "tests/e2e/video-summary.spec.ts",
       "dependencies": ["FEAT-909"],
       "passes": false
+    },
+    {
+      "id": "FEAT-1000",
+      "phase": 10,
+      "category": "types",
+      "description": "Voice AI provider types and interfaces for multi-provider architecture",
+      "priority": "critical",
+      "steps": [
+        "Create src/types/voice-ai-provider.ts with VoiceAIProviderType enum (openai, xai)",
+        "Define VoiceAIProviderConfig interface for provider-specific configuration",
+        "Define VoiceMapping for personality-to-voice translation across providers",
+        "Define AudioConfig interface with format and sample rate settings",
+        "Define FunctionToolDefinition interface compatible with both providers",
+        "Define VoiceAIProviderCallbacks interface for event handling",
+        "Define ProviderCapabilities interface with provider feature flags",
+        "Export all types from central index"
+      ],
+      "testFile": "tests/unit/types/voice-ai-provider.test.ts",
+      "dependencies": [],
+      "passes": true
+    },
+    {
+      "id": "FEAT-1001",
+      "phase": 10,
+      "category": "ai",
+      "description": "OpenAI Realtime provider adapter implementing IVoiceAIProvider interface",
+      "priority": "critical",
+      "steps": [
+        "Create src/server/ai-providers/openai-realtime-provider.ts",
+        "Implement IVoiceAIProvider interface for OpenAI Realtime API",
+        "Extract WebSocket connection logic from server.ts",
+        "Implement session.update with proper OpenAI format",
+        "Implement audio buffer management (append, commit)",
+        "Implement function calling with webSearch, playVideo, getVideoSummary tools",
+        "Implement voice mapping from personality to OpenAI voices",
+        "Handle all OpenAI-specific event types"
+      ],
+      "testFile": "tests/unit/ai-providers/openai-realtime-provider.test.ts",
+      "dependencies": ["FEAT-1000"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-1002",
+      "phase": 10,
+      "category": "ai",
+      "description": "XAI Grok Voice provider adapter implementing IVoiceAIProvider interface",
+      "priority": "critical",
+      "steps": [
+        "Create src/server/ai-providers/xai-grok-provider.ts",
+        "Implement IVoiceAIProvider interface for XAI Grok Voice API",
+        "Use wss://api.x.ai/v1/realtime WebSocket endpoint",
+        "Implement session.update with XAI-compatible format",
+        "Configure custom functions only (no web_search, x_search, file_search)",
+        "Implement voice mapping from personality to XAI voices (sal, rex, eve, leo, ara)",
+        "Handle XAI-specific audio format options (pcm with configurable rate)",
+        "Ensure function tool definitions match XAI JSON schema format"
+      ],
+      "testFile": "tests/unit/ai-providers/xai-grok-provider.test.ts",
+      "dependencies": ["FEAT-1000"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-1003",
+      "phase": 10,
+      "category": "ai",
+      "description": "Voice AI provider factory with environment-based provider selection",
+      "priority": "critical",
+      "steps": [
+        "Create src/server/ai-providers/voice-ai-factory.ts",
+        "Read VOICE_AI_PROVIDER from process.env (default: openai)",
+        "Read XAI_API_KEY for XAI provider authentication",
+        "Implement createProvider() factory method",
+        "Validate API key presence for selected provider",
+        "Log provider selection on startup",
+        "Export singleton provider instance for server.ts",
+        "Add environment variable documentation"
+      ],
+      "testFile": "tests/unit/ai-providers/voice-ai-factory.test.ts",
+      "dependencies": ["FEAT-1001", "FEAT-1002"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-1004",
+      "phase": 10,
+      "category": "signaling",
+      "description": "Refactor server.ts to use VoiceAIProvider abstraction",
+      "priority": "critical",
+      "steps": [
+        "Import VoiceAIProvider factory in server.ts",
+        "Replace direct WebSocket creation with provider.createSession()",
+        "Replace audio buffer operations with provider.sendAudio(), provider.commitAudio()",
+        "Replace response creation with provider.triggerResponse()",
+        "Replace function output with provider.sendFunctionOutput()",
+        "Use provider.getVoice() for personality-to-voice mapping",
+        "Keep all Socket.io event handling unchanged",
+        "Maintain backward compatibility with existing room functionality"
+      ],
+      "testFile": "tests/unit/signaling/multi-provider-integration.test.ts",
+      "dependencies": ["FEAT-1003"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-1005",
+      "phase": 10,
+      "category": "config",
+      "description": "Environment configuration for multi-provider voice AI",
+      "priority": "high",
+      "steps": [
+        "Add VOICE_AI_PROVIDER to .env.example (openai | xai, default: openai)",
+        "Add XAI_API_KEY to .env.example",
+        "Update startup logging to show active voice AI provider",
+        "Add provider capability check on startup",
+        "Document provider-specific environment requirements",
+        "Verify Serper API key is used for search regardless of voice provider"
+      ],
+      "testFile": "N/A - configuration feature verified by startup logs",
+      "dependencies": ["FEAT-1003"],
+      "passes": true
+    },
+    {
+      "id": "FEAT-1006",
+      "phase": 10,
+      "category": "e2e",
+      "description": "E2E tests for multi-provider voice AI switching",
+      "priority": "high",
+      "steps": [
+        "Test OpenAI provider initialization with VOICE_AI_PROVIDER=openai",
+        "Test XAI provider initialization with VOICE_AI_PROVIDER=xai",
+        "Test PTT audio flow with OpenAI provider",
+        "Test PTT audio flow with XAI provider",
+        "Test webSearch function calling works with both providers",
+        "Test playVideo function calling works with both providers",
+        "Test error handling when provider API key is missing",
+        "Verify Serper API is used for search with both providers"
+      ],
+      "testFile": "tests/e2e/multi-provider-voice.spec.ts",
+      "dependencies": ["FEAT-1004", "FEAT-1005"],
+      "passes": true
     }
   ],
   "categories": {
@@ -1982,10 +2125,11 @@
     "search": "Voice-activated web search integration",
     "cleanup": "Codebase cleanup and architectural simplification",
     "video": "Synchronized video playback and playlist management",
-    "video-intelligence": "Voice-activated video summaries and transcript analysis"
+    "video-intelligence": "Voice-activated video summaries and transcript analysis",
+    "config": "Environment and configuration management"
   },
   "statistics": {
-    "total": 104,
+    "total": 111,
     "phase2": 23,
     "phase3": 14,
     "phase4": 11,
@@ -1994,7 +2138,8 @@
     "phase7": 9,
     "phase8": 8,
     "phase9": 11,
+    "phase10": 7,
     "passed": 84,
-    "pending": 20
+    "pending": 27
   }
 }

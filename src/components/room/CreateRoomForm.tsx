@@ -5,6 +5,7 @@
  *
  * Part of the Long-Horizon Engineering Protocol - FEAT-113
  * Updated in FEAT-513 to add transcript settings
+ * Updated in FEAT-1007 to add voice selection
  */
 
 "use client";
@@ -18,13 +19,16 @@ import {
   Lightbulb,
   FileText,
   Clock,
+  Volume2,
 } from "lucide-react";
 import type { CreateRoomRequest, AIPersonality } from "@/types/room";
+import type { VoiceOption } from "@/types/voice-ai-provider";
 import type {
   RoomTranscriptSettings,
   TranscriptRetention,
 } from "@/types/transcript";
 import { DEFAULT_TRANSCRIPT_SETTINGS } from "@/types/transcript";
+import { VoiceSelector } from "./VoiceSelector";
 
 /**
  * Props for the CreateRoomForm component
@@ -192,6 +196,9 @@ export function CreateRoomForm({
   const [aiPersonality, setAIPersonality] = useState<AIPersonality>(
     initialValues.aiPersonality ?? "assistant",
   );
+  const [aiVoice, setAIVoice] = useState<VoiceOption | undefined>(
+    initialValues.aiVoice,
+  );
   const [aiTopic, setAITopic] = useState(initialValues.aiTopic ?? "");
 
   // Transcript settings state
@@ -337,6 +344,7 @@ export function CreateRoomForm({
           description: description.trim() || undefined,
           maxParticipants,
           aiPersonality,
+          aiVoice,
           aiTopic: aiTopic.trim() || undefined,
           transcriptSettings: {
             enabled: transcriptEnabled,
@@ -356,6 +364,7 @@ export function CreateRoomForm({
       description,
       maxParticipants,
       aiPersonality,
+      aiVoice,
       aiTopic,
       transcriptEnabled,
       summariesEnabled,
@@ -543,6 +552,19 @@ export function CreateRoomForm({
             accordingly.
           </p>
         )}
+      </div>
+
+      {/* AI Voice Selection */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Volume2 className="w-4 h-4" />
+          AI Voice
+        </label>
+        <VoiceSelector
+          value={aiVoice}
+          onChange={setAIVoice}
+          disabled={isSubmitting}
+        />
       </div>
 
       {/* Transcript Settings */}

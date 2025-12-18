@@ -66,6 +66,7 @@ export function createRoom(request: CreateRoomRequest, ownerId: PeerId): Room {
     maxParticipants: request.maxParticipants ?? 6,
     status: "waiting",
     aiPersonality: request.aiPersonality ?? "facilitator",
+    aiVoice: request.aiVoice, // FEAT-1007: Voice selection
     customInstructions: request.customInstructions,
     aiTopic: request.aiTopic,
     voiceSettings: {

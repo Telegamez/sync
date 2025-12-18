@@ -37,6 +37,7 @@ function validateCreateRequest(body: unknown): {
     description,
     maxParticipants,
     aiPersonality,
+    aiVoice, // FEAT-1007: Voice selection
     aiTopic,
     customInstructions,
     voiceSettings,
@@ -126,6 +127,7 @@ function validateCreateRequest(body: unknown): {
       description: description?.trim(),
       maxParticipants,
       aiPersonality,
+      aiVoice, // FEAT-1007: Voice selection
       aiTopic: aiTopic?.trim(),
       customInstructions: customInstructions?.trim(),
       voiceSettings,

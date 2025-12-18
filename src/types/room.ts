@@ -3,11 +3,13 @@
  *
  * Core types for Sync shared room functionality.
  * Part of the Long-Horizon Engineering Protocol - FEAT-100
+ * Updated in FEAT-1007 to add voice selection
  */
 
 import type { Peer, PeerId } from "./peer";
 import type { RoomVoiceSettings } from "./voice-mode";
 import type { RoomTranscriptSettings } from "./transcript";
+import type { VoiceOption } from "./voice-ai-provider";
 
 /**
  * Unique identifier for a room
@@ -41,6 +43,8 @@ export interface CreateRoomRequest {
   maxParticipants?: number;
   /** AI personality preset */
   aiPersonality?: AIPersonality;
+  /** Selected AI voice (provider-specific, e.g., "marin" for OpenAI, "ara" for XAI) */
+  aiVoice?: VoiceOption;
   /** Custom AI instructions (when aiPersonality is 'custom') */
   customInstructions?: string;
   /** Topic/domain for AI expertise (e.g., "real estate broker", "software engineering") */
@@ -67,6 +71,8 @@ export interface Room {
   status: RoomStatus;
   /** AI personality configuration */
   aiPersonality: AIPersonality;
+  /** Selected AI voice (provider-specific) */
+  aiVoice?: VoiceOption;
   /** Custom AI instructions */
   customInstructions?: string;
   /** Topic/domain for AI expertise */
@@ -98,6 +104,8 @@ export interface RoomSummary {
   participantCount: number;
   status: RoomStatus;
   aiPersonality: AIPersonality;
+  /** Selected AI voice */
+  aiVoice?: VoiceOption;
   /** Topic/domain for AI expertise (e.g., "real estate broker", "software engineering") */
   aiTopic?: string;
   createdAt: Date;
@@ -143,6 +151,7 @@ export interface UpdateRoomRequest {
   description?: string;
   maxParticipants?: number;
   aiPersonality?: AIPersonality;
+  aiVoice?: VoiceOption;
   customInstructions?: string;
   voiceSettings?: Partial<RoomVoiceSettings>;
 }

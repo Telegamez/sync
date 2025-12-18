@@ -329,6 +329,7 @@ export class ContextManager {
     speakerId?: PeerId,
     audioDurationMs?: number,
     entryType: TranscriptEntryType = "ptt",
+    speakerNameOverride?: string, // FEAT-502: Allow passing speaker name when ID is unknown
   ): ConversationMessage | null {
     const context = this.contexts.get(roomId);
     if (!context) {
@@ -336,9 +337,10 @@ export class ContextManager {
       return null;
     }
 
-    const speakerName = speakerId
-      ? context.participants.get(speakerId)
-      : undefined;
+    // Use override if provided, otherwise look up from participants
+    const speakerName =
+      speakerNameOverride ||
+      (speakerId ? context.participants.get(speakerId) : undefined);
 
     // Format content with speaker attribution
     const attributedContent = speakerName

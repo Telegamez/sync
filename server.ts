@@ -3,9 +3,10 @@
  *
  * This server starts Next.js and attaches Socket.io for real-time signaling.
  * Required for WebRTC peer connections and room coordination.
- * Includes OpenAI Realtime API integration for shared AI in rooms.
+ * Includes Voice AI provider integration for shared AI in rooms.
+ * FEAT-1008: Multi-provider support (OpenAI/XAI) via provider factory.
  *
- * Part of the Long-Horizon Engineering Protocol - FEAT-411, FEAT-413
+ * Part of the Long-Horizon Engineering Protocol - FEAT-411, FEAT-413, FEAT-1008
  */
 
 // Load environment variables from .env file
@@ -17,6 +18,20 @@ import next from "next";
 import { Server as SocketIOServer } from "socket.io";
 import { nanoid } from "nanoid";
 import { WebSocket } from "ws";
+
+// FEAT-1008: Voice AI Provider imports
+import type {
+  IVoiceAIProvider,
+  VoiceAIProviderCallbacks,
+  VoiceAISessionConfig,
+  FunctionToolDefinition,
+  VoiceAIProviderType,
+} from "./src/types/voice-ai-provider";
+import {
+  createVoiceAIProvider,
+  getConfiguredProviderType,
+  getProviderDisplayName,
+} from "./src/server/ai-providers/voice-ai-factory";
 
 // Note: We cannot import from ./src/server/store/rooms because Next.js runs in a separate process
 // with its own memory. Instead, we fetch room config from the API when needed.
@@ -88,6 +103,7 @@ interface Room {
   maxParticipants: number;
   createdAt: Date;
   aiPersonality: AIPersonality;
+  aiVoice?: string;
   aiTopic?: string;
   customInstructions?: string;
   transcriptSettings: RoomTranscriptSettings;
@@ -102,6 +118,7 @@ interface RoomSummary {
   participantCount: number;
   status: "waiting" | "active" | "full" | "closed";
   aiPersonality: AIPersonality;
+  aiVoice?: string;
   aiTopic?: string;
   createdAt: Date;
 }
@@ -116,6 +133,7 @@ function toRoomSummary(room: Room): RoomSummary {
     maxParticipants: room.maxParticipants,
     status: room.status,
     aiPersonality: room.aiPersonality,
+    aiVoice: room.aiVoice,
     aiTopic: room.aiTopic,
     createdAt: room.createdAt,
   };
@@ -142,6 +160,7 @@ interface RoomAISession {
   isConnected: boolean;
   // Room AI configuration
   aiPersonality: AIPersonality;
+  aiVoice?: string;
   aiTopic?: string;
   customInstructions?: string;
   // Interrupt handling - ignore audio events until next PTT session
@@ -155,7 +174,7 @@ interface RoomAISession {
   lastSpeakerName: string | null;
 }
 
-/** OpenAI Realtime WebSocket endpoint */
+/** OpenAI Realtime WebSocket endpoint (kept for fallback reference) */
 const OPENAI_REALTIME_WS_URL = "wss://api.openai.com/v1/realtime";
 const OPENAI_MODEL = "gpt-4o-realtime-preview-2024-12-17";
 
@@ -165,11 +184,52 @@ console.log(
   `[Server] OpenAI API key configured: ${OPENAI_API_KEY ? "Yes" : "No"}`,
 );
 
+/** XAI API key from environment */
+const XAI_API_KEY = process.env.XAI_API_KEY;
+console.log(`[Server] XAI API key configured: ${XAI_API_KEY ? "Yes" : "No"}`);
+
 /** Serper API key for web search */
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
 console.log(
   `[Server] Serper API key configured: ${SERPER_API_KEY ? "Yes" : "No"}`,
 );
+
+// ============================================================
+// FEAT-1008: VOICE AI PROVIDER INITIALIZATION
+// ============================================================
+
+/** Current voice AI provider type */
+const VOICE_AI_PROVIDER_TYPE: VoiceAIProviderType = getConfiguredProviderType();
+console.log(
+  `[Server] Voice AI Provider: ${getProviderDisplayName(VOICE_AI_PROVIDER_TYPE)}`,
+);
+
+/** Global voice AI provider instance (initialized lazily) */
+let voiceAIProvider: IVoiceAIProvider | null = null;
+
+/**
+ * Get or create the voice AI provider
+ * Lazily initialized to allow server to start even if API keys are missing
+ */
+function getVoiceAIProvider(): IVoiceAIProvider | null {
+  if (voiceAIProvider) {
+    return voiceAIProvider;
+  }
+
+  try {
+    const result = createVoiceAIProvider({ debug: true });
+    voiceAIProvider = result.provider;
+    console.log(
+      `[Server] Voice AI Provider initialized: ${getProviderDisplayName(result.providerType)}`,
+    );
+    return voiceAIProvider;
+  } catch (error) {
+    console.warn(
+      `[Server] Failed to initialize Voice AI Provider: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return null;
+  }
+}
 
 /**
  * webSearch function tool definition for OpenAI
@@ -363,16 +423,21 @@ For example, start with "Hey ${speakerName}," or "${speakerName}, ..." or includ
 
 /**
  * Get personality configuration for OpenAI session
+ * @param personality - The AI personality preset
+ * @param voiceOverride - Optional voice to use instead of personality default (FEAT-1007)
  */
-function getPersonalityConfig(personality: AIPersonality): {
+function getPersonalityConfig(
+  personality: AIPersonality,
+  voiceOverride?: string,
+): {
   voice: string;
   temperature: number;
 } {
   if (personality === "custom" || !PERSONALITY_INSTRUCTIONS[personality]) {
-    return { voice: "alloy", temperature: 0.8 };
+    return { voice: voiceOverride || "alloy", temperature: 0.8 };
   }
   return {
-    voice: PERSONALITY_INSTRUCTIONS[personality].voice,
+    voice: voiceOverride || PERSONALITY_INSTRUCTIONS[personality].voice,
     temperature: PERSONALITY_INSTRUCTIONS[personality].temperature,
   };
 }
@@ -854,6 +919,7 @@ const corsOrigins = dev
   : [
       "https://sync.ference.ai",
       "https://in.ference.ai",
+      "https://chnl.net",
       "http://localhost:24680",
     ];
 
@@ -903,6 +969,7 @@ function createRoom(
   roomId: string,
   name: string,
   aiPersonality: AIPersonality = "assistant",
+  aiVoice?: string,
   aiTopic?: string,
   customInstructions?: string,
   transcriptSettings?: Partial<RoomTranscriptSettings>,
@@ -918,6 +985,7 @@ function createRoom(
     maxParticipants: maxParticipants || 10,
     createdAt: new Date(),
     aiPersonality,
+    aiVoice,
     aiTopic,
     customInstructions,
     transcriptSettings: {
@@ -952,6 +1020,7 @@ function getOrCreateAISession(
   // Get room configuration for AI settings
   const room = rooms.get(roomId);
   const aiPersonality = room?.aiPersonality ?? "assistant";
+  const aiVoice = room?.aiVoice;
   const aiTopic = room?.aiTopic;
   const customInstructions = room?.customInstructions;
 
@@ -964,6 +1033,7 @@ function getOrCreateAISession(
     isConnecting: false,
     isConnected: false,
     aiPersonality,
+    aiVoice,
     aiTopic,
     customInstructions,
     isInterrupted: false,
@@ -977,15 +1047,20 @@ function getOrCreateAISession(
 }
 
 /**
- * Connect OpenAI WebSocket for a room session
+ * Connect Voice AI provider for a room session
+ * FEAT-1008: Uses provider abstraction to support OpenAI and XAI
  */
-function connectOpenAI(
+function connectVoiceAI(
   io: SocketIOServer,
   session: RoomAISession,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!OPENAI_API_KEY) {
-      console.log("[OpenAI] No API key configured - using simulated responses");
+  return new Promise(async (resolve, reject) => {
+    const provider = getVoiceAIProvider();
+
+    if (!provider) {
+      console.log(
+        "[VoiceAI] No provider available - using simulated responses",
+      );
       resolve();
       return;
     }
@@ -996,90 +1071,182 @@ function connectOpenAI(
     }
 
     session.isConnecting = true;
-    const url = `${OPENAI_REALTIME_WS_URL}?model=${OPENAI_MODEL}`;
+    console.log(
+      `[VoiceAI] Connecting ${VOICE_AI_PROVIDER_TYPE} for room ${session.roomId}...`,
+    );
 
-    console.log(`[OpenAI] Connecting for room ${session.roomId}...`);
-
-    const ws = new WebSocket(url, {
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "OpenAI-Beta": "realtime=v1",
+    // Set up provider callbacks to handle events
+    const callbacks: VoiceAIProviderCallbacks = {
+      onReady: (roomId: string) => {
+        console.log(`[VoiceAI] Session ready for room ${roomId}`);
+        session.isConnecting = false;
+        session.isConnected = true;
       },
-    });
+      onAudioData: ({ roomId, audioBase64 }) => {
+        // First audio chunk - transition to speaking
+        if (session.state !== "speaking") {
+          session.state = "speaking";
+          broadcastAIState(io, session);
+        }
+        // Broadcast AI audio to room (same format as original)
+        io.to(roomId).emit("ai:audio", audioBase64);
+      },
+      onAudioDone: (roomId: string) => {
+        // Audio streaming complete
+        console.log(`[VoiceAI] Audio stream complete for room ${roomId}`);
+      },
+      onTranscript: ({
+        roomId,
+        text,
+        isFinal,
+        speakerId,
+        speakerName,
+        isUserInput,
+      }) => {
+        if (isUserInput) {
+          // User speech transcription - store in context manager
+          // Use getOrCreateContextManager to ensure CM exists (it should already exist from session init)
+          const cm = getOrCreateContextManager(roomId);
+          console.log(
+            `[Transcript] Room ${roomId}: PTT transcript received (speakerId: ${speakerId || "null"}, speakerName: ${speakerName || "null"})`,
+          );
+          // Use speakerId if available, fallback to "unknown" for PTT transcripts
+          const effectiveSpeakerId = speakerId || "unknown";
+          cm.addUserMessage(roomId, text, effectiveSpeakerId);
+          console.log(
+            `[ContextManager] Room ${roomId}: Stored user message from ${speakerName || "unknown"} (speakerId: ${effectiveSpeakerId})`,
+          );
+        } else {
+          // AI response transcription - store in context manager
+          console.log(
+            `[VoiceAI] Room ${roomId}: AI transcript complete (${text.length} chars)`,
+          );
+          const cm = getOrCreateContextManager(roomId);
+          cm.addAssistantMessage(roomId, text);
+          console.log(`[ContextManager] Room ${roomId}: Stored AI response`);
+        }
+      },
+      onStateChange: ({
+        roomId,
+        state,
+        activeSpeakerId,
+        activeSpeakerName,
+      }) => {
+        session.state = state;
+        session.activeSpeakerId = activeSpeakerId ?? null;
+        session.activeSpeakerName = activeSpeakerName ?? null;
+        broadcastAIState(io, session);
+      },
+      onFunctionCall: (_roomId: string, call) => {
+        // Handle function calls (webSearch, playVideo)
+        const { name, callId, rawArguments } = call;
+        console.log(
+          `[VoiceAI] Room ${session.roomId}: Function call - ${name}`,
+        );
 
-    session.ws = ws;
+        if (name === "webSearch" && SERPER_API_KEY) {
+          handleWebSearch(io, session, callId, rawArguments);
+        } else if (name === "playVideo") {
+          handleVideoCommand(io, session, callId, rawArguments);
+        } else {
+          console.log(`[VoiceAI] Unknown function or no API key: ${name}`);
+          sendFunctionOutput(session, callId, {
+            error: "Function not available",
+          });
+        }
+      },
+      onError: ({ roomId, error, code }) => {
+        console.error(`[VoiceAI] Error in room ${roomId}: ${error} (${code})`);
+        io.to(roomId).emit("ai:error", {
+          roomId,
+          error: error || "Voice AI error",
+        });
+      },
+      onClose: (roomId: string) => {
+        console.log(`[VoiceAI] Session closed for room ${roomId}`);
+        session.isConnected = false;
+        session.ws = null;
+      },
+    };
 
-    ws.on("open", () => {
-      console.log(`[OpenAI] Connected for room ${session.roomId}`);
-      session.isConnecting = false;
-      session.isConnected = true;
+    provider.setCallbacks(callbacks);
 
-      // Get personality configuration for voice and temperature
-      const personalityConfig = getPersonalityConfig(session.aiPersonality);
-
-      // Send session configuration with personality-specific settings
-      // FEAT-501: Enable input_audio_transcription to capture user speech for context
-      const config = {
-        type: "session.update",
-        session: {
-          modalities: ["text", "audio"],
-          instructions: generateInstructions(
-            session.aiPersonality,
-            session.aiTopic,
-            session.activeSpeakerName,
-            session.customInstructions,
-          ),
-          voice: personalityConfig.voice,
-          input_audio_format: "pcm16",
-          output_audio_format: "pcm16",
-          temperature: personalityConfig.temperature,
-          turn_detection: null, // Disable server VAD - we use PTT
-          // FEAT-501: Enable transcription of user input audio for context tracking
-          input_audio_transcription: {
-            model: "whisper-1",
+    // Build session config with voice override support (FEAT-1007)
+    // Build tools array with proper FunctionToolDefinition format
+    const tools: FunctionToolDefinition[] = SERPER_API_KEY
+      ? [
+          {
+            type: "function" as const,
+            name: WEB_SEARCH_TOOL.name,
+            description: WEB_SEARCH_TOOL.description,
+            parameters:
+              WEB_SEARCH_TOOL.parameters as FunctionToolDefinition["parameters"],
           },
-          // FEAT-602: Function calling tools for voice-activated search
-          // FEAT-803: Add video playback control tool
-          tools: SERPER_API_KEY ? [WEB_SEARCH_TOOL, PLAY_VIDEO_TOOL] : [],
-          tool_choice: SERPER_API_KEY ? "auto" : "none",
-        },
-      };
-      ws.send(JSON.stringify(config));
+          {
+            type: "function" as const,
+            name: PLAY_VIDEO_TOOL.name,
+            description: PLAY_VIDEO_TOOL.description,
+            parameters:
+              PLAY_VIDEO_TOOL.parameters as FunctionToolDefinition["parameters"],
+          },
+        ]
+      : [];
+
+    const sessionConfig: VoiceAISessionConfig = {
+      roomId: session.roomId,
+      personality: session.aiPersonality,
+      voiceOverride: session.aiVoice, // FEAT-1007: Room's selected voice
+      topic: session.aiTopic,
+      customInstructions: session.customInstructions,
+      speakerName: session.activeSpeakerName || undefined,
+      tools,
+    };
+
+    try {
+      console.log(`[VoiceAI] Creating session for room ${session.roomId}...`);
+      await provider.createSession(sessionConfig);
       console.log(
-        `[OpenAI] Session configured with personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, tools: ${SERPER_API_KEY ? "webSearch" : "none"}`,
+        `[VoiceAI] Session created successfully for room ${session.roomId}`,
       );
 
+      // Store reference to provider's WebSocket for backward compatibility
+      const providerWs = (provider as any).getWebSocket?.(session.roomId);
+      console.log(
+        `[VoiceAI] WebSocket lookup for room ${session.roomId}: ${providerWs ? "FOUND" : "NOT FOUND"}`,
+      );
+      if (providerWs) {
+        session.ws = providerWs;
+        console.log(
+          `[VoiceAI] WebSocket assigned to session.ws, readyState=${providerWs.readyState}`,
+        );
+      } else {
+        console.warn(
+          `[VoiceAI] WARNING: Could not get WebSocket from provider for room ${session.roomId}`,
+        );
+      }
+
+      console.log(
+        `[VoiceAI] Session configured: provider=${VOICE_AI_PROVIDER_TYPE}, personality=${session.aiPersonality}, voice=${session.aiVoice || "default"}, topic=${session.aiTopic || "none"}`,
+      );
       resolve();
-    });
-
-    ws.on("message", (data) => {
-      handleOpenAIMessage(io, session, data.toString());
-    });
-
-    ws.on("error", (error) => {
-      console.error(
-        `[OpenAI] WebSocket error for room ${session.roomId}:`,
-        error.message,
-      );
+    } catch (error) {
+      console.error(`[VoiceAI] Failed to create session: ${error}`);
       session.isConnecting = false;
       reject(error);
-    });
-
-    ws.on("close", (code, reason) => {
-      console.log(`[OpenAI] Closed for room ${session.roomId}: ${code}`);
-      session.isConnected = false;
-      session.ws = null;
-    });
-
-    // Connection timeout
-    setTimeout(() => {
-      if (session.isConnecting) {
-        ws.close();
-        session.isConnecting = false;
-        reject(new Error("Connection timeout"));
-      }
-    }, 10000);
+    }
   });
+}
+
+/**
+ * Connect OpenAI WebSocket for a room session
+ * @deprecated Use connectVoiceAI instead - kept for reference
+ */
+function connectOpenAI(
+  io: SocketIOServer,
+  session: RoomAISession,
+): Promise<void> {
+  // FEAT-1008: Delegate to provider-based connection
+  return connectVoiceAI(io, session);
 }
 
 /**
@@ -2523,10 +2690,12 @@ app
             if (response.ok) {
               const apiRoom = await response.json();
               // Create socket room with API room's configuration
+              // FEAT-1007: Include aiVoice from room config
               room = createRoom(
                 roomId,
                 apiRoom.name,
                 apiRoom.aiPersonality || "assistant",
+                apiRoom.aiVoice,
                 apiRoom.aiTopic,
                 apiRoom.customInstructions,
                 apiRoom.transcriptSettings,
@@ -2534,7 +2703,7 @@ app
                 apiRoom.maxParticipants,
               );
               console.log(
-                `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, topic: ${apiRoom.aiTopic || "none"}, transcript: ${apiRoom.transcriptSettings?.enabled ?? true}`,
+                `[Socket.io] Created room ${roomId} from API config - personality: ${apiRoom.aiPersonality}, voice: ${apiRoom.aiVoice || "default"}, topic: ${apiRoom.aiTopic || "none"}, transcript: ${apiRoom.transcriptSettings?.enabled ?? true}`,
               );
             } else {
               // API room not found, auto-create with defaults
@@ -2955,13 +3124,29 @@ app
         // Broadcast AI state: listening
         broadcastAIState(io, session);
 
-        // Connect to OpenAI if API key is configured
-        if (OPENAI_API_KEY && !session.isConnected && !session.isConnecting) {
+        // Connect to Voice AI provider if available and not already connected
+        // FEAT-1008: Support both OpenAI and XAI providers
+        const provider = getVoiceAIProvider();
+        if (provider && !session.isConnected && !session.isConnecting) {
           try {
-            await connectOpenAI(io, session);
+            console.log(
+              `[VoiceAI] PTT START - connecting ${VOICE_AI_PROVIDER_TYPE} provider for room ${roomId}`,
+            );
+            await connectVoiceAI(io, session);
           } catch (error) {
-            console.error(`[Socket.io] Failed to connect OpenAI:`, error);
+            console.error(`[VoiceAI] Failed to connect provider:`, error);
           }
+        } else {
+          console.log(
+            `[VoiceAI] PTT START - provider=${!!provider}, isConnected=${session.isConnected}, isConnecting=${session.isConnecting}`,
+          );
+        }
+
+        // FEAT-502: Sync active speaker to the provider for deferred transcription attribution
+        // The provider needs to know the speaker info so it can attribute transcripts correctly
+        // when the transcription arrives later (after PTT ends)
+        if (provider && session.isConnected) {
+          provider.setActiveSpeaker(roomId, peerId, displayName);
         }
 
         // Update session instructions with current speaker's name
@@ -3044,15 +3229,26 @@ app
         if (!roomId) return;
 
         const session = roomAISessions.get(roomId);
-        if (
-          !session ||
-          !session.ws ||
-          session.ws.readyState !== WebSocket.OPEN
-        ) {
+        if (!session) {
+          console.warn(
+            `[VoiceAI] ai:audio_data - No session for room ${roomId}`,
+          );
+          return;
+        }
+        if (!session.ws) {
+          console.warn(
+            `[VoiceAI] ai:audio_data - No WebSocket for room ${roomId}`,
+          );
+          return;
+        }
+        if (session.ws.readyState !== WebSocket.OPEN) {
+          console.warn(
+            `[VoiceAI] ai:audio_data - WebSocket not OPEN for room ${roomId}, state=${session.ws.readyState}`,
+          );
           return;
         }
 
-        // Forward audio to OpenAI
+        // Forward audio to provider
         const audioEvent = {
           type: "input_audio_buffer.append",
           audio: payload.audio, // base64 encoded PCM16
@@ -3077,8 +3273,11 @@ app
           broadcastAIState(io, session);
         }
 
-        // If OpenAI is connected, commit audio and trigger response
+        // If provider is connected, commit audio and trigger response
         if (session && session.ws && session.ws.readyState === WebSocket.OPEN) {
+          console.log(
+            `[VoiceAI] PTT END - WebSocket ready, committing audio and triggering response`,
+          );
           // Commit the audio buffer
           const commitEvent = {
             type: "input_audio_buffer.commit",
@@ -3143,9 +3342,9 @@ app
             `[Socket.io] Triggered OpenAI response for room ${roomId}, personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, speaker: ${speakerName || "unknown"}, participants: [${participantNames.join(", ")}]`,
           );
         } else {
-          // Simulate AI response if OpenAI not connected
+          // Simulate AI response if provider not connected
           console.log(
-            `[Socket.io] Simulating AI response (no OpenAI connection)`,
+            `[VoiceAI] PTT END - No WebSocket, simulating AI response. session=${!!session}, ws=${!!session?.ws}, readyState=${session?.ws?.readyState}`,
           );
           setTimeout(() => {
             if (session) {
