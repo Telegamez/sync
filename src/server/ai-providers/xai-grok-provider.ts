@@ -77,6 +77,13 @@ export class XAIGrokProvider implements IVoiceAIProvider {
   private websockets: Map<string, WebSocket> = new Map();
   private tools: Map<string, FunctionToolDefinition[]> = new Map();
   private debug: boolean;
+  private pendingResponseInstructions: Map<string, string | undefined> =
+    new Map();
+  private awaitingAudioCommit: Set<string> = new Set();
+  private recentUserTranscriptByRoom: Map<
+    string,
+    { text: string; atMs: number }
+  > = new Map();
 
   constructor(apiKey: string, debug = false) {
     this.apiKey = apiKey;
@@ -85,6 +92,27 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     if (!apiKey) {
       throw new Error("XAI API key is required");
     }
+  }
+
+  private shouldEmitUserTranscript(
+    roomId: string,
+    transcript: string,
+  ): boolean {
+    const normalized = transcript.trim().replace(/\s+/g, " ");
+    if (!normalized) return false;
+
+    const prev = this.recentUserTranscriptByRoom.get(roomId);
+    const now = Date.now();
+    // XAI can emit the same user transcript via multiple event paths; de-dupe within a short window.
+    const windowMs = 5000;
+    if (prev && prev.text === normalized && now - prev.atMs < windowMs) {
+      return false;
+    }
+    this.recentUserTranscriptByRoom.set(roomId, {
+      text: normalized,
+      atMs: now,
+    });
+    return true;
   }
 
   // ============================================================
@@ -281,7 +309,8 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       type: "input_audio_buffer.commit",
     };
     ws.send(JSON.stringify(commitEvent));
-    this.log(roomId, "Audio buffer committed");
+    this.awaitingAudioCommit.add(roomId);
+    this.log(roomId, "Audio buffer commit sent");
   }
 
   // ============================================================
@@ -296,6 +325,17 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       return;
     }
 
+    // If we just committed audio, wait until XAI acknowledges the commit (or adds the user item)
+    // before triggering response.create. Otherwise XAI may respond without the user's audio.
+    if (this.awaitingAudioCommit.has(roomId)) {
+      this.pendingResponseInstructions.set(roomId, responseInstructions);
+      this.log(
+        roomId,
+        "Delaying response.create until audio commit acknowledged",
+      );
+      return;
+    }
+
     // Transition to processing state
     session.state = "processing";
     this.sessions.set(roomId, session);
@@ -306,21 +346,64 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       activeSpeakerName: session.activeSpeakerName,
     });
 
-    const responseEvent: Record<string, unknown> = {
-      type: "response.create",
-      response: {
-        modalities: ["audio", "text"],
-      },
-    };
-
-    // Add per-response instructions if provided
     if (responseInstructions) {
-      (responseEvent.response as Record<string, unknown>).instructions =
-        responseInstructions;
+      const responseContextEvent = {
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: responseInstructions,
+            },
+          ],
+        },
+      };
+      ws.send(JSON.stringify(responseContextEvent));
     }
 
-    ws.send(JSON.stringify(responseEvent));
+    ws.send(JSON.stringify({ type: "response.create" }));
     this.log(roomId, "Response triggered");
+  }
+
+  private flushPendingResponse(roomId: string): void {
+    if (
+      !this.awaitingAudioCommit.has(roomId) &&
+      !this.pendingResponseInstructions.has(roomId)
+    ) {
+      return;
+    }
+
+    const ws = this.websockets.get(roomId);
+    const session = this.sessions.get(roomId);
+    if (!ws || ws.readyState !== WebSocket.OPEN || !session) {
+      return;
+    }
+
+    const responseInstructions = this.pendingResponseInstructions.get(roomId);
+    this.pendingResponseInstructions.delete(roomId);
+    this.awaitingAudioCommit.delete(roomId);
+
+    if (responseInstructions) {
+      const responseContextEvent = {
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: responseInstructions,
+            },
+          ],
+        },
+      };
+      ws.send(JSON.stringify(responseContextEvent));
+    }
+
+    ws.send(JSON.stringify({ type: "response.create" }));
+    this.log(roomId, "Response triggered (after commit ack)");
   }
 
   cancelResponse(roomId: string): void {
@@ -341,12 +424,6 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     };
     ws.send(JSON.stringify(cancelEvent));
     this.log(roomId, "Response cancelled");
-
-    // Clear audio buffer
-    const clearEvent = {
-      type: "input_audio_buffer.clear",
-    };
-    ws.send(JSON.stringify(clearEvent));
 
     // Return to idle
     session.state = "idle";
@@ -383,13 +460,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     ws.send(JSON.stringify(outputEvent));
 
     // Trigger response to get AI to speak about the result
-    const responseEvent = {
-      type: "response.create",
-      response: {
-        modalities: ["audio", "text"],
-      },
-    };
-    ws.send(JSON.stringify(responseEvent));
+    ws.send(JSON.stringify({ type: "response.create" }));
 
     this.log(roomId, `Function output sent for call ${callId}`);
   }
@@ -554,7 +625,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
         },
         temperature,
         turn_detection: null, // Disabled - using PTT
-        // NOTE: XAI has automatic input transcription, no config needed
+        // XAI emits conversation.item.input_audio_transcription.completed automatically
         // Custom function tools only (NOT web_search, x_search, file_search)
         tools: registeredTools.map((tool) => ({
           type: "function",
@@ -704,6 +775,7 @@ Tailor your language and examples to this specific field.`);
           break;
 
         case "response.audio.delta":
+        case "response.output_audio.delta":
           if (event.delta && !session.isInterrupted) {
             // Verify this is from the expected response
             const audioResponseId = event.response_id;
@@ -735,10 +807,12 @@ Tailor your language and examples to this specific field.`);
           break;
 
         case "response.audio.done":
+        case "response.output_audio.done":
           this.callbacks.onAudioDone?.(roomId);
           break;
 
         case "response.audio_transcript.done":
+        case "response.output_audio_transcript.done":
           if (event.transcript) {
             this.callbacks.onTranscript?.({
               roomId,
@@ -749,25 +823,90 @@ Tailor your language and examples to this specific field.`);
           }
           break;
 
-        // XAI has automatic input transcription
         case "conversation.item.input_audio_transcription.completed":
           if (event.transcript) {
             const transcript = event.transcript.trim();
             if (transcript.length >= 5) {
               // Skip very short transcripts
-              this.callbacks.onTranscript?.({
-                roomId,
-                text: transcript,
-                isFinal: true,
-                speakerId:
-                  session.activeSpeakerId || session.lastSpeakerId || undefined,
-                speakerName:
-                  session.activeSpeakerName ||
-                  session.lastSpeakerName ||
-                  undefined,
-                isUserInput: true,
-              });
+              if (this.shouldEmitUserTranscript(roomId, transcript)) {
+                this.callbacks.onTranscript?.({
+                  roomId,
+                  text: transcript,
+                  isFinal: true,
+                  speakerId:
+                    session.activeSpeakerId ||
+                    session.lastSpeakerId ||
+                    undefined,
+                  speakerName:
+                    session.activeSpeakerName ||
+                    session.lastSpeakerName ||
+                    undefined,
+                  isUserInput: true,
+                });
+              }
             }
+          }
+          break;
+
+        case "conversation.item.added":
+          // XAI may include user audio transcription on the item itself:
+          // item.role === "user" and item.content includes { type: "input_audio", transcript: "..." }
+          if (
+            event.item?.role === "user" &&
+            Array.isArray(event.item?.content)
+          ) {
+            const transcriptChunk = event.item.content.find(
+              (c: unknown) =>
+                typeof c === "object" &&
+                c !== null &&
+                "type" in (c as Record<string, unknown>) &&
+                (c as Record<string, unknown>).type === "input_audio" &&
+                "transcript" in (c as Record<string, unknown>) &&
+                typeof (c as Record<string, unknown>).transcript === "string",
+            ) as { transcript?: string } | undefined;
+
+            const transcript =
+              typeof transcriptChunk?.transcript === "string"
+                ? transcriptChunk.transcript.trim()
+                : "";
+
+            if (transcript.length >= 5) {
+              if (this.shouldEmitUserTranscript(roomId, transcript)) {
+                this.callbacks.onTranscript?.({
+                  roomId,
+                  text: transcript,
+                  isFinal: true,
+                  speakerId:
+                    session.activeSpeakerId ||
+                    session.lastSpeakerId ||
+                    undefined,
+                  speakerName:
+                    session.activeSpeakerName ||
+                    session.lastSpeakerName ||
+                    undefined,
+                  isUserInput: true,
+                });
+              }
+            }
+
+            // Also treat this as the "audio commit has produced a user item" signal
+            if (this.awaitingAudioCommit.has(roomId)) {
+              this.log(
+                roomId,
+                "Audio commit acknowledged via conversation.item.added (user)",
+              );
+              this.flushPendingResponse(roomId);
+            }
+          }
+          break;
+
+        case "input_audio_buffer.committed":
+          if (this.awaitingAudioCommit.has(roomId)) {
+            this.log(
+              roomId,
+              "Audio commit acknowledged via input_audio_buffer.committed",
+            );
+            this.flushPendingResponse(roomId);
           }
           break;
 
@@ -789,18 +928,70 @@ Tailor your language and examples to this specific field.`);
           break;
 
         case "response.output_item.done":
-          if (event.item?.type === "function_call") {
-            const { name, call_id, arguments: argsString } = event.item;
-            try {
-              const args = JSON.parse(argsString || "{}");
-              this.callbacks.onFunctionCall?.(roomId, {
-                name,
-                callId: call_id,
-                arguments: args,
-                rawArguments: argsString || "{}",
-              });
-            } catch {
-              this.log(roomId, `Failed to parse function arguments: ${name}`);
+          if (event.item) {
+            // XAI may differ slightly from OpenAI in the shape of tool/function calls.
+            // Support common variants:
+            // - item.type === "function_call" (OpenAI-like)
+            // - item.type === "tool_call" (alternate naming)
+            // - item.function: { name, arguments } (nested function payload)
+            const item = event.item as Record<string, unknown>;
+            const itemType = typeof item.type === "string" ? item.type : null;
+
+            const functionPayload =
+              typeof item.function === "object" && item.function !== null
+                ? (item.function as Record<string, unknown>)
+                : null;
+
+            const nameCandidate =
+              (typeof item.name === "string" ? item.name : null) ||
+              (functionPayload && typeof functionPayload.name === "string"
+                ? functionPayload.name
+                : null);
+
+            const callIdCandidate =
+              (typeof item.call_id === "string" ? item.call_id : null) ||
+              (typeof item.id === "string" ? item.id : null) ||
+              (typeof item.tool_call_id === "string"
+                ? item.tool_call_id
+                : null);
+
+            const argsStringCandidate =
+              (typeof item.arguments === "string" ? item.arguments : null) ||
+              (functionPayload && typeof functionPayload.arguments === "string"
+                ? functionPayload.arguments
+                : null) ||
+              null;
+
+            if (
+              (itemType === "function_call" || itemType === "tool_call") &&
+              nameCandidate &&
+              callIdCandidate
+            ) {
+              try {
+                const args = JSON.parse(argsStringCandidate || "{}");
+                this.callbacks.onFunctionCall?.(roomId, {
+                  name: nameCandidate,
+                  callId: callIdCandidate,
+                  arguments: args,
+                  rawArguments: argsStringCandidate || "{}",
+                });
+              } catch {
+                this.log(
+                  roomId,
+                  `Failed to parse function arguments: ${nameCandidate}`,
+                );
+              }
+            } else if (this.debug) {
+              // Log a compact shape to help adapt parsing without dumping huge payloads
+              const debugItem = {
+                type: itemType,
+                keys: Object.keys(item).slice(0, 20),
+                name: nameCandidate,
+              };
+              this.log(
+                roomId,
+                `output_item.done (non-function): ${JSON.stringify(debugItem)}`,
+              );
             }
           }
           break;

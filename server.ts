@@ -147,6 +147,13 @@ function toRoomSummary(room: Room): RoomSummary {
 /** Lobby room name for broadcasting */
 const LOBBY_ROOM = "lobby";
 
+function base64ApproxByteLength(base64: string): number {
+  const len = base64.length;
+  if (len === 0) return 0;
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.floor((len * 3) / 4) - padding;
+}
+
 // ============================================================
 // OPENAI REALTIME API TYPES AND CONFIG
 // ============================================================
@@ -163,6 +170,9 @@ interface RoomAISession {
   activeSpeakerName: string | null;
   isConnecting: boolean;
   isConnected: boolean;
+  pendingAudioChunks: string[];
+  pttAudioChunkCount: number;
+  pttAudioApproxBytes: number;
   // Room AI configuration
   aiPersonality: AIPersonality;
   aiVoice?: string;
@@ -1037,6 +1047,9 @@ function getOrCreateAISession(
     activeSpeakerName: null,
     isConnecting: false,
     isConnected: false,
+    pendingAudioChunks: [],
+    pttAudioChunkCount: 0,
+    pttAudioApproxBytes: 0,
     aiPersonality,
     aiVoice,
     aiTopic,
@@ -1086,6 +1099,14 @@ function connectVoiceAI(
         console.log(`[VoiceAI] Session ready for room ${roomId}`);
         session.isConnecting = false;
         session.isConnected = true;
+
+        if (session.pendingAudioChunks.length > 0) {
+          const buffered = session.pendingAudioChunks;
+          session.pendingAudioChunks = [];
+          for (const audioBase64 of buffered) {
+            provider.sendAudio(roomId, audioBase64);
+          }
+        }
       },
       onAudioData: ({ roomId, audioBase64 }) => {
         // First audio chunk - transition to speaking
@@ -3019,12 +3040,12 @@ app
         // Set interrupt flag - will ignore all audio until next PTT session starts
         session.isInterrupted = true;
 
-        // Send response.cancel to OpenAI to stop streaming
-        // Also clear the input audio buffer to prevent queued responses
-        if (session.ws && session.ws.readyState === WebSocket.OPEN) {
-          // Cancel current response
+        // Stop streaming and clear input buffer (provider-specific)
+        const interruptProvider = getVoiceAIProvider();
+        if (interruptProvider && session.isConnected) {
+          interruptProvider.cancelResponse(roomId);
+        } else if (session.ws && session.ws.readyState === WebSocket.OPEN) {
           session.ws.send(JSON.stringify({ type: "response.cancel" }));
-          // Clear input buffer to prevent any queued audio from triggering new responses
           session.ws.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
           console.log(
             `[OpenAI] Sent response.cancel and input_audio_buffer.clear for room ${roomId}`,
@@ -3066,6 +3087,8 @@ app
 
         // Get or create AI session for this room
         const session = getOrCreateAISession(io, roomId);
+        session.pttAudioChunkCount = 0;
+        session.pttAudioApproxBytes = 0;
 
         // Check if another user is already addressing the AI
         // Allow same user to restart PTT, but block other users
@@ -3095,11 +3118,18 @@ app
 
         // Cancel OpenAI response and clear buffer (always, to be safe)
         if (session.ws && session.ws.readyState === WebSocket.OPEN) {
-          session.ws.send(JSON.stringify({ type: "response.cancel" }));
-          session.ws.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
-          console.log(
-            `[OpenAI] PTT triggered response.cancel and input_audio_buffer.clear for room ${roomId}`,
-          );
+          const pttInterruptProvider = getVoiceAIProvider();
+          if (pttInterruptProvider && session.isConnected) {
+            pttInterruptProvider.cancelResponse(roomId);
+          } else {
+            session.ws.send(JSON.stringify({ type: "response.cancel" }));
+            session.ws.send(
+              JSON.stringify({ type: "input_audio_buffer.clear" }),
+            );
+            console.log(
+              `[OpenAI] PTT triggered response.cancel and input_audio_buffer.clear for room ${roomId}`,
+            );
+          }
         }
 
         // Broadcast interrupt to all clients so they close AudioContext
@@ -3155,7 +3185,31 @@ app
         }
 
         // Update session instructions with current speaker's name
-        if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+        if (
+          VOICE_AI_PROVIDER_TYPE === "xai" &&
+          provider &&
+          session.isConnected
+        ) {
+          // XAI: avoid OpenAI-specific conversation item shapes that can trigger invalid_event.
+          // Instead, inject context via provider abstraction.
+          const cm = getOrCreateContextManager(roomId);
+          cm.addParticipant(roomId, peerId, displayName);
+
+          const contextText = buildContextInjection(roomId, 2000);
+          const combinedContext = [
+            `Current speaker: ${displayName}`,
+            contextText,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+
+          if (combinedContext) {
+            provider.injectContext(roomId, combinedContext);
+            console.log(
+              `[VoiceAI] Injected context for room ${roomId} (provider=${VOICE_AI_PROVIDER_TYPE})`,
+            );
+          }
+        } else if (session.ws && session.ws.readyState === WebSocket.OPEN) {
           const updateConfig = {
             type: "session.update",
             session: {
@@ -3240,6 +3294,24 @@ app
           );
           return;
         }
+
+        session.pttAudioChunkCount += 1;
+        session.pttAudioApproxBytes += base64ApproxByteLength(
+          payload.audio || "",
+        );
+
+        const provider = getVoiceAIProvider();
+        if (provider && session.isConnected) {
+          provider.sendAudio(roomId, payload.audio);
+          return;
+        }
+        if (session.isConnecting) {
+          // Buffer audio briefly while provider is connecting to avoid dropping the start of speech
+          if (session.pendingAudioChunks.length < 200) {
+            session.pendingAudioChunks.push(payload.audio);
+          }
+          return;
+        }
         if (!session.ws) {
           console.warn(
             `[VoiceAI] ai:audio_data - No WebSocket for room ${roomId}`,
@@ -3254,11 +3326,12 @@ app
         }
 
         // Forward audio to provider
-        const audioEvent = {
-          type: "input_audio_buffer.append",
-          audio: payload.audio, // base64 encoded PCM16
-        };
-        session.ws.send(JSON.stringify(audioEvent));
+        session.ws.send(
+          JSON.stringify({
+            type: "input_audio_buffer.append",
+            audio: payload.audio, // base64 encoded PCM16
+          }),
+        );
       });
 
       // Handle PTT end - user finished speaking, process with AI
@@ -3269,6 +3342,11 @@ app
         console.log(`[Socket.io] PTT END from ${peerId} in room ${roomId}`);
 
         const session = roomAISessions.get(roomId);
+        if (session) {
+          console.log(
+            `[VoiceAI] PTT audio stats for room ${roomId}: chunks=${session.pttAudioChunkCount}, approxBytes=${session.pttAudioApproxBytes}`,
+          );
+        }
 
         // Update state to processing and clear interrupt flag
         // Now we're ready to receive audio for the response to this PTT session
@@ -3283,11 +3361,20 @@ app
           console.log(
             `[VoiceAI] PTT END - WebSocket ready, committing audio and triggering response`,
           );
-          // Commit the audio buffer
-          const commitEvent = {
-            type: "input_audio_buffer.commit",
-          };
-          session.ws.send(JSON.stringify(commitEvent));
+          const providerForCommit = getVoiceAIProvider();
+          if (
+            VOICE_AI_PROVIDER_TYPE === "xai" &&
+            providerForCommit &&
+            session.isConnected
+          ) {
+            providerForCommit.commitAudio(roomId);
+          } else {
+            // Commit the audio buffer (OpenAI-compatible)
+            const commitEvent = {
+              type: "input_audio_buffer.commit",
+            };
+            session.ws.send(JSON.stringify(commitEvent));
+          }
 
           // Trigger response with full personality, topic, and speaker context
           const speakerName = session.activeSpeakerName;
@@ -3335,17 +3422,29 @@ app
             responseInstructions += `IMPORTANT: ${speakerName} just spoke to you. Address them by name ("${speakerName}") in your response.`;
           }
 
-          const responseEvent = {
-            type: "response.create",
-            response: {
-              modalities: ["audio", "text"],
-              instructions: responseInstructions || undefined,
-            },
-          };
-          session.ws.send(JSON.stringify(responseEvent));
-          console.log(
-            `[Socket.io] Triggered OpenAI response for room ${roomId}, personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, speaker: ${speakerName || "unknown"}, participants: [${participantNames.join(", ")}]`,
-          );
+          const provider = getVoiceAIProvider();
+          if (
+            VOICE_AI_PROVIDER_TYPE === "xai" &&
+            provider &&
+            session.isConnected
+          ) {
+            provider.triggerResponse(roomId, responseInstructions || undefined);
+            console.log(
+              `[Socket.io] Triggered VoiceAI response for room ${roomId}, provider: ${VOICE_AI_PROVIDER_TYPE}, personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, speaker: ${speakerName || "unknown"}, participants: [${participantNames.join(", ")}]`,
+            );
+          } else {
+            const responseEvent = {
+              type: "response.create",
+              response: {
+                modalities: ["audio", "text"],
+                instructions: responseInstructions || undefined,
+              },
+            };
+            session.ws.send(JSON.stringify(responseEvent));
+            console.log(
+              `[Socket.io] Triggered OpenAI response for room ${roomId}, personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, speaker: ${speakerName || "unknown"}, participants: [${participantNames.join(", ")}]`,
+            );
+          }
         } else {
           // Simulate AI response if provider not connected
           console.log(
