@@ -173,6 +173,10 @@ interface RoomAISession {
   pendingAudioChunks: string[];
   pttAudioChunkCount: number;
   pttAudioApproxBytes: number;
+  // Logging-only: correlate PTT lifecycle across server/provider logs
+  pttTurnSeq?: number;
+  pttTurnId?: string;
+  pttStartedAtMs?: number;
   // Room AI configuration
   aiPersonality: AIPersonality;
   aiVoice?: string;
@@ -1050,6 +1054,9 @@ function getOrCreateAISession(
     pendingAudioChunks: [],
     pttAudioChunkCount: 0,
     pttAudioApproxBytes: 0,
+    pttTurnSeq: 0,
+    pttTurnId: undefined,
+    pttStartedAtMs: undefined,
     aiPersonality,
     aiVoice,
     aiTopic,
@@ -3089,6 +3096,12 @@ app
         const session = getOrCreateAISession(io, roomId);
         session.pttAudioChunkCount = 0;
         session.pttAudioApproxBytes = 0;
+        session.pttTurnSeq = (session.pttTurnSeq || 0) + 1;
+        session.pttTurnId = `${roomId}:${session.pttTurnSeq}:${Date.now()}`;
+        session.pttStartedAtMs = Date.now();
+        console.log(
+          `[VoiceAI] PTT TURN START room=${roomId} turnId=${session.pttTurnId} speakerId=${peerId} speakerName=${displayName}`,
+        );
 
         // Check if another user is already addressing the AI
         // Allow same user to restart PTT, but block other users
@@ -3120,6 +3133,9 @@ app
         if (session.ws && session.ws.readyState === WebSocket.OPEN) {
           const pttInterruptProvider = getVoiceAIProvider();
           if (pttInterruptProvider && session.isConnected) {
+            console.log(
+              `[VoiceAI] PTT TURN ${session.pttTurnId} cancelling provider response (provider=${VOICE_AI_PROVIDER_TYPE})`,
+            );
             pttInterruptProvider.cancelResponse(roomId);
           } else {
             session.ws.send(JSON.stringify({ type: "response.cancel" }));
@@ -3130,6 +3146,10 @@ app
               `[OpenAI] PTT triggered response.cancel and input_audio_buffer.clear for room ${roomId}`,
             );
           }
+        } else {
+          console.log(
+            `[VoiceAI] PTT TURN ${session.pttTurnId} no ws to cancel/clear (ws=${!!session?.ws}, readyState=${session?.ws?.readyState})`,
+          );
         }
 
         // Broadcast interrupt to all clients so they close AudioContext
@@ -3185,31 +3205,27 @@ app
         }
 
         // Update session instructions with current speaker's name
-        if (
-          VOICE_AI_PROVIDER_TYPE === "xai" &&
-          provider &&
-          session.isConnected
-        ) {
-          // XAI: avoid OpenAI-specific conversation item shapes that can trigger invalid_event.
-          // Instead, inject context via provider abstraction.
+        // For xAI: use provider.isSessionConnected() which is true immediately on WebSocket open.
+        // For OpenAI: also use provider abstraction when available.
+        // The else branch with direct session.ws is legacy fallback only.
+        const providerConnected =
+          provider && provider.isSessionConnected(roomId);
+
+        if (VOICE_AI_PROVIDER_TYPE === "xai" && providerConnected) {
+          // XAI: Skip context injection via conversation.item.create as it causes invalid_event errors.
+          // xAI's conversation.item.create is sensitive to timing - must be after session.updated
+          // and cannot be sent right after response.cancel.
+          // Instead, rely on the session instructions which are set via session.update.
           const cm = getOrCreateContextManager(roomId);
           cm.addParticipant(roomId, peerId, displayName);
-
-          const contextText = buildContextInjection(roomId, 2000);
-          const combinedContext = [
-            `Current speaker: ${displayName}`,
-            contextText,
-          ]
-            .filter(Boolean)
-            .join("\n\n");
-
-          if (combinedContext) {
-            provider.injectContext(roomId, combinedContext);
-            console.log(
-              `[VoiceAI] Injected context for room ${roomId} (provider=${VOICE_AI_PROVIDER_TYPE})`,
-            );
-          }
-        } else if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+          console.log(
+            `[VoiceAI] Skipping context injection for xAI (room ${roomId}) - using session instructions only`,
+          );
+        } else if (
+          !providerConnected &&
+          session.ws &&
+          session.ws.readyState === WebSocket.OPEN
+        ) {
           const updateConfig = {
             type: "session.update",
             session: {
@@ -3343,8 +3359,15 @@ app
 
         const session = roomAISessions.get(roomId);
         if (session) {
+          const elapsedMs =
+            typeof session.pttStartedAtMs === "number"
+              ? Date.now() - session.pttStartedAtMs
+              : undefined;
           console.log(
             `[VoiceAI] PTT audio stats for room ${roomId}: chunks=${session.pttAudioChunkCount}, approxBytes=${session.pttAudioApproxBytes}`,
+          );
+          console.log(
+            `[VoiceAI] PTT TURN END room=${roomId} turnId=${session.pttTurnId || "unknown"} elapsedMs=${typeof elapsedMs === "number" ? elapsedMs : "unknown"} activeSpeakerId=${session.activeSpeakerId || "null"} activeSpeakerName=${session.activeSpeakerName || "null"}`,
           );
         }
 
@@ -3367,6 +3390,9 @@ app
             providerForCommit &&
             session.isConnected
           ) {
+            console.log(
+              `[VoiceAI] PTT TURN ${session.pttTurnId || "unknown"} commitAudio provider=xai isConnected=${session.isConnected}`,
+            );
             providerForCommit.commitAudio(roomId);
           } else {
             // Commit the audio buffer (OpenAI-compatible)
@@ -3428,6 +3454,9 @@ app
             provider &&
             session.isConnected
           ) {
+            console.log(
+              `[VoiceAI] PTT TURN ${session.pttTurnId || "unknown"} triggerResponse provider=xai instructionsChars=${responseInstructions.length}`,
+            );
             provider.triggerResponse(roomId, responseInstructions || undefined);
             console.log(
               `[Socket.io] Triggered VoiceAI response for room ${roomId}, provider: ${VOICE_AI_PROVIDER_TYPE}, personality: ${session.aiPersonality}, topic: ${session.aiTopic || "none"}, speaker: ${speakerName || "unknown"}, participants: [${participantNames.join(", ")}]`,

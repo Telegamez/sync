@@ -155,31 +155,31 @@ export const XAI_VOICES: VoiceInfo[] = [
   {
     id: "ara",
     name: "Ara",
-    description: "Confident and articulate, professional tone",
+    description: "Default voice, balanced and conversational",
     style: "feminine",
   },
   {
     id: "eve",
     name: "Eve",
-    description: "Warm and approachable, friendly conversations",
+    description: "Engaging and enthusiastic, great for interactive experiences",
     style: "feminine",
   },
   {
     id: "leo",
     name: "Leo",
-    description: "Authoritative and knowledgeable, expert delivery",
+    description: "Decisive and commanding, suitable for instructional content",
     style: "masculine",
   },
   {
     id: "sal",
     name: "Sal",
-    description: "Creative and expressive, great for ideation",
-    style: "masculine",
+    description: "Versatile voice suitable for various contexts",
+    style: "neutral",
   },
   {
     id: "rex",
     name: "Rex",
-    description: "Bold and energetic, commanding presence",
+    description: "Professional and articulate, ideal for business applications",
     style: "masculine",
   },
   {

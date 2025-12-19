@@ -37,6 +37,12 @@ const XAI_REALTIME_WS_URL = "wss://api.x.ai/v1/realtime";
 /** Connection timeout in ms */
 const CONNECTION_TIMEOUT_MS = 10000;
 
+const formatXaiVoiceForApi = (voice: string): string => {
+  const normalized = voice.trim().toLowerCase();
+  if (!normalized) return voice;
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
 // ============================================================
 // PERSONALITY CONFIGURATION
 // ============================================================
@@ -76,14 +82,9 @@ export class XAIGrokProvider implements IVoiceAIProvider {
   private sessions: Map<string, ProviderSessionState> = new Map();
   private websockets: Map<string, WebSocket> = new Map();
   private tools: Map<string, FunctionToolDefinition[]> = new Map();
+  private pendingConfigs: Map<string, VoiceAISessionConfig> = new Map();
+  private sessionConfigSent: Map<string, boolean> = new Map();
   private debug: boolean;
-  private pendingResponseInstructions: Map<string, string | undefined> =
-    new Map();
-  private awaitingAudioCommit: Set<string> = new Set();
-  private recentUserTranscriptByRoom: Map<
-    string,
-    { text: string; atMs: number }
-  > = new Map();
 
   constructor(apiKey: string, debug = false) {
     this.apiKey = apiKey;
@@ -92,27 +93,6 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     if (!apiKey) {
       throw new Error("XAI API key is required");
     }
-  }
-
-  private shouldEmitUserTranscript(
-    roomId: string,
-    transcript: string,
-  ): boolean {
-    const normalized = transcript.trim().replace(/\s+/g, " ");
-    if (!normalized) return false;
-
-    const prev = this.recentUserTranscriptByRoom.get(roomId);
-    const now = Date.now();
-    // XAI can emit the same user transcript via multiple event paths; de-dupe within a short window.
-    const windowMs = 5000;
-    if (prev && prev.text === normalized && now - prev.atMs < windowMs) {
-      return false;
-    }
-    this.recentUserTranscriptByRoom.set(roomId, {
-      text: normalized,
-      atMs: now,
-    });
-    return true;
   }
 
   // ============================================================
@@ -177,10 +157,12 @@ export class XAIGrokProvider implements IVoiceAIProvider {
         session.isConnected = true;
         this.sessions.set(roomId, session);
 
-        // Send session configuration
-        this.sendSessionConfig(roomId, config);
+        // Store config to send after session.created event (like voice preview)
+        this.pendingConfigs.set(roomId, config);
+        this.sessionConfigSent.set(roomId, false);
 
-        this.callbacks.onReady?.(roomId);
+        // Don't send session config yet - wait for session.created event
+        // This matches the working voice preview pattern
         resolve();
       });
 
@@ -228,6 +210,8 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     }
     this.sessions.delete(roomId);
     this.tools.delete(roomId);
+    this.pendingConfigs.delete(roomId);
+    this.sessionConfigSent.delete(roomId);
     this.log(roomId, "Session closed");
   }
 
@@ -291,7 +275,6 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       this.sessions.set(roomId, session);
     }
 
-    // XAI uses the same event format as OpenAI (compatible API)
     const audioEvent = {
       type: "input_audio_buffer.append",
       audio: audioBase64,
@@ -309,8 +292,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       type: "input_audio_buffer.commit",
     };
     ws.send(JSON.stringify(commitEvent));
-    this.awaitingAudioCommit.add(roomId);
-    this.log(roomId, "Audio buffer commit sent");
+    this.log(roomId, "Audio buffer committed");
   }
 
   // ============================================================
@@ -325,17 +307,6 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       return;
     }
 
-    // If we just committed audio, wait until XAI acknowledges the commit (or adds the user item)
-    // before triggering response.create. Otherwise XAI may respond without the user's audio.
-    if (this.awaitingAudioCommit.has(roomId)) {
-      this.pendingResponseInstructions.set(roomId, responseInstructions);
-      this.log(
-        roomId,
-        "Delaying response.create until audio commit acknowledged",
-      );
-      return;
-    }
-
     // Transition to processing state
     session.state = "processing";
     this.sessions.set(roomId, session);
@@ -346,64 +317,22 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       activeSpeakerName: session.activeSpeakerName,
     });
 
+    // xAI is OpenAI-compatible: use same format as OpenAI provider
+    const responseEvent: Record<string, unknown> = {
+      type: "response.create",
+      response: {
+        modalities: ["audio", "text"],
+      },
+    };
+
+    // Add per-response instructions if provided
     if (responseInstructions) {
-      const responseContextEvent = {
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: responseInstructions,
-            },
-          ],
-        },
-      };
-      ws.send(JSON.stringify(responseContextEvent));
+      (responseEvent.response as Record<string, unknown>).instructions =
+        responseInstructions;
     }
 
-    ws.send(JSON.stringify({ type: "response.create" }));
+    ws.send(JSON.stringify(responseEvent));
     this.log(roomId, "Response triggered");
-  }
-
-  private flushPendingResponse(roomId: string): void {
-    if (
-      !this.awaitingAudioCommit.has(roomId) &&
-      !this.pendingResponseInstructions.has(roomId)
-    ) {
-      return;
-    }
-
-    const ws = this.websockets.get(roomId);
-    const session = this.sessions.get(roomId);
-    if (!ws || ws.readyState !== WebSocket.OPEN || !session) {
-      return;
-    }
-
-    const responseInstructions = this.pendingResponseInstructions.get(roomId);
-    this.pendingResponseInstructions.delete(roomId);
-    this.awaitingAudioCommit.delete(roomId);
-
-    if (responseInstructions) {
-      const responseContextEvent = {
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: responseInstructions,
-            },
-          ],
-        },
-      };
-      ws.send(JSON.stringify(responseContextEvent));
-    }
-
-    ws.send(JSON.stringify({ type: "response.create" }));
-    this.log(roomId, "Response triggered (after commit ack)");
   }
 
   cancelResponse(roomId: string): void {
@@ -424,6 +353,9 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     };
     ws.send(JSON.stringify(cancelEvent));
     this.log(roomId, "Response cancelled");
+
+    // NOTE: Do NOT send input_audio_buffer.clear immediately after response.cancel
+    // xAI may reject this as invalid event. The buffer will be cleared on next PTT start.
 
     // Return to idle
     session.state = "idle";
@@ -494,15 +426,17 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       return;
     }
 
+    // Use "user" role since xAI may not support "system" in conversation items
+    // System instructions are set via session.update instead
     const contextEvent = {
       type: "conversation.item.create",
       item: {
         type: "message",
-        role: "system",
+        role: "user",
         content: [
           {
             type: "input_text",
-            text: context,
+            text: `[Context update: ${context}]`,
           },
         ],
       },
@@ -591,11 +525,14 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     const { personality, voiceOverride, topic, customInstructions, tools } =
       config;
     // FEAT-1007: Use voice override if provided, otherwise use personality default
-    const voice = voiceOverride || this.getVoice(personality);
+    const voice = formatXaiVoiceForApi(
+      voiceOverride || this.getVoice(personality),
+    );
     const temperature = this.getTemperature(personality);
     const registeredTools = tools || this.tools.get(roomId) || [];
 
-    // XAI session config format (compatible with OpenAI)
+    // Use nested audio format that works with voice preview
+    // This matches the xAI cookbook pattern and differs from OpenAI's flat format
     // Important: We explicitly set only custom function tools,
     // NOT the built-in web_search, x_search, or file_search
     const sessionConfig = {
@@ -608,7 +545,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
           customInstructions,
         ),
         voice,
-        // XAI supports multiple audio formats and rates
+        // Use xAI nested audio format (matches working voice preview)
         audio: {
           input: {
             format: {
@@ -625,7 +562,6 @@ export class XAIGrokProvider implements IVoiceAIProvider {
         },
         temperature,
         turn_detection: null, // Disabled - using PTT
-        // XAI emits conversation.item.input_audio_transcription.completed automatically
         // Custom function tools only (NOT web_search, x_search, file_search)
         tools: registeredTools.map((tool) => ({
           type: "function",
@@ -633,6 +569,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
           description: tool.description,
           parameters: tool.parameters,
         })),
+        tool_choice: registeredTools.length > 0 ? "auto" : "none",
       },
     };
 
@@ -696,7 +633,20 @@ FORBIDDEN:
 GOOD: "Matt, the answer is X. Try Y next."
 BAD: "Great question, Matt! So, let me break this down for you. There are several things to consider here..."
 
-Remember: This is VOICE. People are listening, not reading. Respect their time.`);
+Remember: This is VOICE. People are listening, not reading. Respect their time.
+
+## SEARCH CAPABILITY
+You have access to a webSearch function.
+When users say "search", "look up", "find", "google", or ask about current events/news or anything that requires up-to-date info, CALL webSearch instead of guessing.
+Extract a short, clean query from what the user said (remove filler words).
+Set searchType="images" when the user asks for pictures/photos/images. Set searchType="videos" when the user asks for videos. Otherwise use searchType="all".
+After webSearch returns, briefly summarize the top results.
+
+## VIDEO CONTROL CAPABILITY
+You have access to a playVideo function for controlling the shared video player and playlist.
+Use playVideo when the user says things like: "play videos", "watch videos", "show videos", "stop video", "pause video", "resume", "next video", "previous video", "replay", "rewind", "fast forward", "play video 3", "go to video 5".
+If the user mentions a time amount for rewind/fast forward (e.g. "30 seconds", "1 minute", "2 minutes"), extract it into seconds.
+If the user mentions a specific video number (e.g. "video 3"), use action="goto" with videoIndex=3 (1-indexed).`);
 
     // Personality-specific instructions
     if (personality === "custom" && customInstructions) {
@@ -735,7 +685,7 @@ Tailor your language and examples to this specific field.`);
   /**
    * Handle incoming WebSocket message
    *
-   * XAI uses the same event format as OpenAI (compatible API)
+   * Simplified to match OpenAI's event handling pattern
    */
   private handleMessage(roomId: string, data: string): void {
     try {
@@ -744,25 +694,42 @@ Tailor your language and examples to this specific field.`);
 
       if (!session) return;
 
-      // Log important events in debug mode
-      if (this.debug) {
-        const importantEvents = [
-          "session.created",
-          "session.updated",
-          "error",
-          "response.created",
-          "response.done",
-          "response.output_item.done",
-        ];
-        if (importantEvents.includes(event.type)) {
-          this.log(roomId, `Event: ${event.type}`);
-        }
+      // Log all events for debugging audio issues
+      const importantEvents = [
+        "session.created",
+        "session.updated",
+        "error",
+        "response.created",
+        "response.done",
+        "response.output_item.done",
+        "response.audio.delta",
+        "response.output_audio.delta",
+        "response.audio.done",
+        "response.output_audio.done",
+        "conversation.item.input_audio_transcription.completed",
+        "conversation.item.input_audio_transcription.failed",
+      ];
+      if (importantEvents.includes(event.type)) {
+        this.log(roomId, `Event: ${event.type}`);
       }
 
       switch (event.type) {
         case "session.created":
+        case "conversation.created":
+          // Send session config when we receive session.created (like voice preview)
+          if (!this.sessionConfigSent.get(roomId)) {
+            this.sessionConfigSent.set(roomId, true);
+            const pendingConfig = this.pendingConfigs.get(roomId);
+            if (pendingConfig) {
+              this.sendSessionConfig(roomId, pendingConfig);
+              this.pendingConfigs.delete(roomId);
+            }
+          }
+          break;
+
         case "session.updated":
           this.log(roomId, "Session ready");
+          this.callbacks.onReady?.(roomId);
           break;
 
         case "response.created":
@@ -776,6 +743,7 @@ Tailor your language and examples to this specific field.`);
 
         case "response.audio.delta":
         case "response.output_audio.delta":
+          // xAI may use either event name for audio output
           if (event.delta && !session.isInterrupted) {
             // Verify this is from the expected response
             const audioResponseId = event.response_id;
@@ -808,11 +776,11 @@ Tailor your language and examples to this specific field.`);
 
         case "response.audio.done":
         case "response.output_audio.done":
+          // xAI may use either event name for audio completion
           this.callbacks.onAudioDone?.(roomId);
           break;
 
         case "response.audio_transcript.done":
-        case "response.output_audio_transcript.done":
           if (event.transcript) {
             this.callbacks.onTranscript?.({
               roomId,
@@ -824,33 +792,44 @@ Tailor your language and examples to this specific field.`);
           break;
 
         case "conversation.item.input_audio_transcription.completed":
+          // Primary transcription event - same as OpenAI
+          this.log(
+            roomId,
+            `PTT Transcription received: "${event.transcript?.substring(0, 50)}..."`,
+          );
           if (event.transcript) {
             const transcript = event.transcript.trim();
             if (transcript.length >= 5) {
               // Skip very short transcripts
-              if (this.shouldEmitUserTranscript(roomId, transcript)) {
-                this.callbacks.onTranscript?.({
-                  roomId,
-                  text: transcript,
-                  isFinal: true,
-                  speakerId:
-                    session.activeSpeakerId ||
-                    session.lastSpeakerId ||
-                    undefined,
-                  speakerName:
-                    session.activeSpeakerName ||
-                    session.lastSpeakerName ||
-                    undefined,
-                  isUserInput: true,
-                });
-              }
+              this.callbacks.onTranscript?.({
+                roomId,
+                text: transcript,
+                isFinal: true,
+                speakerId:
+                  session.activeSpeakerId || session.lastSpeakerId || undefined,
+                speakerName:
+                  session.activeSpeakerName ||
+                  session.lastSpeakerName ||
+                  undefined,
+                isUserInput: true,
+              });
+            } else {
+              this.log(
+                roomId,
+                `PTT Transcription too short (${transcript.length} chars), skipping`,
+              );
             }
           }
           break;
 
+        case "conversation.item.input_audio_transcription.failed":
+          this.log(roomId, `Transcription failed: ${event.error || "Unknown"}`);
+          break;
+
         case "conversation.item.added":
-          // XAI may include user audio transcription on the item itself:
-          // item.role === "user" and item.content includes { type: "input_audio", transcript: "..." }
+          // xAI sends transcription via BOTH this event AND input_audio_transcription.completed
+          // We only use input_audio_transcription.completed to avoid duplicates
+          // Just log this for debugging
           if (
             event.item?.role === "user" &&
             Array.isArray(event.item?.content)
@@ -871,47 +850,13 @@ Tailor your language and examples to this specific field.`);
                 : "";
 
             if (transcript.length >= 5) {
-              if (this.shouldEmitUserTranscript(roomId, transcript)) {
-                this.callbacks.onTranscript?.({
-                  roomId,
-                  text: transcript,
-                  isFinal: true,
-                  speakerId:
-                    session.activeSpeakerId ||
-                    session.lastSpeakerId ||
-                    undefined,
-                  speakerName:
-                    session.activeSpeakerName ||
-                    session.lastSpeakerName ||
-                    undefined,
-                  isUserInput: true,
-                });
-              }
-            }
-
-            // Also treat this as the "audio commit has produced a user item" signal
-            if (this.awaitingAudioCommit.has(roomId)) {
               this.log(
                 roomId,
-                "Audio commit acknowledged via conversation.item.added (user)",
+                `PTT Transcription (via item.added, ignoring - using transcription.completed instead): "${transcript.substring(0, 50)}..."`,
               );
-              this.flushPendingResponse(roomId);
+              // Don't emit - let input_audio_transcription.completed handle it
             }
           }
-          break;
-
-        case "input_audio_buffer.committed":
-          if (this.awaitingAudioCommit.has(roomId)) {
-            this.log(
-              roomId,
-              "Audio commit acknowledged via input_audio_buffer.committed",
-            );
-            this.flushPendingResponse(roomId);
-          }
-          break;
-
-        case "conversation.item.input_audio_transcription.failed":
-          this.log(roomId, `Transcription failed: ${event.error || "Unknown"}`);
           break;
 
         case "response.done":
@@ -928,70 +873,18 @@ Tailor your language and examples to this specific field.`);
           break;
 
         case "response.output_item.done":
-          if (event.item) {
-            // XAI may differ slightly from OpenAI in the shape of tool/function calls.
-            // Support common variants:
-            // - item.type === "function_call" (OpenAI-like)
-            // - item.type === "tool_call" (alternate naming)
-            // - item.function: { name, arguments } (nested function payload)
-            const item = event.item as Record<string, unknown>;
-            const itemType = typeof item.type === "string" ? item.type : null;
-
-            const functionPayload =
-              typeof item.function === "object" && item.function !== null
-                ? (item.function as Record<string, unknown>)
-                : null;
-
-            const nameCandidate =
-              (typeof item.name === "string" ? item.name : null) ||
-              (functionPayload && typeof functionPayload.name === "string"
-                ? functionPayload.name
-                : null);
-
-            const callIdCandidate =
-              (typeof item.call_id === "string" ? item.call_id : null) ||
-              (typeof item.id === "string" ? item.id : null) ||
-              (typeof item.tool_call_id === "string"
-                ? item.tool_call_id
-                : null);
-
-            const argsStringCandidate =
-              (typeof item.arguments === "string" ? item.arguments : null) ||
-              (functionPayload && typeof functionPayload.arguments === "string"
-                ? functionPayload.arguments
-                : null) ||
-              null;
-
-            if (
-              (itemType === "function_call" || itemType === "tool_call") &&
-              nameCandidate &&
-              callIdCandidate
-            ) {
-              try {
-                const args = JSON.parse(argsStringCandidate || "{}");
-                this.callbacks.onFunctionCall?.(roomId, {
-                  name: nameCandidate,
-                  callId: callIdCandidate,
-                  arguments: args,
-                  rawArguments: argsStringCandidate || "{}",
-                });
-              } catch {
-                this.log(
-                  roomId,
-                  `Failed to parse function arguments: ${nameCandidate}`,
-                );
-              }
-            } else if (this.debug) {
-              // Log a compact shape to help adapt parsing without dumping huge payloads
-              const debugItem = {
-                type: itemType,
-                keys: Object.keys(item).slice(0, 20),
-                name: nameCandidate,
-              };
-              this.log(
-                roomId,
-                `output_item.done (non-function): ${JSON.stringify(debugItem)}`,
-              );
+          if (event.item?.type === "function_call") {
+            const { name, call_id, arguments: argsString } = event.item;
+            try {
+              const args = JSON.parse(argsString || "{}");
+              this.callbacks.onFunctionCall?.(roomId, {
+                name,
+                callId: call_id,
+                arguments: args,
+                rawArguments: argsString || "{}",
+              });
+            } catch {
+              this.log(roomId, `Failed to parse function arguments: ${name}`);
             }
           }
           break;

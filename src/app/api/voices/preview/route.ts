@@ -43,11 +43,11 @@ const PREVIEW_TEXTS: Record<string, string> = {
   verse:
     "Good day, I'm Verse. I speak with refined elegance and clear articulation.",
   // XAI voices
-  ara: "Hello, I'm Ara. I bring confidence and professionalism to every conversation.",
-  eve: "Hi there! I'm Eve, your friendly and approachable conversation partner.",
-  leo: "Hello, I'm Leo. I deliver authoritative and knowledgeable guidance.",
-  sal: "Hey! I'm Sal. I bring creativity and expressiveness to our discussions!",
-  rex: "Hello, I'm Rex. I speak with bold energy and commanding presence.",
+  ara: "Hi there! I'm Ara. I have a warm, friendly tone that's balanced and conversational.",
+  eve: "Hey! I'm Eve. I'm energetic and upbeat—great for interactive experiences.",
+  leo: "Hello, I'm Leo. I speak with an authoritative, strong tone—decisive and commanding.",
+  sal: "Hello, I'm Sal. I have a smooth, balanced voice that's versatile for many contexts.",
+  rex: "Hi, I'm Rex. I speak with a confident, clear tone—professional and articulate.",
   mika: "Hi, I'm Mika. I'm here to offer gentle, supportive guidance.",
   valentin:
     "Good evening, I'm Valentin. I speak with sophistication and charm.",
@@ -61,6 +61,12 @@ const OPENAI_REALTIME_MODEL = "gpt-4o-realtime-preview-2024-12-17";
 const XAI_REALTIME_URL = "wss://api.x.ai/v1/realtime";
 const XAI_REALTIME_CLIENT_SECRETS_URL =
   "https://api.x.ai/v1/realtime/client_secrets";
+
+const formatXaiVoiceForApi = (voice: string): string => {
+  const normalized = voice.trim().toLowerCase();
+  if (!normalized) return voice;
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
 
 const createXaiRealtimeClientSecret = async (): Promise<string> => {
   const apiKey = process.env.XAI_API_KEY;
@@ -292,6 +298,7 @@ async function generateXAIPreview(
   text: string,
 ): Promise<ArrayBuffer> {
   const clientSecret = await createXaiRealtimeClientSecret();
+  const xaiVoice = formatXaiVoiceForApi(voiceId);
 
   console.log(`[Voice Preview] Generating XAI preview for ${voiceId}`);
 
@@ -355,7 +362,7 @@ async function generateXAIPreview(
                 type: "session.update",
                 session: {
                   instructions: `You are a voice assistant. When asked to speak, say exactly what is requested without any additional commentary. Speak naturally and expressively.`,
-                  voice: voiceId,
+                  voice: xaiVoice,
                   audio: {
                     input: {
                       format: {
