@@ -18,6 +18,8 @@ import {
   Loader2,
   AlertCircle,
   X,
+  Share2,
+  Check,
 } from "lucide-react";
 import type { RoomSummary, RoomStatus } from "@/types/room";
 import { useLobbySocket } from "@/hooks/useLobbySocket";
@@ -133,6 +135,7 @@ export function RoomLobby({
   const [statusFilter, setStatusFilter] = useState<RoomStatus | "all">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
+  const [copiedRoomId, setCopiedRoomId] = useState<string | null>(null);
 
   /**
    * Handle real-time room updates from lobby socket
@@ -187,10 +190,20 @@ export function RoomLobby({
     setIsLoading(false);
   }, []);
 
+  /**
+   * Handle room deleted event from socket server
+   * Removes the room from the local state immediately
+   */
+  const handleRoomDeleted = useCallback((roomId: string) => {
+    console.log("[RoomLobby] Room deleted via socket:", roomId);
+    setRooms((prev) => prev.filter((room) => room.id !== roomId));
+  }, []);
+
   // Connect to lobby socket for real-time updates
   useLobbySocket({
     autoConnect: true,
     onRoomUpdated: handleRoomUpdated,
+    onRoomDeleted: handleRoomDeleted,
     onRoomsLoaded: handleRoomsLoaded,
   });
 
@@ -351,6 +364,30 @@ export function RoomLobby({
     [],
   );
 
+  /**
+   * Handle share room click - copies room URL to clipboard
+   */
+  const handleShareRoom = useCallback(
+    async (e: React.MouseEvent, roomId: string) => {
+      e.stopPropagation(); // Prevent triggering join
+
+      const roomUrl = `https://${roomId}.chnl.net`;
+
+      try {
+        await navigator.clipboard.writeText(roomUrl);
+        setCopiedRoomId(roomId);
+
+        // Reset copied state after 2 seconds
+        setTimeout(() => {
+          setCopiedRoomId(null);
+        }, 2000);
+      } catch (err) {
+        console.error("Failed to copy room URL:", err);
+      }
+    },
+    [],
+  );
+
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Header */}
@@ -482,6 +519,20 @@ export function RoomLobby({
                     >
                       {room.status}
                     </span>
+                    <button
+                      onClick={(e) => handleShareRoom(e, room.id)}
+                      className="p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                      aria-label={`Share ${room.name}`}
+                      title={
+                        copiedRoomId === room.id ? "Copied!" : "Copy room link"
+                      }
+                    >
+                      {copiedRoomId === room.id ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Share2 className="w-4 h-4" />
+                      )}
+                    </button>
                     {showDeleteButton && (
                       <button
                         onClick={(e) => handleDeleteRoom(e, room.id, room.name)}

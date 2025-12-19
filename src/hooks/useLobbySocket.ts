@@ -32,6 +32,8 @@ export interface UseLobbySocketOptions {
   url?: string;
   /** Callback when a room is updated */
   onRoomUpdated?: (room: RoomSummary) => void;
+  /** Callback when a room is deleted */
+  onRoomDeleted?: (roomId: string) => void;
   /** Callback when initial room list is received on connect */
   onRoomsLoaded?: (rooms: RoomSummary[]) => void;
 }
@@ -69,18 +71,29 @@ export interface UseLobbySocketReturn {
 export function useLobbySocket(
   options: UseLobbySocketOptions = {},
 ): UseLobbySocketReturn {
-  const { autoConnect = true, url, onRoomUpdated, onRoomsLoaded } = options;
+  const {
+    autoConnect = true,
+    url,
+    onRoomUpdated,
+    onRoomDeleted,
+    onRoomsLoaded,
+  } = options;
 
   const [connectionState, setConnectionState] =
     useState<LobbyConnectionState>("disconnected");
   const socketRef = useRef<Socket | null>(null);
   const onRoomUpdatedRef = useRef(onRoomUpdated);
+  const onRoomDeletedRef = useRef(onRoomDeleted);
   const onRoomsLoadedRef = useRef(onRoomsLoaded);
 
   // Keep callback refs updated
   useEffect(() => {
     onRoomUpdatedRef.current = onRoomUpdated;
   }, [onRoomUpdated]);
+
+  useEffect(() => {
+    onRoomDeletedRef.current = onRoomDeleted;
+  }, [onRoomDeleted]);
 
   useEffect(() => {
     onRoomsLoadedRef.current = onRoomsLoaded;
@@ -135,6 +148,11 @@ export function useLobbySocket(
     socket.on("room:updated", (room: RoomSummary) => {
       console.log(`[LobbySocket] Room updated: ${room.id}`, room);
       onRoomUpdatedRef.current?.(room);
+    });
+
+    socket.on("room:deleted", (payload: { roomId: string }) => {
+      console.log(`[LobbySocket] Room deleted: ${payload.roomId}`);
+      onRoomDeletedRef.current?.(payload.roomId);
     });
 
     socketRef.current = socket;

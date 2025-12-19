@@ -2700,9 +2700,59 @@ app
   .prepare()
   .then(() => {
     console.log("[Server] Next.js app prepared successfully");
-    // Create HTTP server
-    const httpServer = createServer((req, res) => {
+    // Create HTTP server with internal API endpoints
+    const httpServer = createServer(async (req, res) => {
       const parsedUrl = parse(req.url || "", true);
+
+      // Internal API: Room deleted notification from Next.js API
+      // POST /internal/room-deleted { roomId: string }
+      if (
+        req.method === "POST" &&
+        parsedUrl.pathname === "/internal/room-deleted"
+      ) {
+        // Only allow internal requests (localhost)
+        const host = req.headers.host || "";
+        const isInternal =
+          host.startsWith("localhost") || host.startsWith("127.0.0.1");
+
+        if (!isInternal) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Forbidden" }));
+          return;
+        }
+
+        // Parse request body
+        let body = "";
+        req.on("data", (chunk) => {
+          body += chunk;
+        });
+        req.on("end", () => {
+          try {
+            const { roomId } = JSON.parse(body);
+            if (!roomId) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "roomId required" }));
+              return;
+            }
+
+            // Handle room deletion (will be defined after io is created)
+            const result = handleRoomDeleted(roomId);
+
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (error) {
+            console.error(
+              "[Internal API] Error parsing room-deleted request:",
+              error,
+            );
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid JSON" }));
+          }
+        });
+        return;
+      }
+
+      // Default: pass to Next.js
       handle(req, res, parsedUrl);
     });
 
@@ -2754,6 +2804,76 @@ app
         `[Lobby] Broadcasting room update: ${room.id} - status: ${summary.status}, participants: ${summary.participantCount}/${summary.maxParticipants} (${clientCount} lobby clients)`,
       );
       io.of("/lobby").to(LOBBY_ROOM).emit("room:updated", summary);
+    }
+
+    /**
+     * Handle room deletion notification from API
+     * - Ejects all participants with room:closed event
+     * - Cleans up AI session, video state, context
+     * - Removes room from socket server's memory
+     * - Broadcasts room:deleted to lobby
+     */
+    function handleRoomDeleted(roomId: string): {
+      ejectedPeers: number;
+      roomExisted: boolean;
+    } {
+      console.log(`[Internal API] Processing room deletion: ${roomId}`);
+
+      const room = rooms.get(roomId);
+      const peers = roomPeers.get(roomId);
+      let ejectedPeers = 0;
+
+      // Eject all participants in this room
+      if (peers && peers.size > 0) {
+        console.log(
+          `[Internal API] Ejecting ${peers.size} peers from room ${roomId}`,
+        );
+
+        // Find all sockets in this room and notify them
+        for (const [socketId, mapping] of socketToPeer.entries()) {
+          if (mapping.roomId === roomId) {
+            const socket = io.sockets.sockets.get(socketId);
+            if (socket) {
+              // Notify the peer that the room was closed/deleted
+              socket.emit("room:closed", {
+                roomId,
+                reason: "Room has been deleted",
+              });
+              // Leave the socket.io room
+              socket.leave(roomId);
+              ejectedPeers++;
+            }
+            // Clean up the mapping
+            socketToPeer.delete(socketId);
+          }
+        }
+
+        // Clear all peers from this room
+        roomPeers.delete(roomId);
+      }
+
+      // Clean up AI session
+      cleanupAISession(roomId);
+
+      // Clean up video state
+      cleanupVideoState(roomId);
+
+      // Remove room from socket server's memory
+      const roomExisted = rooms.delete(roomId);
+
+      // Broadcast room:deleted to lobby subscribers
+      const lobbyRoom = io.of("/lobby").adapter.rooms.get(LOBBY_ROOM);
+      const clientCount = lobbyRoom ? lobbyRoom.size : 0;
+      console.log(
+        `[Lobby] Broadcasting room:deleted for ${roomId} (${clientCount} lobby clients)`,
+      );
+      io.of("/lobby").to(LOBBY_ROOM).emit("room:deleted", { roomId });
+
+      console.log(
+        `[Internal API] Room ${roomId} deletion complete - ejected: ${ejectedPeers}, existed: ${roomExisted}`,
+      );
+
+      return { ejectedPeers, roomExisted };
     }
 
     // Socket.io connection handler
