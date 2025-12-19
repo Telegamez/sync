@@ -697,7 +697,7 @@ Tailor your language and examples to this specific field.`);
 
       if (!session) return;
 
-      // Log all events for debugging audio issues
+      // Log important events for debugging
       const importantEvents = [
         "session.created",
         "session.updated",
@@ -705,10 +705,8 @@ Tailor your language and examples to this specific field.`);
         "response.created",
         "response.done",
         "response.output_item.done",
-        "response.audio.delta",
-        "response.output_audio.delta",
-        "response.audio.done",
         "response.output_audio.done",
+        "response.output_audio_transcript.done",
         "conversation.item.input_audio_transcription.completed",
         "conversation.item.input_audio_transcription.failed",
       ];
@@ -784,7 +782,14 @@ Tailor your language and examples to this specific field.`);
           break;
 
         case "response.audio_transcript.done":
+        case "response.output_audio_transcript.done":
+          // xAI uses response.output_audio_transcript.done for AI response transcripts
+          // OpenAI uses response.audio_transcript.done
           if (event.transcript) {
+            this.log(
+              roomId,
+              `AI response transcript: "${event.transcript.substring(0, 50)}..."`,
+            );
             this.callbacks.onTranscript?.({
               roomId,
               text: event.transcript,
@@ -890,6 +895,7 @@ Tailor your language and examples to this specific field.`);
               this.log(roomId, `Failed to parse function arguments: ${name}`);
             }
           }
+          // Note: AI response transcript comes via response.output_audio_transcript.done event
           break;
 
         case "error":

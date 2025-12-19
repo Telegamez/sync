@@ -216,30 +216,25 @@ export function RoomLobby({
         // Merge API rooms with existing socket data
         // API data is used for room metadata (name, description, etc.)
         // Socket data is authoritative for participant counts and status
+        // IMPORTANT: Only keep rooms that match the API response (respects filter)
         setRooms((prev) => {
-          const merged = new Map<string, RoomSummary>();
+          const prevByIds = new Map<string, RoomSummary>();
+          prev.forEach((room) => prevByIds.set(room.id, room));
 
-          // Add API rooms first (may have stale participant counts)
-          result.rooms.forEach((room) => merged.set(room.id, room));
-
-          // Override with existing socket data (accurate participant counts)
-          // This preserves real-time state from socket updates
-          prev.forEach((room) => {
-            const existing = merged.get(room.id);
-            if (existing) {
+          // Only include rooms from the API response (filtered results)
+          // Update with socket data for accurate participant counts
+          return result.rooms.map((room) => {
+            const socketRoom = prevByIds.get(room.id);
+            if (socketRoom) {
               // Merge: use API metadata but socket participant data
-              merged.set(room.id, {
-                ...existing,
-                participantCount: room.participantCount,
-                status: room.status,
-              });
-            } else {
-              // Room exists in socket data but not API (shouldn't happen, but keep it)
-              merged.set(room.id, room);
+              return {
+                ...room,
+                participantCount: socketRoom.participantCount,
+                status: socketRoom.status,
+              };
             }
+            return room;
           });
-
-          return Array.from(merged.values());
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load rooms");
