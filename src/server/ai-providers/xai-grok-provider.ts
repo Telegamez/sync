@@ -84,6 +84,8 @@ export class XAIGrokProvider implements IVoiceAIProvider {
   private tools: Map<string, FunctionToolDefinition[]> = new Map();
   private pendingConfigs: Map<string, VoiceAISessionConfig> = new Map();
   private sessionConfigSent: Map<string, boolean> = new Map();
+  /** Context to include in the next response.create instructions */
+  private responseContext: Map<string, string> = new Map();
   private debug: boolean;
 
   constructor(apiKey: string, debug = false) {
@@ -212,6 +214,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     this.tools.delete(roomId);
     this.pendingConfigs.delete(roomId);
     this.sessionConfigSent.delete(roomId);
+    this.responseContext.delete(roomId);
     this.log(roomId, "Session closed");
   }
 
@@ -325,11 +328,25 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       },
     };
 
-    // Add per-response instructions if provided
-    if (responseInstructions) {
+    // Build combined instructions from:
+    // 1. Stored context (speaker attribution, conversation history)
+    // 2. Per-response instructions from caller
+    const contextForResponse = this.responseContext.get(roomId);
+    const combinedInstructions = [contextForResponse, responseInstructions]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (combinedInstructions) {
       (responseEvent.response as Record<string, unknown>).instructions =
-        responseInstructions;
+        combinedInstructions;
+      this.log(
+        roomId,
+        `Response with context (${combinedInstructions.length} chars)`,
+      );
     }
+
+    // Clear the context after using it (one-time use per response)
+    this.responseContext.delete(roomId);
 
     ws.send(JSON.stringify(responseEvent));
     this.log(roomId, "Response triggered");
@@ -421,28 +438,14 @@ export class XAIGrokProvider implements IVoiceAIProvider {
   // ============================================================
 
   injectContext(roomId: string, context: string): void {
-    const ws = this.websockets.get(roomId);
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    // Use "user" role since xAI may not support "system" in conversation items
-    // System instructions are set via session.update instead
-    const contextEvent = {
-      type: "conversation.item.create",
-      item: {
-        type: "message",
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: `[Context update: ${context}]`,
-          },
-        ],
-      },
-    };
-    ws.send(JSON.stringify(contextEvent));
-    this.log(roomId, "Context injected");
+    // Store context to be included in the next response.create instructions
+    // This avoids using conversation.item.create which triggers unwanted responses
+    // and is sensitive to timing with xAI's API
+    this.responseContext.set(roomId, context);
+    this.log(
+      roomId,
+      `Context stored for next response (${context.length} chars)`,
+    );
   }
 
   // ============================================================

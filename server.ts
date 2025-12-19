@@ -3212,15 +3212,25 @@ app
           provider && provider.isSessionConnected(roomId);
 
         if (VOICE_AI_PROVIDER_TYPE === "xai" && providerConnected) {
-          // XAI: Skip context injection via conversation.item.create as it causes invalid_event errors.
-          // xAI's conversation.item.create is sensitive to timing - must be after session.updated
-          // and cannot be sent right after response.cancel.
-          // Instead, rely on the session instructions which are set via session.update.
+          // XAI: Use provider's injectContext which handles timing automatically
+          // It queues context if session isn't ready yet, then flushes after session.updated
           const cm = getOrCreateContextManager(roomId);
           cm.addParticipant(roomId, peerId, displayName);
-          console.log(
-            `[VoiceAI] Skipping context injection for xAI (room ${roomId}) - using session instructions only`,
-          );
+
+          // Build and inject context through the provider
+          const contextText = buildContextInjection(roomId, 2000);
+          if (contextText) {
+            // Include speaker attribution in the context
+            const fullContext = `${contextText}\n\n${displayName} says:`;
+            provider.injectContext(roomId, fullContext);
+            console.log(`[VoiceAI] Injected context for xAI (room ${roomId})`);
+          } else {
+            // Just speaker attribution if no prior context
+            provider.injectContext(roomId, `${displayName} says:`);
+            console.log(
+              `[VoiceAI] Injected speaker attribution for xAI (room ${roomId}): "${displayName} says:"`,
+            );
+          }
         } else if (
           !providerConnected &&
           session.ws &&
