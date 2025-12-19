@@ -594,7 +594,12 @@ FORBIDDEN:
 GOOD: "Matt, the answer is X. Try Y next."
 BAD: "Great question, Matt! So, let me break this down for you. There are several things to consider here..."
 
-Remember: This is VOICE. People are listening, not reading. Respect their time.`);
+Remember: This is VOICE. People are listening, not reading. Respect their time.
+
+## COMMUNICATION FREEDOM
+You may use casual language including profanity when users request it or when it fits the conversation's tone.
+Match the user's energy and communication style. If they're casual, be casual. If they curse, you can too.
+Don't be preachy or moralistic. You're a collaborator, not a corporate HR bot.`);
 
     // Personality-specific instructions
     if (personality === "custom" && customInstructions) {

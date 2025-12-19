@@ -874,6 +874,7 @@ function cleanupContextManager(roomId: string): void {
 /**
  * Build context injection text from recent conversation history
  * Returns formatted context string for AI
+ * Includes: room participants, summaries (older context), and recent messages
  */
 function buildContextInjection(
   roomId: string,
@@ -882,42 +883,84 @@ function buildContextInjection(
   const cm = roomContextManagers.get(roomId);
   if (!cm) return "";
 
-  const messages = cm.getMessages(roomId);
-  if (messages.length === 0) return "";
+  const context = cm.exportContext(roomId);
+  if (!context) return "";
 
-  // Get the last N messages that fit within token budget
-  const recentMessages: ConversationMessage[] = [];
+  const messages = context.messages;
+  const summaries = context.summaries;
+
+  const contextParts: string[] = [];
   let tokenCount = 0;
 
-  // Iterate from newest to oldest
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    const msgTokens = msg.tokenEstimate || Math.ceil(msg.content.length / 4);
-
-    if (tokenCount + msgTokens > maxTokens) break;
-
-    recentMessages.unshift(msg);
-    tokenCount += msgTokens;
+  // First, include current room participants
+  const currentPeers = getRoomPeerSummaries(roomId);
+  if (currentPeers.length > 0) {
+    const participantNames = currentPeers.map((p) => p.displayName);
+    contextParts.push("## ROOM PARTICIPANTS");
+    contextParts.push(`Currently in this room: ${participantNames.join(", ")}`);
+    contextParts.push("Address participants by name when responding.");
+    contextParts.push("");
+    tokenCount += 20; // Rough estimate for participant list
   }
 
-  if (recentMessages.length === 0) return "";
+  // If no messages and no summaries, just return participants
+  if (messages.length === 0 && summaries.length === 0) {
+    return contextParts.length > 0 ? contextParts.join("\n") : "";
+  }
 
-  // Format as context string
-  const contextParts = [
-    "## RECENT CONVERSATION CONTEXT",
-    "Here is what was discussed recently in this room. Use this context to provide more relevant and informed responses.",
-    "",
-  ];
+  // First, include summaries (older context that was compressed)
+  if (summaries.length > 0) {
+    contextParts.push("## CONVERSATION SUMMARY");
+    contextParts.push(
+      "Here is a summary of what was discussed earlier in this room:",
+    );
+    contextParts.push("");
 
-  for (const msg of recentMessages) {
-    const timestamp = msg.timestamp.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    const speaker =
-      msg.role === "assistant" ? "AI" : msg.speakerName || "Unknown";
-    contextParts.push(`[${timestamp}] ${speaker}: ${msg.content}`);
+    for (const summary of summaries) {
+      const summaryTokens =
+        summary.summaryTokens || Math.ceil(summary.content.length / 4);
+      if (tokenCount + summaryTokens > maxTokens * 0.4) break; // Reserve 60% for recent messages
+      contextParts.push(summary.content);
+      tokenCount += summaryTokens;
+    }
+    contextParts.push("");
+  }
+
+  // Then include recent messages
+  if (messages.length > 0) {
+    // Get the last N messages that fit within remaining token budget
+    const recentMessages: ConversationMessage[] = [];
+    const remainingTokens = maxTokens - tokenCount;
+
+    // Iterate from newest to oldest
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const msgTokens = msg.tokenEstimate || Math.ceil(msg.content.length / 4);
+
+      if (tokenCount + msgTokens > remainingTokens) break;
+
+      recentMessages.unshift(msg);
+      tokenCount += msgTokens;
+    }
+
+    if (recentMessages.length > 0) {
+      contextParts.push("## RECENT CONVERSATION");
+      contextParts.push(
+        "Here is what was discussed recently. Use this to provide relevant responses.",
+      );
+      contextParts.push("");
+
+      for (const msg of recentMessages) {
+        const timestamp = msg.timestamp.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+        const speaker =
+          msg.role === "assistant" ? "AI" : msg.speakerName || "Unknown";
+        contextParts.push(`[${timestamp}] ${speaker}: ${msg.content}`);
+      }
+    }
   }
 
   return contextParts.join("\n");
@@ -2581,8 +2624,11 @@ function removePeerFromRoom(
 ): void {
   console.log(`[Socket.io] Peer ${peerId} leaving room ${roomId} (${reason})`);
 
-  // Remove from room peers tracking
+  // Capture peer name before deletion for AI context
   const peers = roomPeers.get(roomId);
+  const leavingPeerName = peers?.get(peerId)?.displayName || peerId;
+
+  // Remove from room peers tracking
   if (peers) {
     peers.delete(peerId);
     if (peers.size === 0) {
@@ -2620,6 +2666,24 @@ function removePeerFromRoom(
 
   // Broadcast peer:left to others
   socket.to(roomId).emit("peer:left", peerId);
+
+  // XAI: Inject room participants context when someone leaves
+  const provider = getVoiceAIProvider();
+  if (
+    VOICE_AI_PROVIDER_TYPE === "xai" &&
+    provider &&
+    provider.isSessionConnected(roomId) &&
+    peers &&
+    peers.size > 0
+  ) {
+    const remainingPeers = getRoomPeerSummaries(roomId);
+    const participantNames = remainingPeers.map((p) => p.displayName);
+    const participantsContext = `[Room update: ${leavingPeerName} left. ${participantNames.length} participants remaining - ${participantNames.join(", ")}.]`;
+    provider.injectContext(roomId, participantsContext);
+    console.log(
+      `[VoiceAI] Injected room participants for xAI on leave: ${participantNames.join(", ")}`,
+    );
+  }
 
   // Broadcast room update to lobby subscribers
   if (room) {
@@ -2831,6 +2895,24 @@ app
 
         // FEAT-803: Send current video state to late joiner
         broadcastVideoState(socket, roomId);
+
+        // XAI: Inject room participants context when someone joins
+        // This keeps the AI informed about who is in the room without
+        // flooding context on every PTT
+        const provider = getVoiceAIProvider();
+        if (
+          VOICE_AI_PROVIDER_TYPE === "xai" &&
+          provider &&
+          provider.isSessionConnected(roomId)
+        ) {
+          const currentPeers = getRoomPeerSummaries(roomId);
+          const participantNames = currentPeers.map((p) => p.displayName);
+          const participantsContext = `[Room update: ${participantNames.length} participants - ${participantNames.join(", ")}. ${displayName} just joined.]`;
+          provider.injectContext(roomId, participantsContext);
+          console.log(
+            `[VoiceAI] Injected room participants for xAI on join: ${participantNames.join(", ")}`,
+          );
+        }
 
         // Broadcast room update to lobby subscribers
         broadcastRoomUpdate(room);
@@ -3212,8 +3294,8 @@ app
           provider && provider.isSessionConnected(roomId);
 
         if (VOICE_AI_PROVIDER_TYPE === "xai" && providerConnected) {
-          // XAI: Use provider's injectContext which handles timing automatically
-          // It queues context if session isn't ready yet, then flushes after session.updated
+          // XAI: Use provider's injectContext which stores context for response.create
+          // Context is included in response.create instructions, not conversation.item.create
           const cm = getOrCreateContextManager(roomId);
           cm.addParticipant(roomId, peerId, displayName);
 

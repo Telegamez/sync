@@ -320,7 +320,9 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       activeSpeakerName: session.activeSpeakerName,
     });
 
-    // xAI is OpenAI-compatible: use same format as OpenAI provider
+    // Build response event
+    // NOTE: Context is now in session instructions via session.update in injectContext()
+    // Only include per-response instructions here if provided
     const responseEvent: Record<string, unknown> = {
       type: "response.create",
       response: {
@@ -328,25 +330,15 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       },
     };
 
-    // Build combined instructions from:
-    // 1. Stored context (speaker attribution, conversation history)
-    // 2. Per-response instructions from caller
-    const contextForResponse = this.responseContext.get(roomId);
-    const combinedInstructions = [contextForResponse, responseInstructions]
-      .filter(Boolean)
-      .join("\n\n");
-
-    if (combinedInstructions) {
+    // Add per-response instructions if provided (speaker name, etc.)
+    if (responseInstructions) {
       (responseEvent.response as Record<string, unknown>).instructions =
-        combinedInstructions;
+        responseInstructions;
       this.log(
         roomId,
-        `Response with context (${combinedInstructions.length} chars)`,
+        `Response with instructions (${responseInstructions.length} chars)`,
       );
     }
-
-    // Clear the context after using it (one-time use per response)
-    this.responseContext.delete(roomId);
 
     ws.send(JSON.stringify(responseEvent));
     this.log(roomId, "Response triggered");
@@ -438,13 +430,47 @@ export class XAIGrokProvider implements IVoiceAIProvider {
   // ============================================================
 
   injectContext(roomId: string, context: string): void {
-    // Store context to be included in the next response.create instructions
-    // This avoids using conversation.item.create which triggers unwanted responses
-    // and is sensitive to timing with xAI's API
-    this.responseContext.set(roomId, context);
+    const ws = this.websockets.get(roomId);
+    const session = this.sessions.get(roomId);
+
+    if (!ws || ws.readyState !== WebSocket.OPEN || !session) {
+      // Store for later if not connected
+      this.responseContext.set(roomId, context);
+      this.log(
+        roomId,
+        `Context stored (not connected, ${context.length} chars)`,
+      );
+      return;
+    }
+
+    // Update session instructions to include context
+    // This puts context in the AI's base instructions, not per-response
+    const baseInstructions = this.generateInstructions(
+      session.personality,
+      session.topic,
+      session.customInstructions,
+    );
+
+    // Add clarifying note about identity to prevent confusion
+    const clarifiedContext = `## CURRENT CONVERSATION CONTEXT
+NOTE: You are TELLY (the AI assistant). The participants listed below are HUMANS in the room - they are NOT you.
+When someone speaks to you via PTT, respond to what they SAY in the audio.
+
+${context}`;
+
+    const updatedInstructions = `${baseInstructions}\n\n${clarifiedContext}`;
+
+    const sessionUpdate = {
+      type: "session.update",
+      session: {
+        instructions: updatedInstructions,
+      },
+    };
+
+    ws.send(JSON.stringify(sessionUpdate));
     this.log(
       roomId,
-      `Context stored for next response (${context.length} chars)`,
+      `Context injected via session.update (${context.length} chars)`,
     );
   }
 
@@ -637,6 +663,11 @@ GOOD: "Matt, the answer is X. Try Y next."
 BAD: "Great question, Matt! So, let me break this down for you. There are several things to consider here..."
 
 Remember: This is VOICE. People are listening, not reading. Respect their time.
+
+## COMMUNICATION FREEDOM
+You may use casual language including profanity when users request it or when it fits the conversation's tone.
+Match the user's energy and communication style. If they're casual, be casual. If they curse, you can too.
+Don't be preachy or moralistic. You're a collaborator, not a corporate HR bot.
 
 ## SEARCH CAPABILITY
 You have access to a webSearch function.
@@ -868,9 +899,25 @@ Tailor your language and examples to this specific field.`);
           break;
 
         case "response.done":
+          // Check if this is from the expected response to filter stale events
+          // Stale response.done can arrive after we've cancelled and started a new response
+          const doneResponseId = event.response?.id;
+          if (
+            session.expectedResponseId &&
+            doneResponseId &&
+            doneResponseId !== session.expectedResponseId
+          ) {
+            this.log(
+              roomId,
+              `Ignoring stale response.done (got ${doneResponseId}, expected ${session.expectedResponseId})`,
+            );
+            break;
+          }
+
           session.state = "idle";
           session.activeSpeakerId = null;
           session.activeSpeakerName = null;
+          session.expectedResponseId = null;
           this.sessions.set(roomId, session);
           this.callbacks.onStateChange?.({
             roomId,
