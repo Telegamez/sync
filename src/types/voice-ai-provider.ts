@@ -616,6 +616,8 @@ export interface ProviderSessionState {
   isConnecting: boolean;
   isConnected: boolean;
   personality: AIPersonality;
+  /** Voice override - preserves selected voice across session.update calls */
+  voiceOverride?: string;
   topic?: string;
   customInstructions?: string;
   isInterrupted: boolean;

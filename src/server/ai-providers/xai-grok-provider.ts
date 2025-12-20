@@ -110,8 +110,14 @@ export class XAIGrokProvider implements IVoiceAIProvider {
   // ============================================================
 
   async createSession(config: VoiceAISessionConfig): Promise<void> {
-    const { roomId, personality, topic, customInstructions, speakerName } =
-      config;
+    const {
+      roomId,
+      personality,
+      voiceOverride,
+      topic,
+      customInstructions,
+      speakerName,
+    } = config;
 
     // Check if session already exists
     const existingSession = this.sessions.get(roomId);
@@ -120,7 +126,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       return;
     }
 
-    // Create session state
+    // Create session state - store voiceOverride for use in subsequent session.update calls
     const session: ProviderSessionState = {
       roomId,
       state: "idle",
@@ -129,6 +135,7 @@ export class XAIGrokProvider implements IVoiceAIProvider {
       isConnecting: true,
       isConnected: false,
       personality,
+      voiceOverride, // FEAT-1007: Preserve voice selection across session updates
       topic,
       customInstructions,
       isInterrupted: false,
@@ -241,6 +248,9 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     if (updates.personality !== undefined) {
       session.personality = updates.personality;
     }
+    if (updates.voiceOverride !== undefined) {
+      session.voiceOverride = updates.voiceOverride;
+    }
     if (updates.topic !== undefined) {
       session.topic = updates.topic;
     }
@@ -249,10 +259,11 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     }
     this.sessions.set(roomId, session);
 
-    // Send updated config to XAI
+    // Send updated config to XAI - FEAT-1007: Include stored voiceOverride
     this.sendSessionConfig(roomId, {
       roomId,
       personality: session.personality,
+      voiceOverride: session.voiceOverride,
       topic: session.topic,
       customInstructions: session.customInstructions,
       tools: updates.tools || this.tools.get(roomId),
@@ -411,12 +422,14 @@ export class XAIGrokProvider implements IVoiceAIProvider {
     this.log(roomId, `Registered ${tools.length} tools`);
 
     // If session is connected, update the session config
+    // FEAT-1007: Include stored voiceOverride to preserve voice selection
     if (this.isSessionConnected(roomId)) {
       const session = this.sessions.get(roomId);
       if (session) {
         this.sendSessionConfig(roomId, {
           roomId,
           personality: session.personality,
+          voiceOverride: session.voiceOverride,
           topic: session.topic,
           customInstructions: session.customInstructions,
           tools,
@@ -460,17 +473,24 @@ ${context}`;
 
     const updatedInstructions = `${baseInstructions}\n\n${clarifiedContext}`;
 
+    // FEAT-1007: Include voice in session.update to prevent XAI from resetting to default
+    // XAI's session.update may replace (not merge) session config, so we must include voice
+    const voice = formatXaiVoiceForApi(
+      session.voiceOverride || this.getVoice(session.personality),
+    );
+
     const sessionUpdate = {
       type: "session.update",
       session: {
         instructions: updatedInstructions,
+        voice, // FEAT-1007: Preserve voice on context injection
       },
     };
 
     ws.send(JSON.stringify(sessionUpdate));
     this.log(
       roomId,
-      `Context injected via session.update (${context.length} chars)`,
+      `Context injected via session.update (${context.length} chars, voice=${voice})`,
     );
   }
 
